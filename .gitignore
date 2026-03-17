@@ -1,0 +1,32 @@
+# Flutter/Dart
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.packages
+**/analyze_output.txt
+**/err.txt
+**/out.txt
+
+# Environment variables
+.env
+.env.*
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project specific
+_bmad/
+_bmad-output/
+agent/
+.agent/
+brain/
+artifacts/
+logs/
