@@ -138,37 +138,63 @@ class _SwipeScreenState extends State<SwipeScreen> {
   int _calculateMatchScore(Map<String, dynamic> job) {
     if (_userSkills.isEmpty) return 0;
 
-    double score = 0;
-    final jobTags = List<String>.from(job['tags'] ?? []).map((t) => t.toLowerCase()).toList();
-    final jobSpecialty = (job['specialty'] as String?)?.toLowerCase() ?? '';
+    double maxScore = 0;
+    
+    // Normalisation basique (minuscules)
     final jobTitle = (job['job_title'] as String?)?.toLowerCase() ?? '';
+    final jobSpecialty = (job['specialty'] as String?)?.toLowerCase() ?? '';
     final jobDescription = (job['description'] as String?)?.toLowerCase() ?? '';
+    final jobTags = List<String>.from(job['tags'] ?? []).map((t) => t.toLowerCase()).toList();
 
     for (final skill in _userSkills) {
+      double currentSectorScore = 0;
+      final skillLower = skill.toLowerCase();
+      
+      // 1. MATCH DIRECT DE SPÉCIALITÉ (GROS POIDS)
+      // Si la spécialité du job est exactement le secteur de l'utilisateur
+      if (jobSpecialty == skillLower || jobSpecialty.contains(skillLower)) {
+        currentSectorScore += 60;
+      }
+
+      // 2. RECHERCHE DE MOTS-CLÉS SPÉCIFIQUES AU SECTEUR
       final keywords = _getExpandedKeywords(skill);
-      int skillHits = 0;
+      int keywordHitsInTitle = 0;
+      int keywordHitsInTags = 0;
 
       for (final keyword in keywords) {
-        if (jobTitle.contains(keyword)) {
-          score += 35;
-          skillHits++;
+        final kw = keyword.toLowerCase();
+        
+        // Poids fort si présent dans le titre
+        if (jobTitle.contains(kw)) {
+          keywordHitsInTitle++;
         }
-        if (jobSpecialty.contains(keyword)) {
-          score += 30;
-          skillHits++;
+        
+        // Poids moyen si présent dans les tags
+        if (jobTags.any((tag) => tag.contains(kw))) {
+          keywordHitsInTags++;
         }
-        if (jobTags.any((t) => t.contains(keyword))) {
-          score += 25;
-          skillHits++;
+
+        // Poids léger dans la description
+        if (jobDescription.contains(kw)) {
+          currentSectorScore += 2;
         }
-        if (jobDescription.contains(keyword) && skillHits < 4) {
-          score += 8;
-          skillHits++;
-        }
+      }
+
+      // Calcul des points par mots-clés (plafonné pour éviter l'inflation)
+      currentSectorScore += (keywordHitsInTitle > 0 ? 30 : 0);
+      currentSectorScore += (keywordHitsInTags > 0 ? 10 : 0);
+      
+      // Bonus si plusieurs mots-clés dans le titre
+      if (keywordHitsInTitle > 1) currentSectorScore += 10;
+
+      if (currentSectorScore > maxScore) {
+        maxScore = currentSectorScore;
       }
     }
 
-    return (score / _userSkills.length).clamp(0, 100).toInt();
+    // Un job qui ne correspond à aucun mot-clé d'aucun secteur choisi
+    // mais qui est dans la base doit quand même avoir un micro score ou 0
+    return maxScore.clamp(0, 100).toInt();
   }
 
   bool _onSwipe(
@@ -210,6 +236,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
       // 3. Traitement spécifique si c'est un swipe DROITE (postulation)
       if (direction == 'right') {
+        debugPrint('*** [DIAGNOSTIC] DÉBUT SWIPE DROITE DÉTECTÉ ***');
+        
         // Enregistrer la postulation
         await _supabase.from('applications').insert({
           'user_id': userId,
@@ -217,23 +245,81 @@ class _SwipeScreenState extends State<SwipeScreen> {
           'status': 'pending',
         });
 
+        debugPrint('*** [DIAGNOSTIC] URL CV: $_cvUrl ***');
+
         // 4. Appel de la fonction Edge pour envoyer l'email avec le CV
         if (_cvUrl != null && _cvUrl!.isNotEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Envoi de la candidature en cours...'),
+                duration: Duration(milliseconds: 1000),
+              ),
+            );
+          }
+          
           try {
-            await _supabase.functions.invoke(
+            final session = _supabase.auth.currentSession;
+            final token = session?.accessToken;
+            
+            debugPrint('*** [DIAGNOSTIC] APPEL EDGE FUNCTION... ***');
+
+            final response = await _supabase.functions.invoke(
               'apply-to-job',
               body: {
                 'jobTitle': job['job_title'],
                 'jobCompany': job['company_name'],
+                'jobContactEmail': job['contact_email'],
                 'cvUrl': _cvUrl,
                 'userName': _fullName,
-                // On pourrait ajouter le message premium ici si c'était implémenté dans l'UI
                 'message': null, 
               },
+              headers: {
+                'Authorization': 'Bearer ${token ?? ''}',
+              },
             );
+            
+            debugPrint('*** [DIAGNOSTIC] RÉPONSE SERVEUR: ${response.status} - ${response.data} ***');
+            
+            if (response.status == 200) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).clearSnackBars();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Candidature envoyée avec succès'), 
+                    backgroundColor: Colors.green,
+                    duration: Duration(milliseconds: 1500),
+                  ),
+                );
+              }
+            } else {
+               if (mounted) {
+                ScaffoldMessenger.of(context).clearSnackBars();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erreur serveur: ${response.data}'), 
+                    backgroundColor: Colors.red,
+                    duration: Duration(milliseconds: 2000),
+                  ),
+                );
+              }
+            }
           } catch (funcErr) {
-            debugPrint('Erreur appel Edge Function: $funcErr');
+            debugPrint('*** [DIAGNOSTIC] ERREUR CRITIQUE: $funcErr ***');
+            if (mounted) {
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Erreur de connexion'), 
+                  backgroundColor: Colors.red,
+                  duration: Duration(milliseconds: 2000),
+                ),
+              );
+            }
           }
+        } else {
+          debugPrint('*** [DIAGNOSTIC] ÉCHEC: PAS DE CV DANS LE PROFIL ***');
         }
 
         // WhatsApp redirect si nécessaire
@@ -241,13 +327,14 @@ class _SwipeScreenState extends State<SwipeScreen> {
         if (whatsapp != null && whatsapp.toString().isNotEmpty) {
           _showWhatsAppRedirect(job['job_title'] ?? 'ce poste', whatsapp.toString());
         } else if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(_cvUrl != null 
-                ? 'Profil & CV envoyés pour ${job['job_title']} ! 🚀'
-                : 'Profil envoyé (pensez à ajouter votre CV dans le profil) ! 🚀'),
+                ? 'Profil et CV envoyés pour ${job['job_title']}'
+                : 'Profil envoyé (pensez à ajouter votre CV dans le profil)'),
               backgroundColor: _cvUrl != null ? Colors.green : Colors.orange,
-              duration: const Duration(milliseconds: 2000),
+              duration: const Duration(milliseconds: 1500),
             ),
           );
         }

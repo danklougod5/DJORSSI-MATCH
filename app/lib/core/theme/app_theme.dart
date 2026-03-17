@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color primaryBlue = Color(0xFF1E3A8A);
+  static const Color primaryBlue = Color(0xFF0F172A); // Slate dark for contrast instead of blue
   static const Color vibrantOrange = Color(0xFFF97316);
   static const Color successGreen = Color(0xFF10B981);
   static const Color errorRed = Color(0xFFEF4444);
@@ -12,12 +12,13 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryBlue,
-        primary: primaryBlue,
-        secondary: vibrantOrange,
+        seedColor: vibrantOrange,
+        primary: vibrantOrange,
+        secondary: const Color(0xFFEA580C), // Deeper orange
         surface: Colors.white,
-        background: backgroundColor,
+        surfaceContainerHighest: backgroundColor,
         error: errorRed,
+        onPrimary: Colors.white,
       ),
       textTheme: GoogleFonts.outfitTextTheme(),
       cardTheme: CardThemeData(

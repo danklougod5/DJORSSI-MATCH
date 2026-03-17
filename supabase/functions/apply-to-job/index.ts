@@ -16,33 +16,39 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "No Authorization header" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    // Use Service Role Key to verify the user - This is the most reliable way in Edge Functions
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
-      }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get the User checking the auth header
+    const jwt = authHeader.replace("Bearer ", "");
     const {
       data: { user },
       error: authError,
-    } = await supabaseClient.auth.getUser();
+    } = await supabaseAdmin.auth.getUser(jwt);
 
-    // Verify authentication
     if (authError || !user) {
-      console.error("Auth error:", authError);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      console.error("Auth error details:", authError);
+      return new Response(JSON.stringify({ 
+        error: "Unauthorized", 
+        details: authError?.message || "Invalid or expired token"
+      }), {
         status: 401,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
     // Parse the request body
-    const { jobTitle, jobCompany, cvUrl, message, userName } = await req.json();
+    const { jobTitle, jobCompany, cvUrl, message, userName, jobContactEmail } = await req.json();
 
     if (!cvUrl || !jobTitle) {
       return new Response(
@@ -70,30 +76,45 @@ serve(async (req) => {
 
     // 2. Prepare the Email content
     const applicantName = userName || user.email?.split("@")[0] || "Un candidat";
+    const userEmail = user.email || "";
+
     // We use the provided premium message or a default standard message (Zéro friction mode)
     const emailBody = message 
         ? message 
-        : `Bonjour,\n\nSuite à votre annonce pour le poste de ${jobTitle} chez ${jobCompany || "votre entreprise"}, je vous soumets ma candidature.\n\nMon profil correspond à vos critères et vous trouverez mon CV en pièce jointe pour plus de détails sur mon parcours.\n\nCordialement,\n${applicantName}`;
+        : `Bonjour,\n\nSuite à votre annonce pour le poste de ${jobTitle} chez ${jobCompany || "votre entreprise"}, je vous soumets ma candidature.\n\nMon profil correspond à vos critères et vous trouverez mon CV en pièce jointe pour plus de détails sur mon parcours.\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`;
 
     // 3. Send email via Resend
-    console.log(`Sending email for job: ${jobTitle} with CV attachment...`);
+    // NOTE: In testing mode with onboarding@resend.dev, we can ONLY send to the account owner
+    const targetEmail = "danklougod5@gmail.com"; 
+    console.log(`Sending email for job: ${jobTitle} to ${targetEmail} (original target was ${jobContactEmail})...`);
+    
     const { data: resendData, error: resendError } = await resend.emails.send({
-      from: "Djossi Match <onboarding@resend.dev>", // TODO: Replace with your actual verified domain in production
-      to: ["danklougod5@gmail.com"], // Hardcoded for testing as requested
+      from: `Djossi Match <onboarding@resend.dev>`, 
+      to: [targetEmail], // Forçage pour le test
+      reply_to: userEmail,
       subject: `Candidature : ${jobTitle} - ${applicantName}`,
       text: emailBody,
       attachments: [
         {
-          filename: `CV_${applicantName.replace(/\\s+/g, "_")}.pdf`,
+          filename: `CV_${applicantName.replace(/\s+/g, "_")}.pdf`,
           content: cvBase64,
         },
       ],
     });
 
     if (resendError) {
-      console.error("Resend error:", resendError);
-      throw new Error(`Erreur lors de l'envoi de l'email: ${resendError.message}`);
+      console.error("Resend delivery error:", resendError);
+      return new Response(JSON.stringify({ 
+        error: "Resend error", 
+        details: resendError.message,
+        code: resendError.name
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
     }
+
+    console.log("Resend success data:", resendData);
 
     return new Response(
       JSON.stringify({ 

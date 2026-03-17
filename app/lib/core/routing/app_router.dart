@@ -5,6 +5,7 @@ import 'package:djossimatch/features/auth/presentation/onboarding_screen.dart';
 import 'package:djossimatch/features/splash/presentation/splash_screen.dart';
 import 'package:djossimatch/features/profile/presentation/profile_screen.dart';
 import 'package:djossimatch/features/premium/presentation/premium_screen.dart';
+import 'package:djossimatch/features/auth/presentation/complete_profile_screen.dart';
 import 'package:djossimatch/main.dart'; // To access MainNavigationScreen
 
 class AppRouter {
@@ -20,10 +21,18 @@ class AppRouter {
         return null;
       }
 
-      if (!isAuth && !isGoingToAuth && state.matchedLocation != '/onboarding') {
-        return '/auth';
+      if (!isAuth) {
+        // Not logged in -> can only be on Splash, Onboarding or Auth
+        if (state.matchedLocation != '/splash' && 
+            state.matchedLocation != '/onboarding' && 
+            state.matchedLocation != '/auth') {
+          return '/onboarding';
+        }
+        return null;
       }
-      if (isAuth && isGoingToAuth) {
+
+      // Logged in
+      if (isGoingToAuth || state.matchedLocation == '/onboarding') {
         return '/';
       }
       return null;
@@ -40,6 +49,10 @@ class AppRouter {
       GoRoute(
         path: '/onboarding',
         builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/complete-profile',
+        builder: (context, state) => const CompleteProfileScreen(),
       ),
       GoRoute(
         path: '/premium',

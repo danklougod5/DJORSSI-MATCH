@@ -55,17 +55,33 @@ class _AuthScreenState extends State<AuthScreen> {
           });
           
           if (mounted) {
-            context.go('/');
+            context.go('/complete-profile');
           }
         }
       } else {
         // Connexion classique
-        await Supabase.instance.client.auth.signInWithPassword(
+        final response = await Supabase.instance.client.auth.signInWithPassword(
           email: email,
           password: password,
         );
-        if (mounted) {
-          context.go('/onboarding');
+        
+        if (mounted && response.user != null) {
+          // Vérifier si le profil est déjà complété
+          final profile = await Supabase.instance.client
+              .from('profiles')
+              .select('full_name, skills')
+              .eq('id', response.user!.id)
+              .maybeSingle();
+          
+          final isProfileComplete = profile != null && 
+                                   profile['full_name'] != null && 
+                                   (profile['skills'] as List?)?.isNotEmpty == true;
+
+          if (isProfileComplete) {
+            context.go('/');
+          } else {
+            context.go('/complete-profile');
+          }
         }
       }
     } on AuthException catch (e) {

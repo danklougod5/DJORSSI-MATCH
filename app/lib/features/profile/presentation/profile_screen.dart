@@ -67,9 +67,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (result != null) {
         setState(() => _isUploading = true);
         
-        final file = File(result.files.single.path!);
-        final fileExt = result.files.single.extension;
-        final fileName = '${_supabase.auth.currentUser!.id}_cv.$fileExt';
+        final path = result.files.single.path;
+        if (path == null) {
+          debugPrint('Erreur: Le chemin du fichier est null');
+          setState(() => _isUploading = false);
+          return;
+        }
+
+        final user = _supabase.auth.currentUser;
+        if (user == null) {
+          debugPrint('Erreur: Utilisateur non connecté');
+          setState(() => _isUploading = false);
+          return;
+        }
+
+        final file = File(path);
+        final fileExt = result.files.single.extension ?? 'pdf';
+        final fileName = '${user.id}_cv.$fileExt';
         final filePath = 'cvs/$fileName';
 
         // Upload to Supabase Storage (bucket: cv_files)
@@ -85,7 +99,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Update profile in DB
         await _supabase.from('profiles').update({
           'cv_url': publicUrl,
-        }).eq('id', _supabase.auth.currentUser!.id);
+        }).eq('id', user.id);
 
         setState(() {
           _cvUrl = publicUrl;
@@ -164,16 +178,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final userId = _supabase.auth.currentUser?.id;
         if (userId == null) return;
 
-        // 1. Supprimer le profil (la cascade SQL s'occupera des applications si configurée)
-        await _supabase.from('profiles').delete().eq('id', userId);
-
-        // 2. Déconnexion
-        await _supabase.auth.signOut();
+        // 1. Appeler l'Edge Function pour supprimer le compte définitivement (Auth + Profil)
+        await _supabase.functions.invoke('delete-account');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Votre compte a été supprimé. Bonne continuation !'),
+              content: Text('Votre compte a été définitivement supprimé. Bonne continuation !'),
               backgroundColor: Colors.black,
             ),
           );
@@ -236,32 +247,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Positioned(
                         bottom: 0,
                         right: 0,
-                        child: Container(
-                          padding: EdgeInsets.all(8.r),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
+                        child: GestureDetector(
+                          onTap: () => context.push('/complete-profile'),
+                          child: Container(
+                            padding: EdgeInsets.all(8.r),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF97316),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 3),
+                            ),
+                            child: Icon(Icons.edit, color: Colors.white, size: 18.r),
                           ),
-                          child: Icon(Icons.edit, color: Colors.white, size: 18.r),
                         ),
                       ),
                     ],
                   ),
                   SizedBox(height: 20.h),
                   Text(
-                    _fullName ?? 'Utilisateur Djossi',
+                    'Bienvenue, ${_fullName ?? 'Utilisateur Djossi'}',
                     style: TextStyle(
-                      fontSize: 24.sp,
+                      fontSize: 22.sp,
                       fontWeight: FontWeight.w800,
                       color: const Color(0xFF0F172A),
                     ),
                   ),
-                  SizedBox(height: 4.h),
+                  SizedBox(height: 8.h),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: (_profileData?['is_premium'] ?? false) 
+                          ? const Color(0xFFF97316).withOpacity(0.1) 
+                          : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(20.r),
+                    ),
+                    child: Text(
+                      (_profileData?['is_premium'] ?? false) ? 'Candidat Premium' : 'Utilisateur Freemium',
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.bold,
+                        color: (_profileData?['is_premium'] ?? false) 
+                            ? const Color(0xFFF97316) 
+                            : Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
                   Text(
                     contactInfo,
                     style: TextStyle(
-                      fontSize: 14.sp,
+                      fontSize: 13.sp,
                       color: const Color(0xFF64748B),
                     ),
                   ),
@@ -279,9 +313,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Section Secteurs d'intérêt (Skills)
             _buildCardSection(
               title: 'Mes Secteurs',
-              onEdit: () => context.go('/onboarding'),
+              onEdit: () => context.push('/complete-profile'),
               child: InkWell(
-                onTap: () => context.go('/onboarding'),
+                onTap: () => context.push('/complete-profile'),
                 child: _skills.isEmpty
                     ? Text('Aucun secteur sélectionné', style: TextStyle(color: const Color(0xFF94A3B8), fontSize: 14.sp))
                     : Wrap(
@@ -316,10 +350,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 leading: Container(
                   padding: EdgeInsets.all(10.r),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: const Color(0xFFF97316).withOpacity(0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.description, color: Colors.blue, size: 24.r),
+                  child: Icon(Icons.description, color: const Color(0xFFF97316), size: 24.r),
                 ),
                 title: Text(
                   _cvUrl != null ? 'CV déjà téléchargé' : 'Aucun CV ajouté',
@@ -513,10 +547,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       leading: Container(
         padding: EdgeInsets.all(8.r),
         decoration: BoxDecoration(
-          color: (color ?? const Color(0xFF0F172A)).withOpacity(0.1),
+          color: (color ?? const Color(0xFFF97316)).withOpacity(0.1),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: color ?? const Color(0xFF0F172A), size: 20.r),
+        child: Icon(icon, color: color ?? const Color(0xFFF97316), size: 20.r),
       ),
       title: Text(
         title,

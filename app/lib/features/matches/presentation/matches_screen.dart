@@ -15,6 +15,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _matches = [];
 
+  String _selectedFilter = 'Tous';
+
   @override
   void initState() {
     super.initState();
@@ -42,11 +44,32 @@ class _MatchesScreenState extends State<MatchesScreen> {
     }
   }
 
+  List<Map<String, dynamic>> get _filteredMatches {
+    if (_selectedFilter == 'Tous') return _matches;
+
+    final now = DateTime.now();
+    return _matches.where((match) {
+      final date = DateTime.parse(match['created_at']);
+      final difference = now.difference(date).inDays;
+
+      if (_selectedFilter == 'Aujourd\'hui') {
+        return difference == 0 && date.day == now.day;
+      } else if (_selectedFilter == '7 derniers jours') {
+        return difference <= 7;
+      } else if (_selectedFilter == '30 derniers jours') {
+        return difference <= 30;
+      }
+      return true;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(color: Color(0xFFF97316)));
     }
+
+    final filtered = _filteredMatches;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -63,23 +86,74 @@ class _MatchesScreenState extends State<MatchesScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: _matches.isEmpty
-          ? _buildEmptyState()
-          : RefreshIndicator(
-              onRefresh: _loadMatches,
-              child: ListView.separated(
-                padding: EdgeInsets.all(16.r),
-                itemCount: _matches.length,
-                separatorBuilder: (context, index) => SizedBox(height: 12.h),
-                itemBuilder: (context, index) {
-                  final match = _matches[index];
-                  final job = match['jobs'];
-                  final date = DateTime.parse(match['created_at']);
-                  
-                  return _buildMatchCard(job, date);
-                },
+      body: Column(
+        children: [
+          _buildFilterBar(),
+          Expanded(
+            child: filtered.isEmpty
+                ? _buildEmptyState()
+                : RefreshIndicator(
+                    onRefresh: _loadMatches,
+                    child: ListView.separated(
+                      padding: EdgeInsets.all(16.r),
+                      itemCount: filtered.length,
+                      separatorBuilder: (context, index) => SizedBox(height: 12.h),
+                      itemBuilder: (context, index) {
+                        final match = filtered[index];
+                        final job = match['jobs'];
+                        final date = DateTime.parse(match['created_at']);
+                        
+                        return _buildMatchCard(job, date);
+                      },
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterBar() {
+    final filters = ['Tous', 'Aujourd\'hui', '7 derniers jours', '30 derniers jours'];
+    return Container(
+      height: 60.h,
+      color: Colors.white,
+      child: ListView.separated(
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        scrollDirection: Axis.horizontal,
+        itemCount: filters.length,
+        separatorBuilder: (context, index) => SizedBox(width: 8.w),
+        itemBuilder: (context, index) {
+          final filter = filters[index];
+          final isSelected = _selectedFilter == filter;
+          return Center(
+            child: ChoiceChip(
+              label: Text(filter),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() => _selectedFilter = filter);
+                }
+              },
+              backgroundColor: Colors.grey.shade50,
+              selectedColor: const Color(0xFFF97316).withOpacity(0.1),
+              labelStyle: TextStyle(
+                color: isSelected ? const Color(0xFFF97316) : Colors.grey.shade600,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13.sp,
               ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.r),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFFF97316) : Colors.grey.shade200,
+                  width: 1,
+                ),
+              ),
+              showCheckmark: false,
             ),
+          );
+        },
+      ),
     );
   }
 
@@ -91,12 +165,16 @@ class _MatchesScreenState extends State<MatchesScreen> {
           Icon(Icons.favorite_border, size: 80.r, color: Colors.grey.shade300),
           SizedBox(height: 16.h),
           Text(
-            'Aucun match pour le moment',
+            _selectedFilter == 'Tous' 
+              ? 'Aucun match pour le moment'
+              : 'Aucun match pour cette période',
             style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
           ),
           SizedBox(height: 8.h),
           Text(
-            'Continuez à swiper pour trouver votre Djossi !',
+            _selectedFilter == 'Tous'
+              ? 'Continuez à swiper pour trouver votre Djossi !'
+              : 'Essayez un autre filtre ou continuez à swiper.',
             style: TextStyle(color: Colors.grey.shade500),
           ),
         ],
@@ -187,13 +265,13 @@ class _MatchesScreenState extends State<MatchesScreen> {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: const Color(0xFFF97316).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10.r),
                   ),
                   child: Text(
                     'CV Envoyé',
                     style: TextStyle(
-                      color: Colors.blue,
+                      color: const Color(0xFFF97316),
                       fontSize: 11.sp,
                       fontWeight: FontWeight.bold,
                     ),
