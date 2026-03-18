@@ -72,10 +72,13 @@ def process_and_store(jobs: list[dict], db: SupabaseClient, validator: AIJobVali
 
     for i, job in enumerate(jobs):
         if success_count >= MAX_JOBS_PER_CYCLE:
-            print(f"\n[INFO] Reached limit of {MAX_JOBS_PER_CYCLE} jobs for this cycle. Stopping to save quota.")
+            msg = f"Reached limit of {MAX_JOBS_PER_CYCLE} jobs for this cycle. Stopping to save quota."
+            print(f"\n[INFO] {msg}")
+            db.log("INFO", msg)
             break
 
         print(f"\n[{i+1}/{len(jobs)}] Processing: {job['source_url'][:65]}...", flush=True)
+        db.log("INFO", f"Analyse IA pour: {job['source_url'][:50]}...")
         
         # PRE-FILTER: Check if contact info exists in raw text
         raw_text = clean_text(job["raw_text"])
@@ -84,6 +87,7 @@ def process_and_store(jobs: list[dict], db: SupabaseClient, validator: AIJobVali
         
         if not has_email and not has_phone:
             print(f"  [PRE-SKIP] No REAL email or phone detected in raw text. Saving AI quota.")
+            db.log("SKIP", f"Rejet automatique (pas de contact) - {job['source_url'][:30]}...")
             skip_count += 1
             continue
 
@@ -91,6 +95,7 @@ def process_and_store(jobs: list[dict], db: SupabaseClient, validator: AIJobVali
         
         if not job_data or not job_data.get("job_title") or not job_data.get("contact_email"):
             print(f"  [SKIP] Invalid job, missing title or contact email.")
+            db.log("SKIP", f"IA Rejet: format invalide ou contact manquant.")
             skip_count += 1
             continue
         
@@ -102,9 +107,11 @@ def process_and_store(jobs: list[dict], db: SupabaseClient, validator: AIJobVali
         result = db.insert_job(job_data)
         if result:
             print(f"  [OK] Inserted: {job_data.get('job_title')} @ {job_data.get('company_name')}", flush=True)
+            db.log("OK", f"Ajouté: {job_data.get('job_title')} @ {job_data.get('company_name')}")
             success_count += 1
         else:
             print(f"  [WARN] Insert failed or duplicate.", flush=True)
+            db.log("SKIP", f"Doublon ignoré: {job_data.get('job_title')}")
             skip_count += 1
         
         time.sleep(1)  # Faster now with DeepSeek fallback handling 429s
@@ -139,8 +146,11 @@ def main():
     db = SupabaseClient()
     validator = AIJobValidator()
     
+    db.log("INFO", f"Lancement d'un cycle de scraping complet à {now}")
+
     if not db.supabase or not validator.providers:
         print("[ERROR] Critical initialization failed. Check .env file. Exiting.", flush=True)
+        db.log("ERROR", "Erreur critique d'initialisation du moteur.")
         sys.exit(1)
     
     totals = [0, 0]  # [success, skip]
@@ -163,6 +173,7 @@ def main():
     
     for idx, (name, fn, is_paginated) in enumerate(sources, 1):
         print(f"\n[{idx}] {name}", flush=True)
+        db.log("INFO", f"Exploration de la source: {name}")
         
         current_page = state.get(name, 1) if is_paginated else 1
         jobs_found = scrape_source(name, fn, db, validator, totals, state_page=current_page)
@@ -179,16 +190,26 @@ def main():
     print("\n" + "=" * 60, flush=True)
     print(f"DONE! Inserted: {totals[0]} | Skipped/Dupes: {totals[1]}", flush=True)
     print("=" * 60, flush=True)
+    db.log("INFO", f"BILAN DU CYCLE: {totals[0]} ajouts, {totals[1]} rejets/doublons.")
 
 
 if __name__ == "__main__":
     cycle = 0
+    db = SupabaseClient()
+    
     while True:
+        # Check if we should run
+        command = db.check_control()
+        if command == "stop":
+            print(f"DEBUG: Scraper is STOPPED via dashboard. Waiting 30 seconds check...", flush=True)
+            time.sleep(30)
+            continue
+            
         cycle += 1
         print(f"DEBUG: Starting cycle {cycle}", flush=True)
-        print(f"\n{'#' * 60}", flush=True)
-        print(f"  AUTO-SCRAPE CYCLE #{cycle}", flush=True)
-        print(f"{'#' * 60}", flush=True)
+        print(f"\n{'#' * 60}")
+        print(f"  AUTO-SCRAPE CYCLE #{cycle}")
+        print(f"{'#' * 60}")
         
         try:
             main()

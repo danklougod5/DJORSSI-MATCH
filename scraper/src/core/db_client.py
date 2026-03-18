@@ -30,3 +30,12 @@ class SupabaseClient:
         except Exception as e:
             print(f"Error inserting job: {e}")
             return None
+
+    def check_control(self):
+        """Always return 'start' to run via terminal as requested by user."""
+        return "start"
+
+    def log(self, level: str, message: str):
+        """Only print to terminal, skip database insertion to save space."""
+        print(f"[{level}] {message}", flush=True)
+        return None

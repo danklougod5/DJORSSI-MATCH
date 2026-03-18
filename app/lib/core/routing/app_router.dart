@@ -6,6 +6,7 @@ import 'package:djossimatch/features/splash/presentation/splash_screen.dart';
 import 'package:djossimatch/features/profile/presentation/profile_screen.dart';
 import 'package:djossimatch/features/premium/presentation/premium_screen.dart';
 import 'package:djossimatch/features/auth/presentation/complete_profile_screen.dart';
+import 'package:djossimatch/features/profile/presentation/job_alerts_screen.dart';
 import 'package:djossimatch/main.dart'; // To access MainNavigationScreen
 
 class AppRouter {
@@ -57,6 +58,10 @@ class AppRouter {
       GoRoute(
         path: '/premium',
         builder: (context, state) => const PremiumScreen(),
+      ),
+      GoRoute(
+        path: '/job-alerts',
+        builder: (context, state) => const JobAlertsScreen(),
       ),
       GoRoute(
         path: '/',

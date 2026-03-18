@@ -160,6 +160,13 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   description: 'Vous avez swipé trop vite ? Annulez votre dernier geste instantanément.',
                   color: const Color(0xFFFB923C),
                 ),
+                const SizedBox(height: 16),
+                _buildFeatureCard(
+                  icon: Icons.notifications_active_rounded,
+                  title: 'ALERTES EMPLOIS PAR EMAIL',
+                  description: 'Soyez le premier informé ! Recevez un email dès qu\'un job correspondant est publié.',
+                  color: const Color(0xFFF97316),
+                ),
                 const SizedBox(height: 40),
                 _buildPriceCard(),
                 const SizedBox(height: 40),

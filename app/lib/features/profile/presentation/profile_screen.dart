@@ -385,7 +385,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: Icons.notifications_none_rounded,
                     title: 'Alertes Emplois',
                     subtitle: 'Gérer mes notifications',
-                    onTap: () {},
+                    trailing: (_profileData?['is_premium'] ?? false) 
+                        ? null 
+                        : Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF97316).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8.r),
+                            ),
+                            child: Text(
+                              'PREMIUM',
+                              style: TextStyle(
+                                fontSize: 9.sp,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFFF97316),
+                              ),
+                            ),
+                          ),
+                    onTap: () => context.push('/job-alerts'),
                   ),
                   _buildOptionTile(
                     icon: Icons.logout_rounded,
@@ -541,6 +558,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     VoidCallback? onTap,
     Color? color,
     bool showArrow = true,
+    Widget? trailing,
   }) {
     return ListTile(
       onTap: onTap,
@@ -566,7 +584,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(fontSize: 12.sp, color: const Color(0xFF64748B)),
             )
           : null,
-      trailing: showArrow ? Icon(Icons.chevron_right, size: 20.r, color: const Color(0xFF94A3B8)) : null,
+      trailing: trailing ?? (showArrow ? Icon(Icons.chevron_right, size: 20.r, color: const Color(0xFF94A3B8)) : null),
       contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
     );

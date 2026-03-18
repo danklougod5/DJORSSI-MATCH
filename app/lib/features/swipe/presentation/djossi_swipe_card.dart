@@ -221,6 +221,7 @@ class DjossiSwipeCard extends StatelessWidget {
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.9),
                                     fontSize: 13.sp,
+                                    fontWeight: FontWeight.bold,
                                     height: 1.4,
                                   ),
                                 ),

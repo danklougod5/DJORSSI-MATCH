@@ -161,11 +161,18 @@ class AIJobValidator:
         - required_level, experience, contact_email, whatsapp_number, description, tags, deadline.
         - is_ai_verified: true.
 
+        Available Tags (Use only these or similar from this list):
+        'Informatique', 'Marketing', 'Vente', 'Ressources Humaines',
+        'Finance', 'Logistique', 'Ingénierie', 'Design', 'Administration',
+        'Télécommunications', 'BTP', 'Santé', 'Éducation', 'Juridique',
+        'Banque & Assurance', 'Commerce', 'Transport', 'Hôtellerie'.
+
         Critical Rules:
         1. Only return is_job: true if the offer is definitely for Côte d'Ivoire AND contains a REAL contact email OR a WhatsApp number.
         2. EXCEPTION: If the email found is "[email protected]" or "email-protection" or any placeholder, treat it as if NO email was found.
         3. If neither a real email nor a WhatsApp number is found, return {{"is_job": false}}.
         4. Translate everything to French.
+        5. Map the job to at least 1-3 appropriate tags from the 'Available Tags' list.
 
         Raw Text:
         {raw_text}

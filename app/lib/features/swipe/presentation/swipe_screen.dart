@@ -60,32 +60,40 @@ class _SwipeScreenState extends State<SwipeScreen> {
         _userSkills = List<String>.from(profileResponse['skills']);
       }
 
-      // 2. Récupérer les IDs des jobs déjà postulés
-      final appliedResponse = await _supabase
-          .from('applications')
+      // 2. Récupérer les IDs des jobs déjà swipés (GAUCHE ou DROITE)
+      final swipedResponse = await _supabase
+          .from('swipes_log')
           .select('job_id')
           .eq('user_id', userId);
       
-      final appliedJobIds = (appliedResponse as List).map((a) => a['job_id'].toString()).toSet();
+      final swipedJobIds = (swipedResponse as List)
+          .where((s) => s['job_id'] != null)
+          .map((s) => s['job_id'].toString())
+          .toSet();
 
-      // 2.5 Compter swipes du jour (GAUCHE + DROITE)
+      // 2.5 Compter swipes du jour (GAUCHE + DROITE) pour la limite
       final today = DateTime.now().toIso8601String().substring(0, 10);
-      final countResp = await _supabase
-          .from('swipes_log')
-          .select('id')
-          .eq('user_id', userId)
-          .gte('created_at', '${today}T00:00:00Z');
-      
-      _swipeCount = countResp != null ? (countResp as List).length : 0;
+      try {
+        final countResp = await _supabase
+            .from('swipes_log')
+            .select('id')
+            .eq('user_id', userId)
+            .gte('created_at', '${today}T00:00:00Z');
+        
+        _swipeCount = countResp != null ? (countResp as List).length : 0;
+      } catch (e) {
+        debugPrint('Erreur lors du comptage des swipes: $e');
+        _swipeCount = 0;
+      }
 
-      // 3. Récupérer toutes les offres non postulées
+      // 3. Récupérer toutes les offres non swipées
       final jobsResponse = await _supabase
           .from('jobs')
           .select()
           .order('created_at', ascending: false);
 
       final allJobs = List<Map<String, dynamic>>.from(jobsResponse)
-          .where((job) => !appliedJobIds.contains(job['id'].toString()))
+          .where((job) => !swipedJobIds.contains(job['id'].toString()))
           .toList();
 
       // 4. Trier par matching
@@ -223,9 +231,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      // 1. Enregistrer l'action dans le log global (pour la limite)
+      // 1. Enregistrer l'action dans le log global (pour le filtrage et la limite)
       await _supabase.from('swipes_log').insert({
         'user_id': userId,
+        'job_id': job['id'],
         'direction': direction,
       });
 
@@ -345,6 +354,14 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   void _showPremiumLimitDialog() {
+    // Calculer le temps restant avant minuit
+    final now = DateTime.now();
+    final midnight = DateTime(now.year, now.month, now.day + 1);
+    final remaining = midnight.difference(now);
+    
+    final hours = remaining.inHours;
+    final minutes = remaining.inMinutes % 60;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -356,8 +373,41 @@ class _SwipeScreenState extends State<SwipeScreen> {
             const Text('Limite atteinte !'),
           ],
         ),
-        content: const Text(
-          'Vous avez utilisé vos 10 swipes gratuits pour aujourd\'hui. Revenez demain ou passez au illimité maintenant !',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Vous avez utilisé vos 10 swipes gratuits pour aujourd\'hui.',
+            ),
+            SizedBox(height: 16.h),
+            Container(
+              padding: EdgeInsets.all(12.r),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.timer_outlined, size: 18, color: Color(0xFF64748B)),
+                  SizedBox(width: 8.w),
+                  Text(
+                    'Nouveaux swipes dans $hours\h $minutes\min',
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 16.h),
+            const Text(
+              'Ou passez au illimité maintenant pour ne rater aucun Djossi !',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -371,9 +421,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF97316),
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+              elevation: 0,
             ),
-            child: const Text('Passer Premium', style: TextStyle(color: Colors.white)),
+            child: const Text('Passer Premium', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

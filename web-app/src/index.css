@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #F97316; /* Vibrant Orange */
+  --color-secondary: #1E3A8A; /* Deep Blue */
+  --color-accent: #FFD215; /* Yellow Accent like Aya */
+  --color-background: #FAF9F6;
+  --color-dark: #0A1A18; /* Dark Green/Black from Aya */
+  --color-text: #000000;
+  
+  --brutalist-border: 3px solid #000000;
+  --brutalist-shadow: 6px 6px 0px 0px #000000;
+  --brutalist-shadow-sm: 4px 4px 0px 0px #000000;
+  --brutalist-shadow-hover: 2px 2px 0px 0px #000000;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text font-body antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-black tracking-tight uppercase;
+  }
+}
+
+@layer components {
+  .neo-brutal-btn {
+    @apply px-8 py-4 bg-primary text-white font-black text-xl border-black border-[3px] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] uppercase;
+  }
+  
+  .neo-brutal-btn-secondary {
+    @apply px-8 py-4 bg-white text-black font-black text-xl border-black border-[3px] shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] uppercase;
+  }
+
+  .neo-brutal-card {
+    @apply bg-white border-black border-[3px] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-8 transition-all hover:translate-x-[-4px] hover:translate-y-[-4px] hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)];
+  }
+
+  .neo-brutal-tag {
+    @apply px-3 py-1 bg-accent text-black font-bold border-black border-2 text-xs uppercase;
+  }
+
+  .bg-pattern {
+    background-image: radial-gradient(#000 1px, transparent 0);
+    background-size: 24px 24px;
+    background-position: -19px -19px;
+    @apply opacity-10;
+  }
+}
+

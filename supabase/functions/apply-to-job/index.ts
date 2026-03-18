@@ -89,7 +89,7 @@ serve(async (req) => {
     console.log(`Sending email for job: ${jobTitle} to ${targetEmail} (original target was ${jobContactEmail})...`);
     
     const { data: resendData, error: resendError } = await resend.emails.send({
-      from: `Djossi Match <onboarding@resend.dev>`, 
+      from: `${applicantName} via Djossi Match <onboarding@resend.dev>`, 
       to: [targetEmail], // Forçage pour le test
       reply_to: userEmail,
       subject: `Candidature : ${jobTitle} - ${applicantName}`,
