@@ -176,10 +176,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() => _isLoading = true);
       try {
         final userId = _supabase.auth.currentUser?.id;
-        if (userId == null) return;
+        final accessToken = _supabase.auth.currentSession?.accessToken;
+        if (userId == null || accessToken == null) {
+          throw 'Utilisateur non identifié ou session expirée. Veuillez vous reconnecter.';
+        }
 
         // 1. Appeler l'Edge Function pour supprimer le compte définitivement (Auth + Profil)
-        await _supabase.functions.invoke('delete-account');
+        await _supabase.functions.invoke(
+          'delete-account',
+          headers: {
+            'Authorization': 'Bearer ${_supabase.auth.currentSession?.accessToken}',
+          },
+        );
+
+        // 2. Déconnexion locale pour forcer le nettoyage de la session
+        await _supabase.auth.signOut();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -188,6 +199,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               backgroundColor: Colors.black,
             ),
           );
+          // 3. Rediriger vers l'écran d'authentification
           context.go('/auth');
         }
       } catch (e) {

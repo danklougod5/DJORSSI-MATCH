@@ -48,14 +48,23 @@ class _AuthScreenState extends State<AuthScreen> {
         );
 
         if (response.user != null) {
-          // Créer l'entrée dans public.profiles immédiatement
-          await Supabase.instance.client.from('profiles').upsert({
-            'id': response.user!.id,
-            'full_name': fullName,
-          });
-          
-          if (mounted) {
-            context.go('/complete-profile');
+          if (response.session != null) {
+            // Déjà vérifié (ex: désactivation de la confirmation d'email en dev)
+            await Supabase.instance.client.from('profiles').upsert({
+              'id': response.user!.id,
+              'full_name': fullName,
+            });
+            if (mounted) {
+              context.go('/complete-profile');
+            }
+          } else {
+            // Attente de confirmation email
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Un code de confirmation a été envoyé à votre email.')),
+              );
+              context.push('/otp', extra: {'email': email, 'fullName': fullName});
+            }
           }
         }
       } else {
@@ -86,6 +95,10 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } on AuthException catch (e) {
       if (mounted) {
+        if (e.message.toLowerCase().contains('email not confirmed')) {
+          context.push('/otp', extra: {'email': email});
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(e.message),
           backgroundColor: Theme.of(context).colorScheme.error,
@@ -97,6 +110,43 @@ class _AuthScreenState extends State<AuthScreen> {
           content: const Text('Une erreur est survenue.'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez entrer votre adresse e-mail.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'com.djossimatch://login-callback',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Un lien de réinitialisation a été envoyé.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -249,7 +299,23 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                       ),
                     ),
-                    SizedBox(height: 32.h),
+                    if (!_isSignUp)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _isLoading ? null : _resetPassword,
+                          child: Text(
+                            'Mot de passe oublié ?',
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      SizedBox(height: 32.h),
 
                     // Auth button
                     SizedBox(

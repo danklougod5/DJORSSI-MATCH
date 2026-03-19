@@ -27,13 +27,22 @@ class DjossiMatchApp extends StatefulWidget {
 }
 
 class _DjossiMatchAppState extends State<DjossiMatchApp> {
+  late final StreamSubscription<AuthState> _authSubscription;
+
   @override
   void initState() {
     super.initState();
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final AuthChangeEvent event = data.event;
+      if (event == AuthChangeEvent.passwordRecovery) {
+        AppRouter.router.go('/reset-password');
+      }
+    });
   }
 
   @override
   void dispose() {
+    _authSubscription.cancel();
     super.dispose();
   }
 

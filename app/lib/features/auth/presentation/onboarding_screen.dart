@@ -32,12 +32,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onPageChanged: (index) => setState(() => _currentPage = index),
                 children: [
                   _buildSlide(
-                    image: 'onboarding_swipe',
+                    image: 'screen-removebg-preview',
                     title: 'Swippez pour trouver\nvotre job',
                     description: 'À droite pour postuler, à gauche pour ignorer. Trouver un Djossi n\'a jamais été aussi simple.',
                   ),
                   _buildSlide(
-                    image: 'onboarding_match',
+                    image: 'onboarding_match new',
                     title: 'Un Match, Une Opportunité',
                     description: 'Dès qu\'une entreprise est intéressée par votre profil, c\'est un match ! Vous pouvez alors discuter.',
                   ),

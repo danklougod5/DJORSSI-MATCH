@@ -5,7 +5,9 @@ import 'package:djossimatch/features/auth/presentation/onboarding_screen.dart';
 import 'package:djossimatch/features/splash/presentation/splash_screen.dart';
 import 'package:djossimatch/features/profile/presentation/profile_screen.dart';
 import 'package:djossimatch/features/premium/presentation/premium_screen.dart';
+import 'package:djossimatch/features/auth/presentation/otp_screen.dart';
 import 'package:djossimatch/features/auth/presentation/complete_profile_screen.dart';
+import 'package:djossimatch/features/auth/presentation/reset_password_screen.dart';
 import 'package:djossimatch/features/profile/presentation/job_alerts_screen.dart';
 import 'package:djossimatch/main.dart'; // To access MainNavigationScreen
 
@@ -17,23 +19,30 @@ class AppRouter {
       final isAuth = session != null;
       final isGoingToAuth = state.matchedLocation == '/auth';
       final isGoingToSplash = state.matchedLocation == '/splash';
+      final isResetPassword = state.matchedLocation == '/reset-password';
 
       if (isGoingToSplash) {
         return null;
       }
 
+      if (isResetPassword) {
+        return null; // Always allow the reset password screen
+      }
+
       if (!isAuth) {
-        // Not logged in -> can only be on Splash, Onboarding or Auth
+        // Not logged in -> can only be on Splash, Onboarding, Auth or OTP
         if (state.matchedLocation != '/splash' && 
             state.matchedLocation != '/onboarding' && 
-            state.matchedLocation != '/auth') {
+            state.matchedLocation != '/auth' &&
+            state.matchedLocation != '/otp' &&
+            state.matchedLocation != '/reset-password') {
           return '/onboarding';
         }
         return null;
       }
 
       // Logged in
-      if (isGoingToAuth || state.matchedLocation == '/onboarding') {
+      if (isGoingToAuth || state.matchedLocation == '/onboarding' || state.matchedLocation == '/otp') {
         return '/';
       }
       return null;
@@ -46,6 +55,20 @@ class AppRouter {
       GoRoute(
         path: '/auth',
         builder: (context, state) => const AuthScreen(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) => const ResetPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/otp',
+        builder: (context, state) {
+          final extras = state.extra as Map<String, dynamic>?;
+          return OtpScreen(
+            email: extras?['email'] ?? '',
+            fullName: extras?['fullName'],
+          );
+        },
       ),
       GoRoute(
         path: '/onboarding',

@@ -26,6 +26,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
   String? _cvUrl;
   String? _fullName;
 
+  // File d'attente pour les envois d'email (éviter le rate-limiting)
+  final List<Map<String, dynamic>> _emailQueue = [];
+  bool _isProcessingQueue = false;
+
   @override
   void initState() {
     super.initState();
@@ -256,76 +260,19 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
         debugPrint('*** [DIAGNOSTIC] URL CV: $_cvUrl ***');
 
-        // 4. Appel de la fonction Edge pour envoyer l'email avec le CV
+        // 4. Ajouter l'email à la file d'attente (NON BLOQUANT)
         if (_cvUrl != null && _cvUrl!.isNotEmpty) {
+          _enqueueEmail(job);
+          
           if (mounted) {
             ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Envoi de la candidature en cours...'),
-                duration: Duration(milliseconds: 1000),
+              SnackBar(
+                content: Text('✅ Candidature enregistrée pour ${job['job_title']} — email en cours d\'envoi...'),
+                backgroundColor: Colors.green,
+                duration: const Duration(milliseconds: 1500),
               ),
             );
-          }
-          
-          try {
-            final session = _supabase.auth.currentSession;
-            final token = session?.accessToken;
-            
-            debugPrint('*** [DIAGNOSTIC] APPEL EDGE FUNCTION... ***');
-
-            final response = await _supabase.functions.invoke(
-              'apply-to-job',
-              body: {
-                'jobTitle': job['job_title'],
-                'jobCompany': job['company_name'],
-                'jobContactEmail': job['contact_email'],
-                'cvUrl': _cvUrl,
-                'userName': _fullName,
-                'message': null, 
-              },
-              headers: {
-                'Authorization': 'Bearer ${token ?? ''}',
-              },
-            );
-            
-            debugPrint('*** [DIAGNOSTIC] RÉPONSE SERVEUR: ${response.status} - ${response.data} ***');
-            
-            if (response.status == 200) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).clearSnackBars();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Candidature envoyée avec succès'), 
-                    backgroundColor: Colors.green,
-                    duration: Duration(milliseconds: 1500),
-                  ),
-                );
-              }
-            } else {
-               if (mounted) {
-                ScaffoldMessenger.of(context).clearSnackBars();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erreur serveur: ${response.data}'), 
-                    backgroundColor: Colors.red,
-                    duration: Duration(milliseconds: 2000),
-                  ),
-                );
-              }
-            }
-          } catch (funcErr) {
-            debugPrint('*** [DIAGNOSTIC] ERREUR CRITIQUE: $funcErr ***');
-            if (mounted) {
-              ScaffoldMessenger.of(context).clearSnackBars();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Erreur de connexion'), 
-                  backgroundColor: Colors.red,
-                  duration: Duration(milliseconds: 2000),
-                ),
-              );
-            }
           }
         } else {
           debugPrint('*** [DIAGNOSTIC] ÉCHEC: PAS DE CV DANS LE PROFIL ***');
@@ -351,6 +298,68 @@ class _SwipeScreenState extends State<SwipeScreen> {
     } catch (e) {
       debugPrint('Erreur lors du swipe: $e');
     }
+  }
+
+  /// Ajoute un job à la file d'attente d'envoi d'email
+  void _enqueueEmail(Map<String, dynamic> job) {
+    _emailQueue.add(job);
+    debugPrint('*** [QUEUE] Email ajouté à la file. Taille: ${_emailQueue.length} ***');
+    
+    // Lancer le traitement de la file si pas déjà en cours
+    if (!_isProcessingQueue) {
+      _processEmailQueue();
+    }
+  }
+
+  /// Traite la file d'attente d'envoi d'email un par un avec délai
+  Future<void> _processEmailQueue() async {
+    if (_isProcessingQueue) return;
+    _isProcessingQueue = true;
+    
+    while (_emailQueue.isNotEmpty) {
+      final job = _emailQueue.removeAt(0);
+      
+      try {
+        final session = _supabase.auth.currentSession;
+        final token = session?.accessToken;
+        
+        debugPrint('*** [QUEUE] Envoi email pour: ${job['job_title']} ***');
+
+        final response = await _supabase.functions.invoke(
+          'apply-to-job',
+          body: {
+            'jobTitle': job['job_title'],
+            'jobCompany': job['company_name'],
+            'jobContactEmail': job['contact_email'],
+            'cvUrl': _cvUrl,
+            'userName': _fullName,
+            'message': null, 
+          },
+          headers: {
+            'Authorization': 'Bearer ${token ?? ''}',
+          },
+        );
+        
+        debugPrint('*** [QUEUE] RÉPONSE SERVEUR: ${response.status} - ${response.data} ***');
+        
+        if (response.status == 200) {
+          debugPrint('*** [QUEUE] ✅ Email envoyé avec succès pour: ${job['job_title']} ***');
+        } else {
+          debugPrint('*** [QUEUE] ❌ Erreur serveur pour: ${job['job_title']} - ${response.data} ***');
+        }
+      } catch (funcErr) {
+        debugPrint('*** [QUEUE] ❌ ERREUR CRITIQUE pour ${job['job_title']}: $funcErr ***');
+      }
+      
+      // Délai entre chaque envoi pour éviter le rate-limiting de Resend
+      if (_emailQueue.isNotEmpty) {
+        debugPrint('*** [QUEUE] Attente 2s avant le prochain envoi... ***');
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+    
+    _isProcessingQueue = false;
+    debugPrint('*** [QUEUE] File d\'attente vidée. Tous les emails envoyés. ***');
   }
 
   void _showPremiumLimitDialog() {
@@ -527,7 +536,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
                           onSwipe: _onSwipe,
                           numberOfCardsDisplayed: 3,
                           backCardOffset: const Offset(0, 40),
+                          duration: const Duration(milliseconds: 400),
                           padding: EdgeInsets.zero,
+                          scale: 0.9,
+                          maxAngle: 30,
+                          threshold: 40,
+                          isLoop: true, // Permet de revenir en arrière plus facilement
                           cardBuilder: (context, index, horizontalThresholdPercent, verticalThresholdPercent) {
                             final job = _jobs[index];
                             final matchScore = _calculateMatchScore(job);
@@ -628,19 +642,42 @@ class _SwipeScreenState extends State<SwipeScreen> {
     );
   }
 
+  Future<void> _handleUndo() async {
+    if (!_isPremium) {
+      _showPremiumLimitDialog();
+      return;
+    }
+
+    // Dans CardSwiper, l'undo ramène la carte précédente
+    _controller.undo();
+    
+    setState(() {
+      if (_swipeCount > 0) _swipeCount--;
+    });
+    
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId != null) {
+        // Optionnel: On pourrait supprimer le log en DB
+      }
+    } catch (e) {
+      debugPrint('Erreur undo DB: $e');
+    }
+  }
+
   Widget _buildActionButtons() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildActionButton(Icons.close, Colors.red, () {
+        _buildActionButton(Icons.close_rounded, Colors.red, () {
           if (!_isPremium && _swipeCount >= 10) {
             _showPremiumLimitDialog();
             return;
           }
           _controller.swipe(CardSwiperDirection.left);
         }),
-        _buildActionButton(Icons.replay, Colors.orange, () => _controller.undo(), isMini: true),
-        _buildActionButton(Icons.favorite, Colors.green, () {
+        _buildActionButton(Icons.replay_rounded, const Color(0xFFF97316), _handleUndo, isMini: true),
+        _buildActionButton(Icons.favorite_rounded, Colors.green, () {
           if (!_isPremium && _swipeCount >= 10) {
             _showPremiumLimitDialog();
             return;

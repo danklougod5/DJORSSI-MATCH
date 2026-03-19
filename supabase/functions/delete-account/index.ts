@@ -19,24 +19,30 @@ serve(async (req) => {
     );
 
     // 2. Setup standard client to verify the user's current session
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
-      }
-    );
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("Missing Authorization header");
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
 
-    // 3. Get the User from the token
+    // 2. Extract Token from Authorization header
+    const token = authHeader.replace('Bearer ', '');
+
+    // 3. Get the User from the token using Admin client
     const {
       data: { user },
       error: authError,
-    } = await supabaseClient.auth.getUser();
+    } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      console.error("Auth Error:", authError?.message);
+      return new Response(JSON.stringify({ 
+        error: "Unauthorized", 
+        details: authError?.message || "User not found" 
+      }), {
         status: 401,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
