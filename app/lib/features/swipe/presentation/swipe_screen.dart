@@ -65,7 +65,14 @@ class _SwipeScreenState extends State<SwipeScreen> {
         .listen((data) {
       if (data.isNotEmpty && mounted) {
         setState(() {
-          _isPremium = data.first['is_premium'] ?? false;
+          final isPremium = data.first['is_premium'] ?? false;
+          final premiumUntilRaw = data.first['premium_until'];
+          if (isPremium && premiumUntilRaw != null) {
+            final premiumUntil = DateTime.parse(premiumUntilRaw);
+            _isPremium = premiumUntil.isAfter(DateTime.now());
+          } else {
+            _isPremium = isPremium;
+          }
           _cvUrl = data.first['cv_url'];
           _fullName = data.first['full_name'];
           _sexe = data.first['sexe'];
@@ -87,7 +94,14 @@ class _SwipeScreenState extends State<SwipeScreen> {
           .maybeSingle();
 
       if (profileResponse != null) {
-        _isPremium = profileResponse['is_premium'] ?? false;
+        final isPremium = profileResponse['is_premium'] ?? false;
+        final premiumUntilRaw = profileResponse['premium_until'];
+        if (isPremium && premiumUntilRaw != null) {
+          final premiumUntil = DateTime.parse(premiumUntilRaw);
+          _isPremium = premiumUntil.isAfter(DateTime.now());
+        } else {
+          _isPremium = isPremium;
+        }
         _cvUrl = profileResponse['cv_url'];
         _fullName = profileResponse['full_name'];
         _sexe = profileResponse['sexe'];

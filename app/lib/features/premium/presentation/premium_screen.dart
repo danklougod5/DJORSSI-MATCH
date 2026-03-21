@@ -34,7 +34,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
       if (response != null && mounted) {
         setState(() {
-          _isPremium = response['is_premium'] ?? false;
+          final isPremium = response['is_premium'] ?? false;
+          final premiumUntilRaw = response['premium_until'];
+          if (isPremium && premiumUntilRaw != null) {
+            final premiumUntil = DateTime.parse(premiumUntilRaw);
+            _isPremium = premiumUntil.isAfter(DateTime.now());
+          } else {
+            _isPremium = isPremium;
+          }
           _userName = response['full_name'];
         });
       }

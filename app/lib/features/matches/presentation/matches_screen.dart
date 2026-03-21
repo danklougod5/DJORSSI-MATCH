@@ -36,7 +36,14 @@ class _MatchesScreenState extends State<MatchesScreen> {
           .eq('id', userId)
           .maybeSingle();
           
-      _isPremium = profileResponse?['is_premium'] ?? false;
+      final isPremium = profileResponse?['is_premium'] ?? false;
+      final premiumUntilRaw = profileResponse?['premium_until'];
+      if (isPremium && premiumUntilRaw != null) {
+        final premiumUntil = DateTime.parse(premiumUntilRaw);
+        _isPremium = premiumUntil.isAfter(DateTime.now());
+      } else {
+        _isPremium = isPremium;
+      }
 
       final response = await _supabase
           .from('applications')
