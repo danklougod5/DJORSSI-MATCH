@@ -17,6 +17,18 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLoading = false;
   bool _isSignUp = false;
 
+  String _translateAuthError(String message) {
+    final msg = message.toLowerCase();
+    if (msg.contains('invalid login credentials')) return 'Email ou mot de passe incorrect.';
+    if (msg.contains('user already registered')) return 'Cet email est déjà utilisé.';
+    if (msg.contains('password should be at least 6 characters')) return 'Le mot de passe doit contenir au moins 6 caractères.';
+    if (msg.contains('rate limit')) return 'Trop de tentatives, veuillez réessayer plus tard.';
+    if (msg.contains('email not confirmed')) return 'Veuillez confirmer votre adresse email.';
+    if (msg.contains('invalid email')) return 'Adresse email invalide.';
+    if (msg.contains('invalid or expired')) return 'Lien ou code invalide/expiré.';
+    return 'Erreur d\'authentification. Veuillez réessayer.';
+  }
+
   Future<void> _handleAuth() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -28,23 +40,26 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
+    final fullName = _fullNameController.text.trim();
+    if (_isSignUp && fullName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez entrer votre nom complet')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     
     try {
       if (_isSignUp) {
-        final fullName = _fullNameController.text.trim();
-        if (fullName.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Veuillez entrer votre nom complet')),
-          );
-          return;
-        }
-
         // Inscription
         final response = await Supabase.instance.client.auth.signUp(
           email: email,
           password: password,
           data: {'full_name': fullName},
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Délai d\'attente dépassé pour l\'inscription. Vérifiez votre connexion internet.'),
         );
 
         if (response.user != null) {
@@ -53,7 +68,10 @@ class _AuthScreenState extends State<AuthScreen> {
             await Supabase.instance.client.from('profiles').upsert({
               'id': response.user!.id,
               'full_name': fullName,
-            });
+            }).timeout(
+              const Duration(seconds: 10),
+              onTimeout: () => throw Exception('Délai d\'attente dépassé pour la création du profil.'),
+            );
             if (mounted) {
               context.go('/complete-profile');
             }
@@ -72,6 +90,9 @@ class _AuthScreenState extends State<AuthScreen> {
         final response = await Supabase.instance.client.auth.signInWithPassword(
           email: email,
           password: password,
+        ).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Délai d\'attente dépassé pour la connexion. Vérifiez votre internet.'),
         );
         
         if (mounted && response.user != null) {
@@ -80,7 +101,11 @@ class _AuthScreenState extends State<AuthScreen> {
               .from('profiles')
               .select('full_name, skills')
               .eq('id', response.user!.id)
-              .maybeSingle();
+              .maybeSingle()
+              .timeout(
+                const Duration(seconds: 10),
+                onTimeout: () => throw Exception('Délai de vérification du profil dépassé.'),
+              );
           
           final isProfileComplete = profile != null && 
                                    profile['full_name'] != null && 
@@ -100,15 +125,16 @@ class _AuthScreenState extends State<AuthScreen> {
           return;
         }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.message),
+          content: Text(_translateAuthError(e.message)),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Une erreur est survenue.'),
+          content: Text(e.toString().replaceAll('Exception: ', '')),
           backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 4),
         ));
       }
     } finally {
@@ -130,6 +156,9 @@ class _AuthScreenState extends State<AuthScreen> {
       await Supabase.instance.client.auth.resetPasswordForEmail(
         email,
         redirectTo: 'com.djossimatch://login-callback',
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw Exception('Délai d\'attente dépassé pour la réinitialisation de mot de passe.'),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -157,6 +186,7 @@ class _AuthScreenState extends State<AuthScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _fullNameController.dispose();
     super.dispose();
   }
 

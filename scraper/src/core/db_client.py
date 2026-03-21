@@ -31,9 +31,14 @@ class SupabaseClient:
             print(f"Error inserting job: {e}")
             return None
 
-    def check_control(self):
-        """Always return 'start' to run via terminal as requested by user."""
-        return "start"
+    def url_exists(self, url: str) -> bool:
+        """Checks if a job with this source_url already exists."""
+        if not self.supabase: return False
+        try:
+            res = self.supabase.table("jobs").select("id").eq("source_url", url).execute()
+            return len(res.data) > 0
+        except:
+            return False
 
     def log(self, level: str, message: str):
         """Only print to terminal, skip database insertion to save space."""

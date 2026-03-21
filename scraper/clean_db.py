@@ -1,34 +1,27 @@
-
 import os
-import re
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-load_dotenv('c:/Users/HP/Desktop/NEW APP/scraper/.env')
+load_dotenv()
 
-url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+# Config
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
-supabase: Client = create_client(url, key)
+if not url or not key:
+    print("[ERROR] Database credentials missing in .env")
+    exit(1)
 
-# Get all jobs with suspicious emails
-response = supabase.table("jobs").select("id, job_title, contact_email").execute()
-all_jobs = response.data
-
-invalid_ids = []
-for job in all_jobs:
-    email = str(job.get('contact_email', '')).lower()
-    if 'protect' in email or '[email' in email or '#' in email:
-        print(f"To delete: {job['id']} | {job['job_title']} | {email}")
-        invalid_ids.append(job['id'])
-
-if invalid_ids:
-    print(f"Deleting {len(invalid_ids)} jobs...")
-    # Delete in batches of 10 to be safe
-    for i in range(0, len(invalid_ids), 10):
-        batch = invalid_ids[i:i+10]
-        supabase.table("jobs").delete().in_("id", batch).execute()
-        print(f"Deleted batch {i//10 + 1}")
-    print("Cleanup complete.")
-else:
-    print("No invalid jobs found.")
+try:
+    supabase: Client = create_client(url, key)
+    print(f"[INFO] Nettoyage en cours sur {url}...")
+    
+    # On supprime toutes les offres actuelles (TOUT supprimer)
+    # n.b. delete().neq() avec un UUID inexistant est le moyen standard Supabase de dire 'TOUT supprimer'
+    response = supabase.table("jobs").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+    
+    print(f"[OK] Base de données vidée avec succès !")
+    print(f"[OK] Offres supprimées.")
+    
+except Exception as e:
+    print(f"[ERROR] Échec du nettoyage : {e}")

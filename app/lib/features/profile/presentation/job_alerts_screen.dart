@@ -18,12 +18,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
   bool _alertsEnabled = true;
   final Set<String> _selectedSectors = {};
 
-  final List<String> _availableSectors = [
-    'Informatique', 'Marketing', 'Vente', 'Ressources Humaines',
-    'Finance', 'Logistique', 'Ingénierie', 'Design', 'Administration',
-    'Télécommunications', 'BTP', 'Santé', 'Éducation', 'Juridique',
-    'Banque & Assurance', 'Commerce', 'Transport', 'Hôtellerie',
-  ];
+  List<String> _availableSectors = [];
 
   @override
   void initState() {
@@ -37,7 +32,25 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
 
-      // 1. Check if user is premium
+      // 1. Fetch dynamic tags
+      try {
+        final tagsResponse = await _supabase.from('jobs').select('tags').timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw Exception('Délai d\'attente dépassé (secteurs)'),
+        );
+        final Set<String> uniqueTags = {};
+        for (var row in tagsResponse as List) {
+          if (row['tags'] != null) {
+            uniqueTags.addAll(List<String>.from(row['tags']));
+          }
+        }
+        _availableSectors = uniqueTags.toList()..sort();
+      } catch (e) {
+        debugPrint('Erreur lors du chargement des tags dynamiques: $e');
+        // Garder une liste vide ou fallback
+      }
+
+      // 2. Check if user is premium
       final profile = await _supabase
           .from('profiles')
           .select('is_premium, skills')
@@ -59,12 +72,25 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
         setState(() {
           _alertsEnabled = response['is_active'] ?? true;
           final sectors = List<String>.from(response['sectors'] ?? []);
-          _selectedSectors.addAll(sectors);
+          // On ne garde que les secteurs qui existent toujours
+          for (var s in sectors) {
+            if (_availableSectors.contains(s)) _selectedSectors.add(s);
+          }
+          
+          // Fallback : si rien n'est sélectionné mais que l'alerte est active, on pourrait pré-remplir
+          if (_selectedSectors.isEmpty && profile != null && profile['skills'] != null) {
+             for (var s in List<String>.from(profile['skills'])) {
+               if (_availableSectors.contains(s)) _selectedSectors.add(s);
+             }
+          }
         });
       } else if (profile != null && profile['skills'] != null) {
         // Default: use sectors from profile
         setState(() {
-          _selectedSectors.addAll(List<String>.from(profile['skills']));
+          final profileSkills = List<String>.from(profile['skills']);
+          for (var s in profileSkills) {
+            if (_availableSectors.contains(s)) _selectedSectors.add(s);
+          }
         });
       }
     } catch (e) {
@@ -158,7 +184,9 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                         ),
                       ),
                       SizedBox(height: 24.h),
-                      _buildSectorsGrid(),
+                      _availableSectors.isEmpty 
+                        ? const Text("Aucun secteur disponible pour le moment.", style: TextStyle(color: Colors.grey))
+                        : _buildSectorsGrid(),
                       SizedBox(height: 48.h),
                       _buildSaveButton(),
                     ],

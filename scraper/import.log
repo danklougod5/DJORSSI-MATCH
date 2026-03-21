@@ -1,0 +1,251 @@
+/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+[OK] Supabase Client initialized.
+🚀 Importing 411 jobs from /Users/mac/DJORSSI-MATCH/scraper/exaction/offres_educarriere_resume.json...
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Error inserting job: {'message': "Could not find the 'application_instructions' column of 'jobs' in the schema cache", 'code': 'PGRST204', 'hint': None, 'details': None}
+Traceback (most recent call last):
+  File "/Users/mac/DJORSSI-MATCH/scraper/import_educarriere.py", line 89, in <module>
+    import_data(FILE_PATH)
+  File "/Users/mac/DJORSSI-MATCH/scraper/import_educarriere.py", line 74, in import_data
+    res = db.insert_job(job_data)
+  File "/Users/mac/DJORSSI-MATCH/scraper/src/core/db_client.py", line 29, in insert_job
+    return self.supabase.table("jobs").upsert(data, on_conflict="source_url").execute()
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/postgrest/_sync/request_builder.py", line 47, in execute
+    r = self.request.send()
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/postgrest/base_request_builder.py", line 82, in send
+    return self.session.request(
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpx/_client.py", line 825, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpcore/_sync/connection.py", line 103, in handle_request
+    return self._connection.handle_request(request)
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpcore/_sync/http2.py", line 187, in handle_request
+    raise exc
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpcore/_sync/http2.py", line 150, in handle_request
+    status, headers = self._receive_response(
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpcore/_sync/http2.py", line 294, in _receive_response
+    event = self._receive_stream_event(request, stream_id)
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpcore/_sync/http2.py", line 336, in _receive_stream_event
+    self._receive_events(request, stream_id)
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpcore/_sync/http2.py", line 364, in _receive_events
+    events = self._read_incoming_data(request)
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpcore/_sync/http2.py", line 441, in _read_incoming_data
+    data = self._network_stream.read(self.READ_NUM_BYTES, timeout)
+  File "/Users/mac/DJORSSI-MATCH/scraper/venv/lib/python3.9/site-packages/httpcore/_backends/sync.py", line 128, in read
+    return self._sock.recv(max_bytes)
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ssl.py", line 1226, in recv
+    return self.read(buflen)
+  File "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ssl.py", line 1101, in read
+    return self._sslobj.read(len)
+KeyboardInterrupt

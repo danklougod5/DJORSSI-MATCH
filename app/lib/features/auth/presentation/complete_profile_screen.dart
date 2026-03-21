@@ -15,47 +15,94 @@ class CompleteProfileScreen extends StatefulWidget {
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _customSkillController = TextEditingController();
-  final List<String> _availableTags = [
-    'Informatique', 'Marketing', 'Vente', 'Ressources Humaines',
-    'Finance', 'Logistique', 'Ingénierie', 'Design', 'Administration',
-    'Télécommunications', 'BTP', 'Santé', 'Éducation', 'Juridique',
-    'Banque & Assurance', 'Commerce', 'Transport', 'Hôtellerie',
-  ];
+  List<String> _availableTags = [];
+  String _searchQuery = '';
   
   final Set<String> _selectedTags = {};
   bool _isLoading = false;
   String? _cvUrl;
   bool _isUploadingCV = false;
+  bool _isLoadingTags = true;
+  String? _selectedGender;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    // 1. Récupération dynamique des tags existants dans la base de données
+    try {
+      final tagsResponse = await Supabase.instance.client.from('jobs').select('tags').timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw Exception('Délai d\'attente dépassé pour le chargement des secteurs.'),
+      );
+      final Set<String> uniqueTags = {};
+      
+      for (var row in tagsResponse as List) {
+        if (row['tags'] != null) {
+          uniqueTags.addAll(List<String>.from(row['tags']));
+        }
+      }
+      
+      if (mounted) {
+        setState(() {
+          _availableTags = uniqueTags.toList()..sort();
+          _isLoadingTags = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du chargement des tags dynamiques: $e');
+      if (mounted) {
+        setState(() => _isLoadingTags = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur de connexion : Impossible de charger les secteurs. Veuillez vérifier votre internet.')),
+        );
+      }
+    }
+
+    // 2. Récupération du profil
+    await _loadProfile();
   }
 
   Future<void> _loadProfile() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
 
-    final profile = await Supabase.instance.client
-        .from('profiles')
-        .select()
-        .eq('id', user.id)
-        .maybeSingle();
+    try {
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle()
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw Exception('Délai d\'attente dépassé.'),
+          );
 
-    if (profile != null && mounted) {
-      setState(() {
-        _nameController.text = profile['full_name'] ?? '';
-        _cvUrl = profile['cv_url'];
-        if (profile['skills'] != null) {
-          final skills = List<String>.from(profile['skills']);
-          for (var skill in skills) {
-             if (_availableTags.contains(skill)) {
-               _selectedTags.add(skill);
-             }
+      if (profile != null && mounted) {
+        setState(() {
+          _nameController.text = profile['full_name'] ?? '';
+          _selectedGender = profile['sexe'];
+          _cvUrl = profile['cv_url'];
+          if (profile['skills'] != null) {
+            final skills = List<String>.from(profile['skills']);
+            for (var skill in skills) {
+               if (_availableTags.contains(skill)) {
+                 _selectedTags.add(skill);
+               }
+            }
           }
-        }
-      });
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du chargement du profil: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur de connexion : Impossible de charger votre profil.')),
+        );
+      }
     }
   }
 
@@ -90,6 +137,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           '$filePath/$fileName',
           file,
           fileOptions: const FileOptions(upsert: true),
+        ).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => throw Exception('Délai d\'attente dépassé. Veuillez vérifier votre connexion internet.'),
         );
 
         final String publicUrl = Supabase.instance.client.storage.from('cv_files').getPublicUrl('$filePath/$fileName');
@@ -109,7 +159,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       setState(() => _isUploadingCV = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur upload CV: $e')),
+          SnackBar(content: Text('Erreur upload CV: Une connexion stable est requise.')),
         );
       }
     }
@@ -117,9 +167,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
   Future<void> _saveProfile() async {
     final name = _nameController.text.trim();
-    if (name.isEmpty || (_selectedTags.isEmpty && _customSkillController.text.isEmpty)) {
+    if (name.isEmpty || _selectedGender == null || (_selectedTags.isEmpty && _customSkillController.text.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir votre nom et choisir un secteur.')),
+        const SnackBar(content: Text('Veuillez remplir votre nom, choisir votre sexe et un secteur.')),
       );
       return;
     }
@@ -136,17 +186,21 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         await Supabase.instance.client.from('profiles').upsert({
           'id': user.id,
           'full_name': name,
+          'sexe': _selectedGender,
           'skills': skills,
           'cv_url': _cvUrl,
           'updated_at': DateTime.now().toIso8601String(),
-        });
+        }).timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Délai d\'attente dépassé. Vérifiez votre connexion internet.'),
+        );
         
         if (mounted) context.go('/');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur: $e')),
+          const SnackBar(content: Text('Erreur: Connexion internet instable. Veuillez réessayer.')),
         );
       }
     } finally {
@@ -185,6 +239,20 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               ),
               
               SizedBox(height: 24.h),
+              _buildLabel('Votre Sexe'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildGenderCard('Homme', Icons.male, const Color(0xFF3B82F6)),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: _buildGenderCard('Femme', Icons.female, const Color(0xFFEC4899)),
+                  ),
+                ],
+              ),
+              
+              SizedBox(height: 24.h),
               _buildLabel('Votre CV (Obligatoire)'),
               GestureDetector(
                 onTap: _pickAndUploadCV,
@@ -213,34 +281,58 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               
               SizedBox(height: 24.h),
               _buildLabel('Secteurs d\'activité'),
-              Wrap(
-                spacing: 8.w,
-                runSpacing: 8.h,
-                children: _availableTags.map((tag) {
-                  final isSelected = _selectedTags.contains(tag);
-                  final themeColor = Theme.of(context).primaryColor;
-                  return FilterChip(
-                    label: Text(tag),
-                    selected: isSelected,
-                    onSelected: (_) => setState(() => isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag)),
-                    selectedColor: themeColor.withValues(alpha: 0.15),
-                    checkmarkColor: themeColor,
-                    labelStyle: TextStyle(
-                      color: isSelected ? themeColor : const Color(0xFF64748B),
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      fontSize: 13.sp,
+              // Barre de recherche pour les tags
+              if (!_isLoadingTags && _availableTags.isNotEmpty) ...[
+                TextField(
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                  decoration: InputDecoration(
+                    hintText: 'Rechercher un secteur...',
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16.r), 
+                      borderSide: BorderSide.none
                     ),
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(100.r),
-                      side: BorderSide(
-                        color: isSelected ? themeColor : const Color(0xFFE2E8F0),
-                        width: isSelected ? 1.5 : 1,
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
+                  ),
+                ),
+                SizedBox(height: 12.h),
+              ],
+              
+              _isLoadingTags
+                  ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(strokeWidth: 2)))
+                  : _availableTags.isEmpty
+                      ? const Center(child: Text('Aucun secteur disponible pour le moment.'))
+                      : Wrap(
+                          spacing: 8.w,
+                          runSpacing: 8.h,
+                          children: _availableTags
+                            .where((tag) => tag.toLowerCase().contains(_searchQuery.toLowerCase()))
+                            .map((tag) {
+                            final isSelected = _selectedTags.contains(tag);
+                            final themeColor = Theme.of(context).primaryColor;
+                            return FilterChip(
+                              label: Text(tag),
+                              selected: isSelected,
+                              onSelected: (_) => setState(() => isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag)),
+                              selectedColor: themeColor.withValues(alpha: 0.15),
+                              checkmarkColor: themeColor,
+                              labelStyle: TextStyle(
+                                color: isSelected ? themeColor : const Color(0xFF64748B),
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 13.sp,
+                              ),
+                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(100.r),
+                                side: BorderSide(
+                                  color: isSelected ? themeColor : const Color(0xFFE2E8F0),
+                                  width: isSelected ? 1.5 : 1,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
               
               SizedBox(height: 40.h),
               ElevatedButton(
@@ -273,4 +365,35 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     fillColor: const Color(0xFFF8FAFC),
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16.r), borderSide: BorderSide.none),
   );
+
+  Widget _buildGenderCard(String label, IconData icon, Color color) {
+    final isSelected = _selectedGender == label;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedGender = label),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 16.h),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: isSelected ? color : const Color(0xFFE2E8F0),
+            width: 2,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: isSelected ? color : const Color(0xFF64748B), size: 28.sp),
+            SizedBox(height: 8.h),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? color : const Color(0xFF64748B),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

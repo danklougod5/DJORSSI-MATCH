@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 class MatchesScreen extends StatefulWidget {
   const MatchesScreen({super.key});
@@ -13,6 +14,7 @@ class MatchesScreen extends StatefulWidget {
 class _MatchesScreenState extends State<MatchesScreen> {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
+  bool _isPremium = false;
   List<Map<String, dynamic>> _matches = [];
 
   String _selectedFilter = 'Tous';
@@ -28,19 +30,29 @@ class _MatchesScreenState extends State<MatchesScreen> {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
+      final profileResponse = await _supabase
+          .from('profiles')
+          .select('is_premium')
+          .eq('id', userId)
+          .maybeSingle();
+          
+      _isPremium = profileResponse?['is_premium'] ?? false;
+
       final response = await _supabase
           .from('applications')
           .select('*, jobs(*)')
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
-      setState(() {
-        _matches = List<Map<String, dynamic>>.from(response);
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _matches = List<Map<String, dynamic>>.from(response);
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('Erreur chargement matches: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -103,7 +115,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
                         final job = match['jobs'];
                         final date = DateTime.parse(match['created_at']);
                         
-                        return _buildMatchCard(job, date);
+                        // Limit to 3 matches if Freemium
+                        final isLocked = !_isPremium && index >= 3;
+                        return _buildMatchCard(job, date, isLocked: isLocked);
                       },
                     ),
                   ),
@@ -182,7 +196,60 @@ class _MatchesScreenState extends State<MatchesScreen> {
     );
   }
 
-  Widget _buildMatchCard(Map<String, dynamic>? job, DateTime date) {
+  Widget _buildMatchCard(Map<String, dynamic>? job, DateTime date, {bool isLocked = false}) {
+    if (isLocked) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3), width: 1.5),
+        ),
+        child: InkWell(
+          onTap: () => context.push('/premium'),
+          child: Padding(
+            padding: EdgeInsets.all(20.r),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12.r),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.lock_rounded, color: const Color(0xFFF59E0B), size: 24.r),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ancien Match Bloqué',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Passez au Premium pour voir tout votre historique.',
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: Colors.grey.shade400),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,

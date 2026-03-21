@@ -1,10 +1,17 @@
+import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:djossimatch/features/swipe/presentation/djossi_swipe_card.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class SwipeScreen extends StatefulWidget {
   const SwipeScreen({super.key});
@@ -25,21 +32,46 @@ class _SwipeScreenState extends State<SwipeScreen> {
   bool _isPremium = false;
   String? _cvUrl;
   String? _fullName;
+  String? _sexe;
 
   // File d'attente pour les envois d'email (éviter le rate-limiting)
   final List<Map<String, dynamic>> _emailQueue = [];
   bool _isProcessingQueue = false;
 
+  StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    _setupRealtime();
   }
 
   @override
   void dispose() {
+    _profileSubscription?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _setupRealtime() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _profileSubscription = _supabase
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', userId)
+        .listen((data) {
+      if (data.isNotEmpty && mounted) {
+        setState(() {
+          _isPremium = data.first['is_premium'] ?? false;
+          _cvUrl = data.first['cv_url'];
+          _fullName = data.first['full_name'];
+          _sexe = data.first['sexe'];
+        });
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -50,7 +82,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       // 1. Récupérer les infos du profil (is_premium et skills)
       final profileResponse = await _supabase
           .from('profiles')
-          .select('skills, is_premium, full_name, cv_url')
+          .select('skills, is_premium, full_name, cv_url, sexe')
           .eq('id', userId)
           .maybeSingle();
 
@@ -58,6 +90,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
         _isPremium = profileResponse['is_premium'] ?? false;
         _cvUrl = profileResponse['cv_url'];
         _fullName = profileResponse['full_name'];
+        _sexe = profileResponse['sexe'];
       }
 
       if (profileResponse != null && profileResponse['skills'] != null) {
@@ -100,12 +133,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
           .where((job) => !swipedJobIds.contains(job['id'].toString()))
           .toList();
 
-      // 4. Trier par matching
+      // 4. Trier par matching pour tous les utilisateurs
       if (_userSkills.isNotEmpty) {
         allJobs.sort((a, b) {
           final scoreA = _calculateMatchScore(a);
           final scoreB = _calculateMatchScore(b);
-          return scoreB.compareTo(scoreA);
+          return scoreB.compareTo(scoreA); // Les meilleurs scores en premier
         });
       }
 
@@ -166,6 +199,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
       // Si la spécialité du job est exactement le secteur de l'utilisateur
       if (jobSpecialty == skillLower || jobSpecialty.contains(skillLower)) {
         currentSectorScore += 60;
+      }
+      
+      // 1.5 MATCH DIRECT PAR TAG RÉEL DE LA BASE (Le plus précis pour le nouveau système)
+      if (jobTags.contains(skillLower)) {
+        currentSectorScore += 80;
       }
 
       // 2. RECHERCHE DE MOTS-CLÉS SPÉCIFIQUES AU SECTEUR
@@ -278,10 +316,20 @@ class _SwipeScreenState extends State<SwipeScreen> {
           debugPrint('*** [DIAGNOSTIC] ÉCHEC: PAS DE CV DANS LE PROFIL ***');
         }
 
-        // WhatsApp redirect si nécessaire
+        // Priorité des redirections sur Match (Swipe Right)
         final whatsapp = job['whatsapp_number'];
+        final email = job['contact_email'];
+        final appLink = job['application_link'] ?? 
+            (job['raw_data'] != null ? job['raw_data']['application_link'] : null);
+
+        // Si il y a un WhatsApp, on redirige
         if (whatsapp != null && whatsapp.toString().isNotEmpty) {
           _showWhatsAppRedirect(job['job_title'] ?? 'ce poste', whatsapp.toString());
+        } 
+        // Sinon, si il n'y a ni email ni WhatsApp, mais un lien, on redirige vers le lien
+        else if ((email == null || email.toString().isEmpty) && 
+                 appLink != null && appLink.toString().isNotEmpty) {
+          _showApplicationLinkRedirect(job['job_title'] ?? 'ce poste', appLink.toString());
         } else if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -297,6 +345,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
       }
     } catch (e) {
       debugPrint('Erreur lors du swipe: $e');
+      if (e.toString().contains('Daily free swipe limit')) {
+        _controller.undo(); // Ramène la carte à l'écran
+        setState(() => _swipeCount = 10); // Resynchronise le compteur local de force
+        if (mounted) _showPremiumLimitDialog();
+      }
     }
   }
 
@@ -333,7 +386,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
             'jobContactEmail': job['contact_email'],
             'cvUrl': _cvUrl,
             'userName': _fullName,
-            'message': null, 
+            'userSexe': _sexe,
+            'message': null,
+            'requiresCoverLetter': job['requires_cover_letter'] ?? false,
+            'coverLetterInstructions': job['cover_letter_instructions'],
+            'jobDescription': job['description'],
           },
           headers: {
             'Authorization': 'Bearer ${token ?? ''}',
@@ -360,6 +417,45 @@ class _SwipeScreenState extends State<SwipeScreen> {
     
     _isProcessingQueue = false;
     debugPrint('*** [QUEUE] File d\'attente vidée. Tous les emails envoyés. ***');
+  }
+
+  void _showPremiumFeatureDialog(String feature) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
+        title: Row(
+          children: [
+            const Icon(Icons.star, color: Color(0xFFF97316)),
+            SizedBox(width: 10.w),
+            const Text('Fonction Premium'),
+          ],
+        ),
+        content: Text(
+          'La fonctionnalité "$feature" est réservée aux membres Premium.\n\nPassez au forfait illimité pour en profiter !',
+          style: const TextStyle(height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Plus tard', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.push('/premium');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF97316),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+              elevation: 0,
+            ),
+            child: const Text('Passer Premium', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showPremiumLimitDialog() {
@@ -455,14 +551,25 @@ class _SwipeScreenState extends State<SwipeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
         title: Row(
           children: [
-            const Icon(Icons.message, color: Color(0xFF25D366)),
+            const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366)),
             SizedBox(width: 10.w),
-            const Text('Postuler via WhatsApp'),
+            const Expanded(child: Text('Postuler via WhatsApp')),
           ],
         ),
-        content: Text(
-          'Ce poste accepte les candidatures via WhatsApp. Voulez-vous envoyer votre profil maintenant ?',
-          style: TextStyle(fontSize: 14.sp),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Prêt à postuler ?',
+              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              "L'application va ouvrir WhatsApp avec le numéro du recruteur. N'oubliez pas de joindre votre CV une fois sur WhatsApp !",
+              style: TextStyle(fontSize: 13.sp),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -472,17 +579,22 @@ class _SwipeScreenState extends State<SwipeScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final message = Uri.encodeComponent(
-                "Bonjour, je suis intéressé par le poste de $jobTitle vu sur Djossi Match. Voici mon profil."
-              );
-              final url = Uri.parse("https://wa.me/$finalPhone?text=$message");
               
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              } else {
+              String textMessage = "Bonjour, je suis intéressé par le poste de $jobTitle vu sur Djossi Match. Veuillez trouver mon CV ci-joint.";
+              
+              final message = Uri.encodeComponent(textMessage);
+              final whatsappAppUrl = Uri.parse("whatsapp://send?phone=$finalPhone&text=$message");
+              final webUrl = Uri.parse("https://wa.me/$finalPhone?text=$message");
+              
+              try {
+                bool launched = await launchUrl(whatsappAppUrl, mode: LaunchMode.externalApplication);
+                if (!launched) {
+                  launched = await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+                }
+              } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Impossible de lancer WhatsApp')),
+                    const SnackBar(content: Text("Impossible d'ouvrir WhatsApp")),
                   );
                 }
               }
@@ -492,6 +604,59 @@ class _SwipeScreenState extends State<SwipeScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
             ),
             child: const Text('Envoyer mon CV', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showApplicationLinkRedirect(String jobTitle, String urlString) {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+        title: Row(
+          children: [
+            const Icon(Icons.open_in_new_rounded, color: Color(0xFFF97316)),
+            SizedBox(width: 10.w),
+            const Expanded(child: Text('Postuler en ligne')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Cette offre nécessite de postuler sur un site externe.',
+              style: TextStyle(fontSize: 14.sp),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              "Voulez-vous ouvrir le lien de candidature ?",
+              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Plus tard', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final url = Uri.parse(urlString);
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF97316),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+            ),
+            child: const Text('Ouvrir le lien', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -519,6 +684,13 @@ class _SwipeScreenState extends State<SwipeScreen> {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1.0),
+          child: Container(
+            color: const Color(0xFFE2E8F0), // Ligne de séparation douce
+            height: 1.0,
+          ),
+        ),
       ),
       body: _jobs.isEmpty 
           ? _buildEmptyState()
@@ -534,14 +706,19 @@ class _SwipeScreenState extends State<SwipeScreen> {
                           controller: _controller,
                           cardsCount: _jobs.length,
                           onSwipe: _onSwipe,
-                          numberOfCardsDisplayed: 3,
+                          numberOfCardsDisplayed: _jobs.length >= 3 ? 3 : _jobs.length,
                           backCardOffset: const Offset(0, 40),
                           duration: const Duration(milliseconds: 400),
                           padding: EdgeInsets.zero,
                           scale: 0.9,
                           maxAngle: 30,
                           threshold: 40,
-                          isLoop: true, // Permet de revenir en arrière plus facilement
+                          isLoop: false,
+                          onEnd: () {
+                            setState(() {
+                              _jobs.clear();
+                            });
+                          },
                           cardBuilder: (context, index, horizontalThresholdPercent, verticalThresholdPercent) {
                             final job = _jobs[index];
                             final matchScore = _calculateMatchScore(job);
@@ -562,6 +739,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
                                   isVerified: job['is_ai_verified'] ?? false,
                                   tags: List<String>.from(job['tags'] ?? []),
                                   deadline: job['deadline'],
+                                  applicationLink: job['application_link'] ?? 
+                                      (job['raw_data'] != null ? job['raw_data']['application_link'] : null),
+                                  requiresCoverLetter: job['requires_cover_letter'] ?? false,
+                                  coverLetterInstructions: job['cover_letter_instructions'],
                                 ),
                                 if (matchScore > 0)
                                   Positioned(
@@ -644,7 +825,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
   Future<void> _handleUndo() async {
     if (!_isPremium) {
-      _showPremiumLimitDialog();
+      _showPremiumFeatureDialog('Retour en arrière');
       return;
     }
 
@@ -676,7 +857,13 @@ class _SwipeScreenState extends State<SwipeScreen> {
           }
           _controller.swipe(CardSwiperDirection.left);
         }),
-        _buildActionButton(Icons.replay_rounded, const Color(0xFFF97316), _handleUndo, isMini: true),
+        _buildActionButton(
+          Icons.replay_rounded, 
+          _isPremium ? const Color(0xFFF59E0B) : Colors.grey, 
+          _handleUndo, 
+          isMini: true,
+          locked: !_isPremium,
+        ),
         _buildActionButton(Icons.favorite_rounded, Colors.green, () {
           if (!_isPremium && _swipeCount >= 10) {
             _showPremiumLimitDialog();
@@ -688,28 +875,49 @@ class _SwipeScreenState extends State<SwipeScreen> {
     );
   }
 
-  Widget _buildActionButton(IconData icon, Color color, VoidCallback onPressed, {bool isMini = false}) {
+  Widget _buildActionButton(IconData icon, Color color, VoidCallback onPressed, {bool isMini = false, bool locked = false}) {
     final size = isMini ? 55.r : 70.r;
     final iconSize = isMini ? 24.r : 32.r;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.2),
-            spreadRadius: 2.r,
-            blurRadius: 10.r,
-            offset: Offset(0, 4.h),
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.2),
+                spreadRadius: 2.r,
+                blurRadius: 10.r,
+                offset: Offset(0, 4.h),
+              ),
+            ],
+            border: _isPremium && !isMini && color == Colors.green
+                ? Border.all(color: const Color(0xFFF59E0B).withOpacity(0.5), width: 2)
+                : null,
           ),
-        ],
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: color, size: iconSize),
-        onPressed: onPressed,
-      ),
+          child: IconButton(
+            icon: Icon(icon, color: color, size: iconSize),
+            onPressed: onPressed,
+          ),
+        ),
+        if (locked)
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              padding: EdgeInsets.all(4.r),
+              decoration: const BoxDecoration(
+                color: Color(0xFF0F172A),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.lock, color: const Color(0xFFF59E0B), size: 12.r),
+            ),
+          ),
+      ],
     );
   }
 }

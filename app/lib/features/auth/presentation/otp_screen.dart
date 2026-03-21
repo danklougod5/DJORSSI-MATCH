@@ -22,6 +22,15 @@ class _OtpScreenState extends State<OtpScreen> {
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
 
+  String _translateAuthError(String message) {
+    final msg = message.toLowerCase();
+    if (msg.contains('token has expired or is invalid') || msg.contains('invalid or expired')) {
+      return 'Le code est invalide ou a expiré.';
+    }
+    if (msg.contains('rate limit')) return 'Trop de tentatives, veuillez réessayer plus tard.';
+    return 'Erreur de vérification. Veuillez réessayer.';
+  }
+
   @override
   void dispose() {
     for (var controller in _controllers) {
@@ -49,6 +58,9 @@ class _OtpScreenState extends State<OtpScreen> {
         email: widget.email,
         token: otp,
         type: OtpType.signup,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw Exception('Délai d\'attente dépassé pour la vérification.'),
       );
 
       if (response.user != null) {
@@ -57,7 +69,10 @@ class _OtpScreenState extends State<OtpScreen> {
           await Supabase.instance.client.from('profiles').upsert({
             'id': response.user!.id,
             'full_name': widget.fullName,
-          });
+          }).timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw Exception('Délai d\'attente dépassé pour la création du profil.'),
+          );
         }
         
         if (mounted) {
@@ -67,15 +82,16 @@ class _OtpScreenState extends State<OtpScreen> {
     } on AuthException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.message),
+          content: Text(_translateAuthError(e.message)),
           backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Une erreur est survenue lors de la vérification.'),
+          content: Text(e.toString().replaceAll('Exception: ', '')),
           backgroundColor: Theme.of(context).colorScheme.error,
+          duration: const Duration(seconds: 4),
         ));
       }
     } finally {
@@ -89,6 +105,9 @@ class _OtpScreenState extends State<OtpScreen> {
       await Supabase.instance.client.auth.resend(
         type: OtpType.signup,
         email: widget.email,
+      ).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => throw Exception('Délai d\'attente dépassé pour l\'envoi du code.'),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -98,7 +117,10 @@ class _OtpScreenState extends State<OtpScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors de l\'envoi du code')),
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {

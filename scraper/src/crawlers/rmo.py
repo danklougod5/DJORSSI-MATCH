@@ -1,8 +1,5 @@
-"""
-Crawler for rmo-jobcenter.com - Cote d'Ivoire jobs.
-"""
-
-import requests
+import httpx
+import asyncio
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import re
@@ -15,61 +12,56 @@ HEADERS = {
     "Accept-Language": "fr-FR,fr;q=0.9",
 }
 
-def scrape_rmo(pages: list[int] = None) -> list[dict]:
-    """Scrapes job listings from RMO for Cote d'Ivoire."""
-    # NOTE: RMO uses AJAX POST for pagination (ajax_navigation.php).
-    # Since URL parameters like ?page= are ignored, we focus on the first page
-    # which contains the 20 most recent offers.
-    
+async def fetch_rmo_detail(client: httpx.AsyncClient, link: str) -> dict:
+    """Fetches RMO job details asynchronously."""
+    try:
+        resp = await client.get(link, headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        
+        detail_content = soup.find("div", class_="offer-details") or \
+                         soup.find("div", class_="content") or \
+                         soup.find("div", id="job-details") or \
+                         soup.find("main")
+        
+        if detail_content:
+            raw_text = detail_content.get_text("\n", strip=True)
+            if len(raw_text) > 200:
+                return {
+                    "raw_text": raw_text[:5000],
+                    "source_url": link
+                }
+    except Exception:
+        pass
+    return None
+
+async def scrape_rmo() -> list[dict]:
+    """Scrapes job listings from RMO for Cote d'Ivoire asynchronously."""
     all_jobs = []
     print(f"  Scraping RMO: {JOBS_URL}")
     
-    try:
-        response = requests.get(JOBS_URL, headers=HEADERS, timeout=15)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        print(f"  [ERROR] Failed to fetch {JOBS_URL}: {e}")
-        return []
-    
-    soup = BeautifulSoup(response.text, "html.parser")
-    
-    # Target links with class 'more' or 'bleu' that go to job details
-    job_links = []
-    for l in soup.select("a.more, a.bleu"):
-        href = l.get('href')
-        if href and "/offre-emploi/" in href:
-            job_links.append(urljoin(BASE_URL, href))
-                
-    job_links = list(set(job_links))
-    print(f"  Found {len(job_links)} potential job links on RMO.")
-    
-    for link in job_links:
+    async with httpx.AsyncClient(follow_redirects=True) as client:
         try:
-            print(f"    - Visiting: {link}")
-            detail_resp = requests.get(link, headers=HEADERS, timeout=10)
-            detail_soup = BeautifulSoup(detail_resp.text, "html.parser")
+            response = await client.get(JOBS_URL, headers=HEADERS, timeout=15)
+            response.raise_for_status()
             
-            # Target detail content - usually in 'offer-details' or similar
-            detail_content = detail_soup.find("div", class_="offer-details") or \
-                             detail_soup.find("div", class_="content") or \
-                             detail_soup.find("div", id="job-details") or \
-                             detail_soup.find("main")
-            
-            if detail_content:
-                raw_text = detail_content.get_text("\n", strip=True)
-            else:
-                raw_text = detail_soup.get_text("\n", strip=True)
-
-            if len(raw_text) > 150:
-                all_jobs.append({
-                    "raw_text": raw_text[:5000],
-                    "source_url": link
-                })
+            soup = BeautifulSoup(response.text, "html.parser")
+            job_links = []
+            for l in soup.select("a.more, a.bleu"):
+                href = l.get('href')
+                if href and "/offre-emploi/" in href:
+                    job_links.append(urljoin(BASE_URL, href))
+                    
+            job_links = list(set(job_links))
+            if job_links:
+                print(f"    - Found {len(job_links)} links. Fetching in parallel...")
+                tasks = [fetch_rmo_detail(client, link) for link in job_links]
+                results = await asyncio.gather(*tasks)
+                all_jobs.extend([res for res in results if res])
         except Exception as e:
-            print(f"      [WARN] Detail visit failed: {e}")
-            continue
+            print(f"  [ERROR] RMO failed: {repr(e)}")
     
     # Remove duplicates
     all_jobs = list({v['source_url']: v for v in all_jobs}.values())
-    print(f"  [OK] RMO: Collected {len(all_jobs)} jobs.")
+    print(f"  [OK] RMO found {len(all_jobs)} jobs.")
     return all_jobs

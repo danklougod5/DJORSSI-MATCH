@@ -15,6 +15,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
 
+  String _translateAuthError(String message) {
+    final msg = message.toLowerCase();
+    if (msg.contains('password should be at least 6 characters')) {
+      return 'Le mot de passe doit contenir au moins 6 caractères.';
+    }
+    if (msg.contains('rate limit')) return 'Trop de tentatives, veuillez réessayer plus tard.';
+    return 'Erreur lors de la réinitialisation. Veuillez réessayer.';
+  }
+
   Future<void> _updatePassword() async {
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
@@ -59,7 +68,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.message),
+            content: Text(_translateAuthError(e.message)),
             backgroundColor: Colors.red,
           ),
         );

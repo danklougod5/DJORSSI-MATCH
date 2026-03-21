@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,9 +12,18 @@ import 'package:djossimatch/core/routing/app_router.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  await dotenv.load(fileName: ".env");
+
+  final supabaseUrl = dotenv.env['SUPABASE_URL'];
+  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];
+
+  if (supabaseUrl == null || supabaseAnonKey == null) {
+    throw Exception('Les clés Supabase sont introuvables dans le fichier .env (SUPABASE_URL et SUPABASE_ANON_KEY)');
+  }
+
   await Supabase.initialize(
-    url: 'https://tbhxbfunyhbrctzfpkwf.supabase.co',
-    anonKey: 'sb_publishable_4rKluxoXhTD11egNVta7Dw_tdGicphB',
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
   );
 
   runApp(const DjossiMatchApp());

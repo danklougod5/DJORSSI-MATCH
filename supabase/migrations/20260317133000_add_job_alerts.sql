@@ -52,14 +52,15 @@ BEGIN
     AND sectors && NEW.tags
   ) THEN
     -- Invoke Edge Function (Webhook style)
-    -- This assumes pg_net is enabled. If not, this part might fail silently or error.
-    -- Better practice: Use Supabase Dashboard Database Webhooks for better reliability.
-    
-    -- PERFORM net.http_post(
-    --   url := 'https://tbhxbfunyhbrctzfpkwf.supabase.co/functions/v1/notify-job-alerts',
-    --   headers := jsonb_build_object('Content-Type', 'application/json', 'Authorization', 'Bearer YOUR_SERVICE_ROLE_KEY'),
-    --   body := jsonb_build_object('job_id', NEW.id)
-    -- );
+    -- Assurez-vous de remplacer <VOTRE_SERVICE_ROLE_KEY> par la clé "service_role" de votre projet
+    PERFORM net.http_post(
+      url := 'https://tbhxbfunyhbrctzfpkwf.supabase.co/functions/v1/notify-job-alerts',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json', 
+        'Authorization', 'Bearer <VOTRE_SERVICE_ROLE_KEY>'
+      ),
+      body := jsonb_build_object('job_id', NEW.id)
+    );
     
     RAISE NOTICE 'New matching job found! ID: %, Tags: %', NEW.id, NEW.tags;
   END IF;

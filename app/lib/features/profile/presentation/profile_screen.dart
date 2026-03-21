@@ -243,7 +243,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.white,
-                          border: Border.all(color: Colors.white, width: 4),
+                          border: Border.all(
+                            color: (_profileData?['is_premium'] ?? false) 
+                                ? const Color(0xFFF59E0B) 
+                                : Colors.white, 
+                            width: 4,
+                          ),
                           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -253,7 +258,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                         child: ClipOval(
-                          child: Icon(Icons.person, size: 60.r, color: const Color(0xFF94A3B8)),
+                          child: Icon(
+                            Icons.person, 
+                            size: 60.r, 
+                            color: (_profileData?['is_premium'] ?? false) 
+                                ? const Color(0xFFF59E0B).withOpacity(0.5) 
+                                : const Color(0xFF94A3B8),
+                          ),
                         ),
                       ),
                       Positioned(
@@ -275,32 +286,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                   SizedBox(height: 20.h),
-                  Text(
-                    'Bienvenue, ${_fullName ?? 'Utilisateur Djossi'}',
-                    style: TextStyle(
-                      fontSize: 22.sp,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Bienvenue, ${_fullName ?? 'Utilisateur Djossi'}',
+                        style: TextStyle(
+                          fontSize: 22.sp,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                      if (_profileData?['is_premium'] ?? false)
+                        Padding(
+                          padding: EdgeInsets.only(left: 8.w),
+                          child: Icon(Icons.verified, color: const Color(0xFFF59E0B), size: 24.r),
+                        ),
+                    ],
                   ),
                   SizedBox(height: 8.h),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
                     decoration: BoxDecoration(
+                      gradient: (_profileData?['is_premium'] ?? false) 
+                          ? const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)])
+                          : null,
                       color: (_profileData?['is_premium'] ?? false) 
-                          ? const Color(0xFFF97316).withOpacity(0.1) 
+                          ? null
                           : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(20.r),
+                      boxShadow: (_profileData?['is_premium'] ?? false)
+                          ? [BoxShadow(color: const Color(0xFFF59E0B).withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                          : null,
                     ),
-                    child: Text(
-                      (_profileData?['is_premium'] ?? false) ? 'Candidat Premium' : 'Utilisateur Freemium',
-                      style: TextStyle(
-                        fontSize: 11.sp,
-                        fontWeight: FontWeight.bold,
-                        color: (_profileData?['is_premium'] ?? false) 
-                            ? const Color(0xFFF97316) 
-                            : Colors.grey.shade600,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_profileData?['is_premium'] ?? false)
+                          Padding(
+                            padding: EdgeInsets.only(right: 6.w),
+                            child: Icon(Icons.workspace_premium, color: Colors.white, size: 14.r),
+                          ),
+                        Text(
+                          (_profileData?['is_premium'] ?? false) ? 'MEMBRE VIP' : 'Utilisateur Freemium',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: (_profileData?['is_premium'] ?? false) ? 1 : 0,
+                            color: (_profileData?['is_premium'] ?? false) 
+                                ? Colors.white 
+                                : Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   SizedBox(height: 8.h),
@@ -469,8 +507,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isPremium ? Icons.stars_rounded : Icons.workspace_premium_rounded,
-              color: Colors.white,
+              isPremium ? Icons.workspace_premium_rounded : Icons.workspace_premium_outlined,
+              color: isPremium ? const Color(0xFFF59E0B) : Colors.white,
               size: 28.r,
             ),
           ),
@@ -480,9 +518,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isPremium ? 'MEMBRE PREMIUM' : 'PASSEZ AU PREMIUM',
+                  isPremium ? 'M E M B R E   P R E M I U M' : 'PASSEZ AU PREMIUM',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: isPremium ? const Color(0xFFF59E0B) : Colors.white,
                     fontWeight: FontWeight.w900,
                     fontSize: 14.sp,
                     letterSpacing: 1.2,

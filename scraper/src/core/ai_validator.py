@@ -4,162 +4,70 @@ import time
 import requests
 from dotenv import load_dotenv
 
-# Mistral
-from mistralai.client import Mistral
-import google.generativeai as genai
-
 load_dotenv()
 
 class AIJobValidator:
     def __init__(self):
-        self.mistral_clients = []
-        self.current_mistral_idx = 0
-        self.openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-        
-        # Load multiple Mistral keys from distinct env vars
-        i = 1
-        while True:
-            key = os.environ.get(f"MISTRAL_KEY_{i}")
-            if not key:
-                if i == 1:
-                    key = os.environ.get("MISTRAL_API_KEY")
-                if not key:
-                    break
-            
-            try:
-                client = Mistral(api_key=key)
-                self.mistral_clients.append(client)
-                print(f"[OK] Mistral Key #{i} initialized.")
-            except Exception as e:
-                print(f"[WARN] Failed to init Mistral Key #{i}: {e}")
-            
-            i += 1
+        self.ollama_model = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b")
+        self.ollama_url = "http://localhost:11434/api/chat"
+        self.providers = ["ollama"]
+        print(f"[OK] AI Validator initialized with Ollama ({self.ollama_model}).")
 
-        if self.openrouter_key:
-            print("[OK] OpenRouter key loaded.")
-
-        self.providers = []
-        if self.mistral_clients:
-            self.providers.append("mistral")
-        if self.openrouter_key:
-            self.providers.append("openrouter")
-        if os.environ.get("GEMINI_API_KEY"):
-            self.providers.append("gemini")
-        if os.environ.get("GROQ_API_KEY"):
-            self.providers.append("groq")
-
-        if not self.providers:
-            print("[ERROR] No AI clients initialized. Scraper will fail validation.")
-
-    def _rotate_mistral(self):
-        if len(self.mistral_clients) > 1:
-            self.current_mistral_idx = (self.current_mistral_idx + 1) % len(self.mistral_clients)
-            print(f"  [ROTATE] Switched to Mistral Key #{self.current_mistral_idx + 1}")
-            return True
-        return False
-
-    def _call_mistral(self, prompt):
-        if not self.mistral_clients:
-            return None
-            
-        client = self.mistral_clients[self.current_mistral_idx]
-        response = client.chat.complete(
-            model="mistral-small-latest",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}
-        )
-        content = response.choices[0].message.content.strip()
-        return json.loads(content)
-
-    def _call_openrouter(self, prompt):
-        if not self.openrouter_key:
-            return None
-            
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.openrouter_key}",
-            "Content-Type": "application/json"
-        }
-        
-        # Use a model that we know works and is free
-        model_id = "nvidia/nemotron-3-super-120b-a12b:free"
+    async def _call_ollama(self, prompt):
+        """Appelle l'API Ollama locale pour analyser l'offre d'emploi en asynchrone."""
+        import httpx
         data = {
-            "model": model_id,
+            "model": self.ollama_model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.1
+            "stream": False,
+            "format": "json"
         }
         
         try:
-            response = requests.post(url, headers=headers, json=data, timeout=30)
-            if response.status_code == 200:
-                result = response.json()
-                content = result['choices'][0]['message']['content'].strip()
-                
-                # Extract JSON from potential markdown or text
-                if "{" in content:
-                    content = content[content.find("{"):content.rfind("}")+1]
-                return json.loads(content)
-            else:
-                print(f"  [ERROR] OpenRouter HTTP {response.status_code}: {response.text[:200]}")
-                return None
+            # Timeout plus court car on tourne en asynchrone
+            async with httpx.AsyncClient() as client:
+                response = await client.post(self.ollama_url, json=data, timeout=300.0)
+                if response.status_code == 200:
+                    result = response.json()
+                    content = result['message']['content'].strip()
+                    
+                    # Extraction du JSON propre
+                    if "{" in content:
+                        content = content[content.find("{"):content.rfind("}")+1]
+                    return json.loads(content)
+                else:
+                    print(f"  [ERROR] Ollama HTTP {response.status_code}")
+                    return None
         except Exception as e:
-            print(f"  [ERROR] OpenRouter request failed: {e}")
+            print(f"  [ERROR] Ollama Error: {repr(e)}")
             return None
 
-    def _call_gemini(self, prompt):
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            return None
-        
-        try:
-            # Add a small delay for Gemini free tier (15 RPM)
-            time.sleep(4) 
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('models/gemini-2.0-flash', generation_config={"response_mime_type": "application/json"})
-            response = model.generate_content(prompt)
-            return json.loads(response.text)
-        except Exception as e:
-            print(f"  [ERROR] Gemini request failed: {e}")
-            return None
-
-    def _call_groq(self, prompt):
-        api_key = os.environ.get("GROQ_API_KEY")
-        if not api_key:
-            return None
-        
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": [{"role": "user", "content": prompt}],
-            "response_format": {"type": "json_object"}
-        }
-        
-        try:
-            response = requests.post(url, headers=headers, json=data, timeout=30)
-            if response.status_code == 200:
-                result = response.json()
-                content = result['choices'][0]['message']['content'].strip()
-                return json.loads(content)
-            else:
-                print(f"  [ERROR] Groq HTTP {response.status_code}: {response.text[:200]}")
-                return None
-        except Exception as e:
-            print(f"  [ERROR] Groq request failed: {e}")
-            return None
-
-    def validate_and_clean_job(self, raw_text: str):
+    async def validate_and_clean_job(self, raw_text: str):
         prompt = f"""
         Extract job information from the following raw text and return it strictly as a valid JSON object.
         If the text is NOT a job offer, return {{"is_job": false}}.
         
-        Fields:
-        - job_title, company_name, specialty, contract_type, salary_range, location, 
-        - required_level, experience, contact_email, whatsapp_number, description, tags, deadline.
-        - is_ai_verified: true.
+        Fields expected in the JSON:
+        - "job_title": Clean title (e.g., 'Comptable' instead of 'Poste de comptable H/F')
+        - "company_name": Name of the hiring company (Return 'Non spécifié' if not found in text)
+        - "specialty": Field of work
+        - "contract_type": CDD, CDI, Stage, etc.
+        - "salary_range": If mentioned
+        - "description": Brief summary
+        - "tags": Array of tags
+        - "location": Precise city/commune (e.g., 'Cocody', 'Plateau')
+        - "experience": Clear experience requirement (e.g., '7 ans', 'Senior')
+        - "required_level": Minimum education level (e.g., 'BAC+5', 'Licence')
+        - "contact_email": The extracted email. IMPORTANT: ALWAYS extract if ending in @educarriere.net !
+        - "whatsapp_number": The extracted phone number
+        
+        CRITICAL: If you cannot find ANY valid contact_email OR whatsapp_number, you MUST return {{"is_job": false}}.
+        - "deadline": Deadline in YYYY-MM-DD (ONLY if explicitly written in the text, otherwise null).
+          Look for phrases like: "Date limite", "Date limite de dépôt", "Date limite de candidature",
+          "avant le", "au plus tard le", "deadline", "date de clôture".
+          Examples: "avant le 30 mars 2026" → "2026-03-30", "Date limite: 30/03/2026" → "2026-03-30"
+        - "benefits": Any perks mentioned
+        - "is_ai_verified": true
 
         Available Tags (Use only these or similar from this list):
         'Informatique', 'Marketing', 'Vente', 'Ressources Humaines',
@@ -173,61 +81,12 @@ class AIJobValidator:
         3. If neither a real email nor a WhatsApp number is found, return {{"is_job": false}}.
         4. Translate everything to French.
         5. Map the job to at least 1-3 appropriate tags from the 'Available Tags' list.
+        6. NEVER INVENT DATA. If a field is not in the text, return null or empty string. Do NOT guess dates, emails, or phone numbers.
+        7. MANDATORY: If the text contains an email address (even if it ends in @educarriere.net), you MUST set it as contact_email! Do not ignore it!
 
         Raw Text:
         {raw_text}
         """
         
-        # 1. Try Mistral (with rotation)
-        if self.mistral_clients:
-            num_keys = len(self.mistral_clients)
-            for attempt in range(num_keys):
-                try:
-                    return self._call_mistral(prompt)
-                except Exception as e:
-                    err_text = str(e).lower()
-                    if any(x in err_text for x in ["429", "rate_limit", "insufficient_quota", "quota exceeded", "limit"]):
-                        print(f"  [LIMIT] Mistral Key #{self.current_mistral_idx + 1} reached limit.")
-                    else:
-                        print(f"  [ERROR] Mistral Key #{self.current_mistral_idx + 1} failed: {e}")
-                    
-                    if num_keys > 1 and attempt < num_keys - 1:
-                        self._rotate_mistral()
-                        continue
-                    else:
-                        print("  [INFO] All Mistral keys exhausted.")
-                        break
-
-        # 2. Try OpenRouter as fallback
-        if self.openrouter_key:
-            print("  [FALLBACK] Attempting OpenRouter (Nvidia Nemotron)...")
-            result = self._call_openrouter(prompt)
-            if result:
-                print("  [OK] OpenRouter fallback successful.")
-                return result
-            else:
-                print("  [ERROR] OpenRouter fallback failed.")
-        
-        # 3. Try Gemini as final fallback
-        if "gemini" in self.providers:
-            for g_attempt in range(2): # Try Gemini twice if 429
-                print(f"  [FALLBACK] Attempting Gemini Flash (Attempt {g_attempt+1})...")
-                result = self._call_gemini(prompt)
-                if result:
-                    print("  [OK] Gemini fallback successful.")
-                    return result
-                else:
-                    print("  [WAIT] Gemini busy or limit reached. Sleeping 30s...")
-                    time.sleep(30)
-        
-        # 4. Try Groq as final fallback
-        if "groq" in self.providers:
-            print("  [FALLBACK] Attempting Groq (Llama 3)...")
-            result = self._call_groq(prompt)
-            if result:
-                print("  [OK] Groq fallback successful.")
-                return result
-            else:
-                print("  [ERROR] Groq fallback failed.")
-        
-        return None
+        # Un seul moteur désormais : Ollama (Local)
+        return await self._call_ollama(prompt)

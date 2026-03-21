@@ -41,3 +41,9 @@ CREATE POLICY "Users can insert own unsubscription" ON public.unsubscriptions FO
 -- Admin (you) can view everything
 -- Note: In a real app, we'd use a role or specific UID. 
 -- For now, let's assume the dashboard will use a service role key or we'll add a policy for a specific admin UID if provided.
+
+CREATE POLICY "Admins can view all feedbacks" ON public.feedbacks 
+  FOR SELECT USING (auth.uid() IN (SELECT id FROM profiles WHERE is_admin = true));
+
+CREATE POLICY "Admins can view all unsubscriptions" ON public.unsubscriptions 
+  FOR SELECT USING (auth.uid() IN (SELECT id FROM profiles WHERE is_admin = true));

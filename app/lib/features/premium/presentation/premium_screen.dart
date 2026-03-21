@@ -13,6 +13,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
   final _supabase = Supabase.instance.client;
   bool _isPremium = false;
   bool _isLoading = false;
+  String? _userName;
 
   @override
   void initState() {
@@ -27,13 +28,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
       final response = await _supabase
           .from('profiles')
-          .select('is_premium')
+          .select('is_premium, full_name')
           .eq('id', userId)
           .maybeSingle();
 
       if (response != null && mounted) {
         setState(() {
           _isPremium = response['is_premium'] ?? false;
+          _userName = response['full_name'];
         });
       }
     } catch (e) {
@@ -69,44 +71,98 @@ class _PremiumScreenState extends State<PremiumScreen> {
   }
 
   void _showSuccessAnimation() {
-    showDialog(
+    showGeneralDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => Center(
-        child: Container(
-          padding: EdgeInsets.all(32.r),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24.r),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.stars, color: Color(0xFFF97316), size: 80),
-              SizedBox(height: 16.h),
-              Text(
-                'BIENVENUE KOFFI !',
-                style: TextStyle(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF0F172A),
+      barrierColor: Colors.black.withOpacity(0.8),
+      transitionDuration: const Duration(milliseconds: 400),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return ScaleTransition(
+          scale: CurvedAnimation(parent: animation, curve: Curves.elasticOut),
+          child: Center(
+            child: Container(
+              margin: EdgeInsets.symmetric(horizontal: 24.w),
+              padding: EdgeInsets.all(32.r),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFF59E0B).withOpacity(0.5),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(20.r),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.workspace_premium_rounded, color: const Color(0xFFF59E0B), size: 100.r),
+                    ),
+                    SizedBox(height: 24.h),
+                    Text(
+                      _userName != null && _userName!.trim().isNotEmpty 
+                          ? 'FÉLICITATIONS\n${_userName!.toUpperCase()} !'
+                          : 'FÉLICITATIONS !',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 24.sp,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                    Text(
+                      'Vous êtes désormais membre PREMIUM.\nPréparez-vous à matcher avec les meilleures offres !',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: Colors.white70,
+                        height: 1.5,
+                      ),
+                    ),
+                    SizedBox(height: 32.h),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context); // Close dialog
+                        Navigator.pop(context); // Go back to profile
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF59E0B),
+                        foregroundColor: const Color(0xFF0F172A),
+                        minimumSize: const Size(double.infinity, 56),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        'EXPLORER MES AVANTAGES',
+                        style: TextStyle(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(height: 8.h),
-              const Text('Vous êtes désormais membre PREMIUM.'),
-              SizedBox(height: 24.h),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF97316),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-                ),
-                child: const Text('Commençons !', style: TextStyle(color: Colors.white)),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -141,9 +197,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildFeatureCard(
-                  icon: Icons.auto_awesome_rounded,
-                  title: 'SMART MATCH PRIORITAIRE',
-                  description: 'L\'IA place les offres qui VOUS correspondent à 100% en haut de votre pile.',
+                  icon: Icons.history_rounded,
+                  title: 'HISTORIQUE DÉVERROUILLÉ',
+                  description: 'Ne soyez plus limité à vos 3 derniers matches. Consultez l\'intégralité de vos candidatures.',
                   color: const Color(0xFFF59E0B),
                 ),
                 const SizedBox(height: 16),
