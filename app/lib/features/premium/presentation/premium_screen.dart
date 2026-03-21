@@ -50,8 +50,11 @@ class _PremiumScreenState extends State<PremiumScreen> {
       if (userId == null) return;
 
       // Simulate payment process or just update DB for MVP
+      // Activate for 30 days
+      final expiryDate = DateTime.now().add(const Duration(days: 30));
       await _supabase.from('profiles').update({
         'is_premium': true,
+        'premium_until': expiryDate.toIso8601String(),
       }).eq('id', userId);
 
       await Future.delayed(const Duration(seconds: 2)); // Logic simulation
@@ -420,7 +423,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
           ),
           SizedBox(height: 16.h),
           Text(
-            'Moins cher qu\'un ticket de bus par jour\npour changer votre carrière.',
+            'Abonnement de 30 jours renouvelable.\nMoins cher qu\'un ticket de bus par jour.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.9),
