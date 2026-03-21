@@ -91,17 +91,19 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late int _selectedIndex;
 
+  // On pré-initialise les écrans pour éviter de les recréer à chaque build
+  late final List<Widget> _screens;
+
   @override
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
+    _screens = [
+      const SwipeScreen(),
+      const MatchesScreen(),
+      const ProfileScreen(),
+    ];
   }
-
-  List<Widget> _getScreens() => [
-    SwipeScreen(),
-    MatchesScreen(),
-    ProfileScreen(),
-  ];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -140,7 +142,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 ),
               if (isWide) const VerticalDivider(thickness: 1, width: 1),
               Expanded(
-                child: SafeArea(child: _getScreens()[_selectedIndex]),
+                child: SafeArea(
+                  child: IndexedStack(
+                    index: _selectedIndex,
+                    children: _screens,
+                  ),
+                ),
               ),
             ],
           ),

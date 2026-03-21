@@ -225,11 +225,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: Text(
+          'Mon Profil',
+          style: TextStyle(
+            color: const Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+            fontSize: 22.sp,
+          ),
+        ),
+        centerTitle: false,
+        backgroundColor: Colors.white,
+        elevation: 0,
+      ),
       body: RefreshIndicator(
         onRefresh: _loadProfile,
+        color: const Color(0xFFF97316),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 32.h),
+          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
           children: [
             // Section Avatar & Nom
             Center(

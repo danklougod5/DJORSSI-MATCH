@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:djossimatch/core/cache/local_cache.dart';
 
 class MatchesScreen extends StatefulWidget {
   const MatchesScreen({super.key});
@@ -26,6 +27,19 @@ class _MatchesScreenState extends State<MatchesScreen> {
   }
 
   Future<void> _loadMatches() async {
+    // 0. Charger le cache immédiatement (hors ligne)
+    try {
+      final cachedMatches = await LocalCache.load(LocalCache.matchesKey);
+      if (cachedMatches != null && cachedMatches is List && mounted) {
+        setState(() {
+          _matches = List<Map<String, dynamic>>.from(cachedMatches);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lecture cache matches: $e');
+    }
+
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
@@ -51,15 +65,31 @@ class _MatchesScreenState extends State<MatchesScreen> {
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
+      final matchesList = List<Map<String, dynamic>>.from(response);
+      
+      // Sauvegarder dans le cache
+      await LocalCache.save(LocalCache.matchesKey, matchesList);
+
       if (mounted) {
         setState(() {
-          _matches = List<Map<String, dynamic>>.from(response);
+          _matches = matchesList;
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Erreur chargement matches: $e');
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint('Erreur chargement réseau matches: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (_matches.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Mode hors-ligne : affichage des matches en cache.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -105,16 +135,25 @@ class _MatchesScreenState extends State<MatchesScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      body: Column(
-        children: [
-          _buildFilterBar(),
-          Expanded(
-            child: filtered.isEmpty
-                ? _buildEmptyState()
-                : RefreshIndicator(
-                    onRefresh: _loadMatches,
-                    child: ListView.separated(
+      body: RefreshIndicator(
+        onRefresh: _loadMatches,
+        color: const Color(0xFFF97316),
+        child: Column(
+          children: [
+            _buildFilterBar(),
+            Expanded(
+              child: filtered.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: 500.h, // Hauteur suffisante pour permettre le scroll
+                        alignment: Alignment.center,
+                        child: _buildEmptyState(),
+                      ),
+                    )
+                  : ListView.separated(
                       padding: EdgeInsets.all(16.r),
+                      physics: const AlwaysScrollableScrollPhysics(),
                       itemCount: filtered.length,
                       separatorBuilder: (context, index) => SizedBox(height: 12.h),
                       itemBuilder: (context, index) {
@@ -127,9 +166,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
                         return _buildMatchCard(job, date, isLocked: isLocked);
                       },
                     ),
-                  ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

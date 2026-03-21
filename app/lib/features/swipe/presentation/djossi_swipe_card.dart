@@ -60,9 +60,10 @@ class DjossiSwipeCard extends StatelessWidget {
     // Pick a color based on the title hash (consistent random)
     final Color bgColor = backgroundColors[title.hashCode % backgroundColors.length];
 
-    return Card(
-      elevation: 8,
-      clipBehavior: Clip.antiAlias,
+    return RepaintBoundary(
+      child: Card(
+      elevation: 4,
+      clipBehavior: Clip.hardEdge,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
       child: Stack(
         children: [
@@ -220,6 +221,7 @@ class DjossiSwipeCard extends StatelessWidget {
                             ),
                             if (contactEmail != null && contactEmail!.isNotEmpty)
                               _buildDetailBadge(Icons.email_outlined, contactEmail!),
+                            
                             if (whatsappNumber != null && whatsappNumber!.isNotEmpty)
                               Container(
                                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -241,7 +243,7 @@ class DjossiSwipeCard extends StatelessWidget {
                                     SizedBox(width: 6.w),
                                     Flexible(
                                       child: Text(
-                                        whatsappNumber!,
+                                        _formatPhoneNumbers(whatsappNumber!),
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           color: Colors.white,
@@ -254,9 +256,8 @@ class DjossiSwipeCard extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                            if (applicationLink != null && applicationLink!.isNotEmpty && 
-                                (contactEmail == null || contactEmail!.isEmpty) &&
-                                (whatsappNumber == null || whatsappNumber!.isEmpty))
+                            
+                            if (applicationLink != null && applicationLink!.isNotEmpty)
                               _buildDetailBadge(
                                 Icons.link, 
                                 "Candidature via lien externe",
@@ -341,7 +342,17 @@ class DjossiSwipeCard extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
+  }
+
+  String _formatPhoneNumbers(String raw) {
+    if (raw.isEmpty) return raw;
+    // On extrait tous les blocs de chiffres (au moins 8 chiffres)
+    final Iterable<Match> matches = RegExp(r'\d{8,}').allMatches(raw.replaceAll(' ', ''));
+    if (matches.isEmpty) return raw;
+    
+    return matches.map((m) => m.group(0)).join(' / ');
   }
 
   Widget _buildDetailBadge(IconData icon, String text, {Color? color}) {
