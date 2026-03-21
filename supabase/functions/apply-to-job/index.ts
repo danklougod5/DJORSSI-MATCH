@@ -241,6 +241,11 @@ serve(async (req) => {
       jobDescription,
     } = await req.json();
 
+    // Normalisation du nom de l'entreprise : éviter le "Non spécifié"
+    const finalCompany = (jobCompany && jobCompany !== "Non spécifié" && jobCompany !== "Inconnu" && jobCompany !== "non spécifié") 
+      ? jobCompany 
+      : "votre entreprise";
+
     if (!cvUrl || !jobTitle) {
       return new Response(
         JSON.stringify({ error: "Missing required fields (cvUrl, jobTitle)" }),
@@ -285,7 +290,7 @@ serve(async (req) => {
         const coverLetterText = generateCoverLetterText(
           applicantName,
           jobTitle,
-          jobCompany || "votre entreprise",
+          finalCompany,
           jobDescription || "",
           coverLetterInstructions || null,
           userEmail,
@@ -321,7 +326,7 @@ serve(async (req) => {
 
     const emailBody = message 
         ? message 
-        : `Bonjour,\n\nSuite a votre annonce pour le poste de ${jobTitle} chez ${jobCompany || "votre entreprise"}, je vous soumets ma candidature.\n\nMon profil correspond a vos criteres et vous trouverez mon CV en piece jointe pour plus de details sur mon parcours.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`;
+        : `Bonjour,\n\nSuite a votre annonce pour le poste de ${jobTitle} chez ${finalCompany}, je vous soumets ma candidature.\n\nMon profil correspond a vos criteres et vous trouverez mon CV en piece jointe pour plus de details sur mon parcours.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`;
 
     // 5. Send email via Resend
     const targetEmail = "danklougod5@gmail.com"; 

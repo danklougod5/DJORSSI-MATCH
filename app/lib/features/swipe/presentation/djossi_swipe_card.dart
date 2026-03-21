@@ -166,8 +166,7 @@ class DjossiSwipeCard extends StatelessWidget {
                         const SizedBox(height: 70), // Spacer for top-left icons padding (Match badge)
                         Text(
                           title,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
+                          textScaler: const TextScaler.linear(1.0),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 24.sp,
