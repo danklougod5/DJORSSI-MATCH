@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:djossimatch/core/cache/local_cache.dart';
 
 class SwipeScreen extends StatefulWidget {
   const SwipeScreen({super.key});
@@ -26,6 +27,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _jobs = [];
   List<String> _userSkills = [];
+  
+  // Cache des scores de matching pour éviter les recalculs à chaque frame
+  final Map<String, int> _matchScoreCache = {};
   
   // Nouveaux états pour le Premium
   int _swipeCount = 0;
@@ -82,6 +86,38 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   Future<void> _loadData() async {
+    // 0a. Charger d'abord les skills du cache pour pouvoir trier correctement
+    try {
+      final cachedSkills = await LocalCache.load(LocalCache.skillsKey);
+      if (cachedSkills != null && cachedSkills is List) {
+        _userSkills = List<String>.from(cachedSkills);
+      }
+    } catch (e) {
+      debugPrint('Erreur lecture cache skills: $e');
+    }
+
+    // 0b. Charger le cache jobs immédiatement pour un affichage instantané (même hors ligne)
+    try {
+      final cachedJobs = await LocalCache.load(LocalCache.jobsKey);
+      if (cachedJobs != null && cachedJobs is List && mounted) {
+        final cachedList = List<Map<String, dynamic>>.from(cachedJobs);
+        // Re-trier le cache avec l'algorithme de matching actuel
+        if (_userSkills.isNotEmpty) {
+          cachedList.sort((a, b) {
+            final scoreA = _calculateMatchScore(a);
+            final scoreB = _calculateMatchScore(b);
+            return scoreB.compareTo(scoreA);
+          });
+        }
+        setState(() {
+          _jobs = cachedList;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lecture cache jobs: $e');
+    }
+
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
@@ -109,6 +145,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
       if (profileResponse != null && profileResponse['skills'] != null) {
         _userSkills = List<String>.from(profileResponse['skills']);
+        // Sauvegarder les skills dans le cache pour le prochain démarrage
+        await LocalCache.save(LocalCache.skillsKey, _userSkills);
       }
 
       // 2. Récupérer les IDs des jobs déjà swipés (GAUCHE ou DROITE)
@@ -149,12 +187,30 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
       // 4. Trier par matching pour tous les utilisateurs
       if (_userSkills.isNotEmpty) {
+        debugPrint('*** [MATCHING] Tags utilisateur: $_userSkills ***');
         allJobs.sort((a, b) {
           final scoreA = _calculateMatchScore(a);
           final scoreB = _calculateMatchScore(b);
           return scoreB.compareTo(scoreA); // Les meilleurs scores en premier
         });
+
+        // Pré-calculer et cacher tous les scores de matching
+        _matchScoreCache.clear();
+        for (final job in allJobs) {
+          final jobId = job['id']?.toString() ?? '';
+          _matchScoreCache[jobId] = _calculateMatchScore(job);
+        }
+
+        // Log des 5 premiers résultats pour vérification
+        for (int i = 0; i < allJobs.length && i < 5; i++) {
+          final job = allJobs[i];
+          final jobId = job['id']?.toString() ?? '';
+          debugPrint('*** [MATCHING] #${i+1} Score=${_matchScoreCache[jobId]} | ${job['job_title']} | Tags: ${job['tags']} ***');
+        }
       }
+
+      // 5. Sauvegarder dans le cache pour la prochaine fois
+      await LocalCache.save(LocalCache.jobsKey, allJobs);
 
       if (mounted) {
         setState(() {
@@ -163,8 +219,21 @@ class _SwipeScreenState extends State<SwipeScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Erreur lors du chargement des offres: $e');
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint('Erreur lors du chargement réseau: $e');
+      // Si on a déjà des données (du cache), on ne masque pas tout
+      if (mounted) {
+        setState(() => _isLoading = false);
+        // Optionnel : avertir l'utilisateur qu'il est hors-ligne
+        if (_jobs.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Mode hors-ligne : affichage des offres en cache.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -198,29 +267,35 @@ class _SwipeScreenState extends State<SwipeScreen> {
     if (_userSkills.isEmpty) return 0;
 
     double maxScore = 0;
+    bool hasDirectTagMatch = false;
     
     // Normalisation basique (minuscules)
-    final jobTitle = (job['job_title'] as String?)?.toLowerCase() ?? '';
-    final jobSpecialty = (job['specialty'] as String?)?.toLowerCase() ?? '';
+    final jobTitle = (job['job_title'] as String?)?.toLowerCase().trim() ?? '';
+    final jobSpecialty = (job['specialty'] as String?)?.toLowerCase().trim() ?? '';
     final jobDescription = (job['description'] as String?)?.toLowerCase() ?? '';
-    final jobTags = List<String>.from(job['tags'] ?? []).map((t) => t.toLowerCase()).toList();
+    final jobTags = List<String>.from(job['tags'] ?? []).map((t) => t.toLowerCase().trim()).toList();
 
     for (final skill in _userSkills) {
       double currentSectorScore = 0;
-      final skillLower = skill.toLowerCase();
+      final skillLower = skill.toLowerCase().trim();
       
-      // 1. MATCH DIRECT DE SPÉCIALITÉ (GROS POIDS)
-      // Si la spécialité du job est exactement le secteur de l'utilisateur
-      if (jobSpecialty == skillLower || jobSpecialty.contains(skillLower)) {
-        currentSectorScore += 60;
-      }
-      
-      // 1.5 MATCH DIRECT PAR TAG RÉEL DE LA BASE (Le plus précis pour le nouveau système)
-      if (jobTags.contains(skillLower)) {
-        currentSectorScore += 80;
+      // 1. MATCH DIRECT PAR TAG (PRIORITÉ ABSOLUE - Le plus fiable)
+      // Vérifie si un des tags du job correspond exactement au secteur choisi par l'utilisateur
+      for (final jobTag in jobTags) {
+        if (jobTag == skillLower || jobTag.contains(skillLower) || skillLower.contains(jobTag)) {
+          currentSectorScore += 200;
+          hasDirectTagMatch = true;
+          break;
+        }
       }
 
-      // 2. RECHERCHE DE MOTS-CLÉS SPÉCIFIQUES AU SECTEUR
+      // 2. MATCH PAR SPÉCIALITÉ (POIDS FORT)
+      if (jobSpecialty == skillLower || jobSpecialty.contains(skillLower) || skillLower.contains(jobSpecialty)) {
+        currentSectorScore += 80;
+        hasDirectTagMatch = true;
+      }
+
+      // 3. RECHERCHE DE MOTS-CLÉS SPÉCIFIQUES AU SECTEUR
       final keywords = _getExpandedKeywords(skill);
       int keywordHitsInTitle = 0;
       int keywordHitsInTags = 0;
@@ -237,28 +312,40 @@ class _SwipeScreenState extends State<SwipeScreen> {
         if (jobTags.any((tag) => tag.contains(kw))) {
           keywordHitsInTags++;
         }
-
-        // Poids léger dans la description
-        if (jobDescription.contains(kw)) {
-          currentSectorScore += 2;
-        }
       }
 
-      // Calcul des points par mots-clés (plafonné pour éviter l'inflation)
-      currentSectorScore += (keywordHitsInTitle > 0 ? 30 : 0);
-      currentSectorScore += (keywordHitsInTags > 0 ? 10 : 0);
-      
-      // Bonus si plusieurs mots-clés dans le titre
-      if (keywordHitsInTitle > 1) currentSectorScore += 10;
+      // Calcul des points par mots-clés
+      if (keywordHitsInTitle > 0) {
+        currentSectorScore += 40;
+        if (keywordHitsInTitle > 1) currentSectorScore += 15;
+      }
+      if (keywordHitsInTags > 0) {
+        currentSectorScore += 20;
+      }
+
+      // 4. Poids léger dans la description (seulement si on a déjà un match de tag/titre)
+      if (currentSectorScore > 0) {
+        int descHits = 0;
+        for (final keyword in keywords) {
+          if (jobDescription.contains(keyword.toLowerCase())) {
+            descHits++;
+          }
+        }
+        currentSectorScore += (descHits > 0 ? 5 : 0);
+      }
 
       if (currentSectorScore > maxScore) {
         maxScore = currentSectorScore;
       }
     }
 
-    // Un job qui ne correspond à aucun mot-clé d'aucun secteur choisi
-    // mais qui est dans la base doit quand même avoir un micro score ou 0
-    return maxScore.clamp(0, 100).toInt();
+    // PÉNALITÉ : Les jobs qui ne correspondent à AUCUN tag/secteur de l'utilisateur
+    // reçoivent un score négatif pour être relégués en fin de liste
+    if (!hasDirectTagMatch && maxScore < 40) {
+      return -100 + maxScore.toInt(); // Score négatif → toujours après les jobs matchés
+    }
+
+    return maxScore.clamp(0, 300).toInt();
   }
 
   bool _onSwipe(
@@ -281,34 +368,40 @@ class _SwipeScreenState extends State<SwipeScreen> {
     return true;
   }
 
-  void _handleSwipe(int index, String direction) async {
+  void _handleSwipe(int index, String direction) {
     final job = _jobs[index];
-    try {
-      final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) return;
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
 
-      // 1. Enregistrer l'action dans le log global (pour le filtrage et la limite)
-      await _supabase.from('swipes_log').insert({
+    // MISE À JOUR UI IMMÉDIATE (pas d'attente réseau)
+    setState(() {
+      _swipeCount++;
+    });
+
+    // TOUTES les opérations DB en arrière-plan (fire-and-forget)
+    _performSwipeDbOps(userId, job, direction);
+  }
+
+  /// Opérations DB du swipe en arrière-plan — ne bloque jamais l'UI
+  Future<void> _performSwipeDbOps(String userId, Map<String, dynamic> job, String direction) async {
+    try {
+      // 1. Enregistrer l'action dans le log global (fire-and-forget)
+      unawaited(_supabase.from('swipes_log').insert({
         'user_id': userId,
         'job_id': job['id'],
         'direction': direction,
-      });
+      }).catchError((e) { debugPrint('Erreur log swipe: $e'); return null; }));
 
-      // 2. Mettre à jour le compteur local immédiatement
-      setState(() {
-        _swipeCount++;
-      });
-
-      // 3. Traitement spécifique si c'est un swipe DROITE (postulation)
+      // 2. Traitement spécifique si c'est un swipe DROITE (postulation)
       if (direction == 'right') {
         debugPrint('*** [DIAGNOSTIC] DÉBUT SWIPE DROITE DÉTECTÉ ***');
         
-        // Enregistrer la postulation
-        await _supabase.from('applications').insert({
+        // Enregistrer la postulation (fire-and-forget)
+        unawaited(_supabase.from('applications').insert({
           'user_id': userId,
           'job_id': job['id'],
           'status': 'pending',
-        });
+        }).catchError((e) { debugPrint('Erreur application insert: $e'); return null; }));
 
         debugPrint('*** [DIAGNOSTIC] URL CV: $_cvUrl ***');
 
@@ -330,26 +423,47 @@ class _SwipeScreenState extends State<SwipeScreen> {
           debugPrint('*** [DIAGNOSTIC] ÉCHEC: PAS DE CV DANS LE PROFIL ***');
         }
 
-        // Priorité des redirections sur Match (Swipe Right)
+        // Priorité des redirections sur Match (Swipe Right) selon la demande utilisateur :
+        // 1. Email (priorité absolue, géré en arrière-plan via _enqueueEmail)
+        // 2. WhatsApp (si pas d'email)
+        // 3. Lien externe (si ni email ni WhatsApp)
+        
         final whatsapp = job['whatsapp_number'];
         final email = job['contact_email'];
         final appLink = job['application_link'] ?? 
             (job['raw_data'] != null ? job['raw_data']['application_link'] : null);
 
-        // Si il y a un WhatsApp, on redirige
-        if (whatsapp != null && whatsapp.toString().isNotEmpty) {
+        final hasEmail = email != null && email.toString().trim().isNotEmpty;
+        final hasWhatsapp = whatsapp != null && whatsapp.toString().trim().isNotEmpty;
+        final hasLink = appLink != null && appLink.toString().trim().isNotEmpty;
+
+        if (hasEmail) {
+          // L'email est prioritaire. L'envoi est déjà initié par _enqueueEmail plus haut.
+          // On n'affiche pas de redirection WhatsApp ou Lien si l'email existe.
+          if (mounted && _cvUrl == null) {
+            // Petit avertissement si l'email est prioritaire mais que l'utilisateur n'a pas de CV
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('⚠️ Email prioritaire mais aucun CV trouvé dans votre profil.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } 
+        else if (hasWhatsapp) {
+          // Le numéro prend le relais uniquement si pas d'email
           _showWhatsAppRedirect(job['job_title'] ?? 'ce poste', whatsapp.toString());
         } 
-        // Sinon, si il n'y a ni email ni WhatsApp, mais un lien, on redirige vers le lien
-        else if ((email == null || email.toString().isEmpty) && 
-                 appLink != null && appLink.toString().isNotEmpty) {
+        else if (hasLink) {
+          // Le lien prend le relais uniquement si ni email ni numéro
           _showApplicationLinkRedirect(job['job_title'] ?? 'ce poste', appLink.toString());
-        } else if (mounted) {
+        } 
+        else if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(_cvUrl != null 
-                ? 'Profil et CV envoyés pour ${job['job_title']}'
+                ? 'Candidature enregistrée pour ${job['job_title']}'
                 : 'Profil envoyé (pensez à ajouter votre CV dans le profil)'),
               backgroundColor: _cvUrl != null ? Colors.green : Colors.orange,
               duration: const Duration(milliseconds: 1500),
@@ -554,10 +668,18 @@ class _SwipeScreenState extends State<SwipeScreen> {
   void _showWhatsAppRedirect(String jobTitle, String phoneNumber) {
     if (!mounted) return;
 
-    // Nettoyer le numéro (enlever espaces, +, etc pour l'URL)
-    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-    // Ajouter le code pays CIV si manquant (8 chiffres ou 10 chiffres sans indicatif)
-    final finalPhone = cleanPhone.length <= 10 ? '225$cleanPhone' : cleanPhone;
+    // On extrait tous les numéros potentiels (au moins 8 chiffres d'affilée)
+    // On nettoie d'abord les espaces
+    final String cleanInput = phoneNumber.replaceAll(' ', '');
+    final Iterable<Match> matches = RegExp(r'\d{8,}').allMatches(cleanInput);
+    
+    if (matches.isEmpty) return; // Aucun numéro de téléphone détecté
+
+    // On prend le PREMIER numéro trouvé pour WhatsApp
+    final String firstNum = matches.first.group(0)!;
+    
+    // Ajouter le code pays CIV si manquant (8 ou 10 chiffres sans indicatif)
+    final finalPhone = firstNum.length <= 10 ? '225$firstNum' : firstNum;
 
     showDialog(
       context: context,
@@ -706,77 +828,98 @@ class _SwipeScreenState extends State<SwipeScreen> {
           ),
         ),
       ),
-      body: _jobs.isEmpty 
-          ? _buildEmptyState()
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: CardSwiper(
-                          controller: _controller,
-                          cardsCount: _jobs.length,
-                          onSwipe: _onSwipe,
-                          numberOfCardsDisplayed: _jobs.length >= 3 ? 3 : _jobs.length,
-                          backCardOffset: const Offset(0, 40),
-                          duration: const Duration(milliseconds: 400),
-                          padding: EdgeInsets.zero,
-                          scale: 0.9,
-                          maxAngle: 30,
-                          threshold: 40,
-                          isLoop: false,
-                          onEnd: () {
-                            setState(() {
-                              _jobs.clear();
-                            });
-                          },
-                          cardBuilder: (context, index, horizontalThresholdPercent, verticalThresholdPercent) {
-                            final job = _jobs[index];
-                            final matchScore = _calculateMatchScore(job);
-                            return Stack(
-                              children: [
-                                DjossiSwipeCard(
-                                  title: job['job_title'] ?? 'Inconnu',
-                                  company: job['company_name'] ?? 'Inconnu',
-                                  salary: job['salary_range'] ?? 'À négocier',
-                                  location: job['location'] ?? 'Abidjan',
-                                  requiredLevel: job['required_level'],
-                                  experience: job['experience'],
-                                  contactEmail: job['contact_email'],
-                                  whatsappNumber: job['whatsapp_number'],
-                                  specialty: job['specialty'],
-                                  contractType: job['contract_type'],
-                                  description: job['description'],
-                                  isVerified: job['is_ai_verified'] ?? false,
-                                  tags: List<String>.from(job['tags'] ?? []),
-                                  deadline: job['deadline'],
-                                  applicationLink: job['application_link'] ?? 
-                                      (job['raw_data'] != null ? job['raw_data']['application_link'] : null),
-                                  requiresCoverLetter: job['requires_cover_letter'] ?? false,
-                                  coverLetterInstructions: job['cover_letter_instructions'],
-                                ),
-                                if (matchScore > 0)
-                                  Positioned(
-                                    top: 12.h,
-                                    right: 12.w,
-                                    child: _buildMatchBadge(matchScore),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          setState(() => _isLoading = true);
+          await _loadData();
+        },
+        color: const Color(0xFFF97316),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return ListView(
+              padding: EdgeInsets.zero,
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(
+                  height: constraints.maxHeight,
+                  child: _jobs.isEmpty 
+                      ? _buildEmptyState()
+                      : Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: Center(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(maxWidth: 600),
+                                    child: CardSwiper(
+                                      controller: _controller,
+                                      cardsCount: _jobs.length,
+                                      onSwipe: _onSwipe,
+                                      numberOfCardsDisplayed: _jobs.length >= 3 ? 3 : _jobs.length,
+                                      backCardOffset: const Offset(0, 40),
+                                      duration: const Duration(milliseconds: 250),
+                                      padding: EdgeInsets.zero,
+                                      scale: 0.9,
+                                      maxAngle: 30,
+                                      threshold: 40,
+                                      isLoop: false,
+                                      onEnd: () {
+                                        setState(() {
+                                          _jobs.clear();
+                                        });
+                                      },
+                                      cardBuilder: (context, index, horizontalThresholdPercent, verticalThresholdPercent) {
+                                        final job = _jobs[index];
+                                        final jobId = job['id']?.toString() ?? '';
+                                        final matchScore = _matchScoreCache[jobId] ?? 0;
+                                        return Stack(
+                                          children: [
+                                            DjossiSwipeCard(
+                                              title: job['job_title'] ?? 'Inconnu',
+                                              company: job['company_name'] ?? 'Inconnu',
+                                              salary: job['salary_range'] ?? 'À négocier',
+                                              location: job['location'] ?? 'Abidjan',
+                                              requiredLevel: job['required_level'],
+                                              experience: job['experience'],
+                                              contactEmail: job['contact_email'],
+                                              whatsappNumber: job['whatsapp_number'],
+                                              specialty: job['specialty'],
+                                              contractType: job['contract_type'],
+                                              description: job['description'],
+                                              isVerified: job['is_ai_verified'] ?? false,
+                                              tags: List<String>.from(job['tags'] ?? []),
+                                              deadline: job['deadline'],
+                                              applicationLink: job['application_link'] ?? 
+                                                  (job['raw_data'] != null ? job['raw_data']['application_link'] : null),
+                                              requiresCoverLetter: job['requires_cover_letter'] ?? false,
+                                              coverLetterInstructions: job['cover_letter_instructions'],
+                                            ),
+                                            if (matchScore > 0)
+                                              Positioned(
+                                                top: 12.h,
+                                                right: 12.w,
+                                                child: _buildMatchBadge(matchScore),
+                                              ),
+                                          ],
+                                        );
+                                      },
+                                    ),
                                   ),
-                              ],
-                            );
-                          },
+                                ),
+                              ),
+                              SizedBox(height: 32.h),
+                              _buildActionButtons(),
+                              SizedBox(height: 8.h),
+                            ],
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 24.h),
-                      _buildActionButtons(),
-                      SizedBox(height: 16.h),
-                    ],
-                  ),
                 ),
-              ),
-            ),
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -876,7 +1019,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
           _isPremium ? const Color(0xFFF59E0B) : Colors.grey, 
           _handleUndo, 
           isMini: true,
-          locked: !_isPremium,
+          locked: false, // Cadenas retiré à la demande de l'utilisateur
         ),
         _buildActionButton(Icons.favorite_rounded, Colors.green, () {
           if (!_isPremium && _swipeCount >= 10) {
