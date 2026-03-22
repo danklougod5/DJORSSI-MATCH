@@ -348,11 +348,64 @@ class DjossiSwipeCard extends StatelessWidget {
 
   String _formatPhoneNumbers(String raw) {
     if (raw.isEmpty) return raw;
-    // On extrait tous les blocs de chiffres (au moins 8 chiffres)
-    final Iterable<Match> matches = RegExp(r'\d{8,}').allMatches(raw.replaceAll(' ', ''));
-    if (matches.isEmpty) return raw;
     
-    return matches.map((m) => m.group(0)).join(' / ');
+    // Nettoyer : retirer espaces, tirets, points, parenthèses
+    final String cleaned = raw.replaceAll(RegExp(r'[\s\-\.\(\)]+'), '');
+    
+    // Extraire tous les blocs de chiffres consécutifs
+    final Iterable<Match> digitBlocks = RegExp(r'\d+').allMatches(cleaned);
+    if (digitBlocks.isEmpty) return raw;
+    
+    final List<String> allNumbers = [];
+    
+    for (final block in digitBlocks) {
+      final String digits = block.group(0)!;
+      
+      // Si le bloc fait exactement 8-10 chiffres, c'est un seul numéro
+      if (digits.length <= 10) {
+        allNumbers.add(digits);
+      } else if (digits.length > 10) {
+        // Bloc de chiffres collés (ex: "050559830505769996960711780662")
+        // Essayer de découper en numéros de 10 chiffres (format CI standard)
+        String remaining = digits;
+        
+        // Si le bloc commence par un indicatif pays (225), le retirer
+        if (remaining.startsWith('225') && remaining.length > 13) {
+          // Indicatif 225 + 10 chiffres = 13 caractères
+          // Multiples numéros avec 225 collés
+          while (remaining.isNotEmpty) {
+            if (remaining.startsWith('225') && remaining.length >= 13) {
+              allNumbers.add(remaining.substring(0, 13));
+              remaining = remaining.substring(13);
+            } else if (remaining.length >= 10) {
+              allNumbers.add(remaining.substring(0, 10));
+              remaining = remaining.substring(10);
+            } else if (remaining.length >= 8) {
+              allNumbers.add(remaining);
+              remaining = '';
+            } else {
+              remaining = '';
+            }
+          }
+        } else {
+          // Pas d'indicatif 225, découper en blocs de 10 chiffres
+          while (remaining.isNotEmpty) {
+            if (remaining.length >= 10) {
+              allNumbers.add(remaining.substring(0, 10));
+              remaining = remaining.substring(10);
+            } else if (remaining.length >= 8) {
+              allNumbers.add(remaining);
+              remaining = '';
+            } else {
+              remaining = '';
+            }
+          }
+        }
+      }
+    }
+    
+    if (allNumbers.isEmpty) return raw;
+    return allNumbers.join(' / ');
   }
 
   Widget _buildDetailBadge(IconData icon, String text, {Color? color}) {

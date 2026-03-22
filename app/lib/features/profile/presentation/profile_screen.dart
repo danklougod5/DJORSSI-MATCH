@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,7 +13,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserver {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
   bool _isUploading = false;
@@ -20,11 +21,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<String> _skills = [];
   String? _fullName;
   String? _cvUrl;
+  
+  StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
+  bool _hasLoadedOnce = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadProfile();
+    _setupRealtime();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Recharger quand l'app revient au premier plan
+    if (state == AppLifecycleState.resumed) {
+      _loadProfile();
+    }
+  }
+
+  @override 
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Recharger à chaque fois qu'on revient sur cet écran (navigation)
+    if (_hasLoadedOnce) {
+      _loadProfile();
+    }
+    _hasLoadedOnce = true;
+  }
+
+  /// Abonnement realtime pour que le profil se mette à jour automatiquement
+  void _setupRealtime() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _profileSubscription = _supabase
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', userId)
+        .listen((data) {
+      if (data.isNotEmpty && mounted) {
+        setState(() {
+          _profileData = data.first;
+          _skills = List<String>.from(data.first['skills'] ?? []);
+          _fullName = data.first['full_name'];
+          _cvUrl = data.first['cv_url'];
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _profileSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {

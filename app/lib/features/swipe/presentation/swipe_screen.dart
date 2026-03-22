@@ -745,21 +745,70 @@ class _SwipeScreenState extends State<SwipeScreen> {
     );
   }
 
+  /// Extrait les numéros de téléphone individuels d'une chaîne (numéros collés ou séparés)
+  List<String> _extractPhoneNumbers(String raw) {
+    final List<String> numbers = [];
+    final String cleaned = raw.replaceAll(RegExp(r'[\s\-\.\(\)]+'), '');
+    final Iterable<Match> digitBlocks = RegExp(r'\d+').allMatches(cleaned);
+    
+    for (final block in digitBlocks) {
+      final String digits = block.group(0)!;
+      
+      if (digits.length <= 10 && digits.length >= 8) {
+        numbers.add(digits);
+      } else if (digits.length > 10) {
+        // Numéros collés — découper en blocs de 10 chiffres (format CI)
+        String remaining = digits;
+        
+        if (remaining.startsWith('225') && remaining.length > 13) {
+          while (remaining.isNotEmpty) {
+            if (remaining.startsWith('225') && remaining.length >= 13) {
+              numbers.add(remaining.substring(0, 13));
+              remaining = remaining.substring(13);
+            } else if (remaining.length >= 10) {
+              numbers.add(remaining.substring(0, 10));
+              remaining = remaining.substring(10);
+            } else if (remaining.length >= 8) {
+              numbers.add(remaining);
+              remaining = '';
+            } else {
+              remaining = '';
+            }
+          }
+        } else {
+          while (remaining.isNotEmpty) {
+            if (remaining.length >= 10) {
+              numbers.add(remaining.substring(0, 10));
+              remaining = remaining.substring(10);
+            } else if (remaining.length >= 8) {
+              numbers.add(remaining);
+              remaining = '';
+            } else {
+              remaining = '';
+            }
+          }
+        }
+      }
+    }
+    return numbers;
+  }
+
   void _showWhatsAppRedirect(String jobTitle, String phoneNumber) {
     if (!mounted) return;
 
-    // On extrait tous les numéros potentiels (au moins 8 chiffres d'affilée)
-    // On nettoie d'abord les espaces
-    final String cleanInput = phoneNumber.replaceAll(' ', '');
-    final Iterable<Match> matches = RegExp(r'\d{8,}').allMatches(cleanInput);
+    // Extraire tous les numéros individuels
+    final List<String> numbers = _extractPhoneNumbers(phoneNumber);
     
-    if (matches.isEmpty) return; // Aucun numéro de téléphone détecté
+    if (numbers.isEmpty) return; // Aucun numéro de téléphone détecté
 
     // On prend le PREMIER numéro trouvé pour WhatsApp
-    final String firstNum = matches.first.group(0)!;
+    final String firstNum = numbers.first;
     
     // Ajouter le code pays CIV si manquant (8 ou 10 chiffres sans indicatif)
     final finalPhone = firstNum.length <= 10 ? '225$firstNum' : firstNum;
+    
+    // Formater les numéros pour l'affichage
+    final String displayNumbers = numbers.join(' / ');
 
     showDialog(
       context: context,
@@ -782,8 +831,33 @@ class _SwipeScreenState extends State<SwipeScreen> {
             ),
             SizedBox(height: 8.h),
             Text(
-              "L'application va ouvrir WhatsApp avec le numéro du recruteur. N'oubliez pas de joindre votre CV une fois sur WhatsApp !",
+              "L'application va ouvrir WhatsApp avec le premier numéro du recruteur. N'oubliez pas de joindre votre CV !",
               style: TextStyle(fontSize: 13.sp),
+            ),
+            SizedBox(height: 12.h),
+            Container(
+              padding: EdgeInsets.all(10.r),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(10.r),
+                border: Border.all(color: const Color(0xFF25D366).withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.phone, size: 16.r, color: const Color(0xFF25D366)),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(
+                      displayNumbers,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF166534),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
