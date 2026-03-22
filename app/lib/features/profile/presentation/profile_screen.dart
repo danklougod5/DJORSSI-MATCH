@@ -109,6 +109,15 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     }
   }
 
+  /// Navigue vers l'écran d'édition et recharge le profil au retour
+  Future<void> _navigateToEditProfile() async {
+    final result = await context.push('/complete-profile');
+    // Si le profil a été modifié, recharger les données
+    if (result == true && mounted) {
+      _loadProfile();
+    }
+  }
+
   Future<void> _pickAndUploadCV() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -337,7 +346,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                         bottom: 0,
                         right: 0,
                         child: GestureDetector(
-                          onTap: () => context.push('/complete-profile'),
+                          onTap: _navigateToEditProfile,
                           child: Container(
                             padding: EdgeInsets.all(8.r),
                             decoration: BoxDecoration(
@@ -429,9 +438,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
             // Section Secteurs d'intérêt (Skills)
             _buildCardSection(
               title: 'Mes Secteurs',
-              onEdit: () => context.push('/complete-profile'),
+              onEdit: _navigateToEditProfile,
               child: InkWell(
-                onTap: () => context.push('/complete-profile'),
+                onTap: _navigateToEditProfile,
                 child: _skills.isEmpty
                     ? Text('Aucun secteur sélectionné', style: TextStyle(color: const Color(0xFF94A3B8), fontSize: 14.sp))
                     : Wrap(

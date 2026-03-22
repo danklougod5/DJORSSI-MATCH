@@ -195,7 +195,16 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           onTimeout: () => throw Exception('Délai d\'attente dépassé. Vérifiez votre connexion internet.'),
         );
         
-        if (mounted) context.go('/');
+        if (mounted) {
+          // Si on peut revenir en arrière (appelé depuis ProfileScreen via push),
+          // on pop pour retourner au profil et déclencher le rechargement
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context, true); // true = profil modifié
+          } else {
+            // Premier enregistrement (après inscription) → aller à l'accueil
+            context.go('/');
+          }
+        }
       }
     } catch (e) {
       if (mounted) {

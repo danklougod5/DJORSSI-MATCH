@@ -156,6 +156,23 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
+      // Bouton fixé en bas, toujours visible
+      bottomNavigationBar: (_isLoading || !_isPremium)
+          ? null
+          : Container(
+              padding: EdgeInsets.fromLTRB(24.w, 12.h, 24.w, MediaQuery.of(context).padding.bottom + 16.h),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: _buildSaveButton(),
+            ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFFF97316)))
           : Stack(
@@ -187,8 +204,8 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                       _availableSectors.isEmpty 
                         ? const Text("Aucun secteur disponible pour le moment.", style: TextStyle(color: Colors.grey))
                         : _buildSectorsGrid(),
-                      SizedBox(height: 48.h),
-                      _buildSaveButton(),
+                      // Espace en bas pour que le contenu ne soit pas caché par le bouton
+                      SizedBox(height: 20.h),
                     ],
                   ),
                 ),
