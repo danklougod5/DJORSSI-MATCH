@@ -100,9 +100,13 @@ class _SwipeScreenState extends State<SwipeScreen> {
     try {
       final cachedJobs = await LocalCache.load(LocalCache.jobsKey);
       if (cachedJobs != null && cachedJobs is List && mounted) {
-        final cachedList = List<Map<String, dynamic>>.from(cachedJobs);
-        // Re-trier le cache avec l'algorithme de matching actuel
-        if (_userSkills.isNotEmpty) {
+        var cachedList = List<Map<String, dynamic>>.from(cachedJobs);
+        // Re-trier et filtrer le cache avec l'algorithme de matching actuel
+        if (_sectorSkills.isNotEmpty) {
+          // Filtrer les jobs non pertinents du cache aussi
+          cachedList = cachedList.where((job) {
+            return _calculateMatchScore(job) > 0;
+          }).toList();
           cachedList.sort((a, b) {
             final scoreA = _calculateMatchScore(a);
             final scoreB = _calculateMatchScore(b);
@@ -185,27 +189,55 @@ class _SwipeScreenState extends State<SwipeScreen> {
           .where((job) => !swipedJobIds.contains(job['id'].toString()))
           .toList();
 
-      // 4. Trier par matching pour tous les utilisateurs
-      if (_userSkills.isNotEmpty) {
-        debugPrint('*** [MATCHING] Tags utilisateur: $_userSkills ***');
-        allJobs.sort((a, b) {
-          final scoreA = _calculateMatchScore(a);
-          final scoreB = _calculateMatchScore(b);
-          return scoreB.compareTo(scoreA); // Les meilleurs scores en premier
-        });
-
-        // Pré-calculer et cacher tous les scores de matching
+      // 4. Trier et FILTRER par matching pour tous les utilisateurs
+      if (_sectorSkills.isNotEmpty) {
+        debugPrint('*** [MATCHING] Tags utilisateur (tous): $_userSkills ***');
+        debugPrint('*** [MATCHING] Tags sectoriels (pour le matching): $_sectorSkills ***');
+        debugPrint('*** [MATCHING] Tags génériques (ignorés): ${_userSkills.where((s) => _isGenericTag(s)).toList()} ***');
+        debugPrint('*** [MATCHING] Nombre total de jobs avant filtrage: ${allJobs.length} ***');
+        
+        // Pré-calculer les scores de matching
         _matchScoreCache.clear();
         for (final job in allJobs) {
           final jobId = job['id']?.toString() ?? '';
           _matchScoreCache[jobId] = _calculateMatchScore(job);
         }
 
-        // Log des 5 premiers résultats pour vérification
-        for (int i = 0; i < allJobs.length && i < 5; i++) {
-          final job = allJobs[i];
+        // FILTRAGE STRICT : retirer les offres sans aucun rapport avec le secteur
+        final matchedJobs = allJobs.where((job) {
           final jobId = job['id']?.toString() ?? '';
-          debugPrint('*** [MATCHING] #${i+1} Score=${_matchScoreCache[jobId]} | ${job['job_title']} | Tags: ${job['tags']} ***');
+          final score = _matchScoreCache[jobId] ?? 0;
+          return score > 0; // Seuls les jobs avec un vrai match sont gardés
+        }).toList();
+
+        debugPrint('*** [MATCHING] Nombre de jobs APRÈS filtrage: ${matchedJobs.length} (${allJobs.length - matchedJobs.length} offres non pertinentes retirées) ***');
+
+        // Trier les jobs restants par score (meilleur match en premier)
+        matchedJobs.sort((a, b) {
+          final scoreA = _matchScoreCache[a['id']?.toString() ?? ''] ?? 0;
+          final scoreB = _matchScoreCache[b['id']?.toString() ?? ''] ?? 0;
+          return scoreB.compareTo(scoreA);
+        });
+
+        // Log des 5 premiers résultats pour vérification
+        for (int i = 0; i < matchedJobs.length && i < 5; i++) {
+          final job = matchedJobs[i];
+          final jobId = job['id']?.toString() ?? '';
+          final jobSectorTags = List<String>.from(job['tags'] ?? [])
+              .where((t) => !_isGenericTag(t.toLowerCase().trim()))
+              .toList();
+          debugPrint('*** [MATCHING] #${i+1} Score=${_matchScoreCache[jobId]} | ${job['job_title']} | Tags sectoriels: $jobSectorTags ***');
+        }
+
+        // Si aucun job ne matche les secteurs, fallback : afficher tous les jobs
+        // (mieux que d'afficher un écran vide)
+        if (matchedJobs.isEmpty) {
+          debugPrint('*** [MATCHING] ⚠️ Aucun job ne correspond aux secteurs sélectionnés. Affichage de tous les jobs. ***');
+          allJobs.sort((a, b) => (b['created_at'] ?? '').compareTo(a['created_at'] ?? ''));
+        } else {
+          allJobs
+            ..clear()
+            ..addAll(matchedJobs);
         }
       }
 
@@ -237,65 +269,110 @@ class _SwipeScreenState extends State<SwipeScreen> {
     }
   }
 
+  // Tags génériques qui ne représentent PAS un secteur d'activité
+  // et qui ne doivent PAS être utilisés pour le matching
+  static const Set<String> _genericTags = {
+    'stage', 'cdi', 'cdd', 'freelance', 'intérim', 'alternance',
+    'junior', 'senior', 'confirmé', 'expérimenté', 'débutant',
+    'temps plein', 'temps partiel', 'mi-temps',
+    'urgent', 'nouveau', 'premium',
+    'bilingue', 'anglais', 'français', 'allemand',
+    'bac', 'bac+2', 'bac+3', 'bac+4', 'bac+5', 'bepc',
+    'fodese', 'ong', 'start-up',
+  };
+
   static const Map<String, List<String>> _skillKeywords = {
-    'informatique': ['développeur', 'developer', 'software', 'web', 'mobile', 'fullstack', 'frontend', 'backend', 'devops', 'informatique', 'programmeur', 'data', 'cloud', 'système', 'réseau', 'sysadmin', 'it', 'tech', 'digital', 'cybersécurité', 'base de données', 'api', 'intelligence artificielle', 'ia', 'machine learning'],
-    'marketing': ['marketing', 'community manager', 'communication', 'digital', 'seo', 'sem', 'publicité', 'brand', 'marque', 'social media', 'content', 'stratégie', 'campagne', 'emailing', 'crm', 'acquisition', 'growth'],
-    'vente': ['vente', 'commercial', 'vendeur', 'business', 'négociation', 'client', 'prospection', 'terrain', 'retail', 'b2b', 'b2c', 'account', 'sales', 'chiffre d\'affaires', 'objectif'],
+    'informatique': ['développeur', 'developer', 'software', 'web', 'mobile', 'fullstack', 'frontend', 'backend', 'devops', 'informatique', 'programmeur', 'data', 'cloud', 'système', 'sysadmin', 'it', 'tech', 'cybersécurité', 'base de données', 'api', 'intelligence artificielle', 'ia', 'machine learning', 'ida'],
+    'marketing': ['marketing', 'community manager', 'community management', 'communication', 'seo', 'sem', 'publicité', 'brand', 'marque', 'social media', 'content', 'stratégie', 'campagne', 'emailing', 'crm', 'acquisition', 'growth', 'marketing digital', 'réseaux sociaux'],
+    'marketing digital': ['marketing digital', 'marketing', 'community manager', 'community management', 'seo', 'sem', 'social media', 'réseaux sociaux', 'digital', 'content', 'création de contenu'],
+    'vente': ['vente', 'commercial', 'vendeur', 'business', 'négociation', 'prospection', 'terrain', 'retail', 'b2b', 'b2c', 'account', 'sales', 'chiffre d\'affaires', 'objectif', 'télévente', 'télévendeur', 'closing'],
+    'commerce': ['commerce', 'commercial', 'vente', 'distribution', 'magasin', 'boutique', 'caissier', 'merchandising', 'achat', 'négoce', 'grossiste', 'prospection', 'technico-commercial'],
     'ressources humaines': ['rh', 'ressources humaines', 'recrutement', 'paie', 'formation', 'talent', 'gpec', 'droit du travail', 'personnel', 'human resources', 'hr', 'onboarding', 'gestion du personnel'],
-    'finance': ['finance', 'comptable', 'comptabilité', 'audit', 'trésorerie', 'banque', 'investissement', 'budget', 'contrôle de gestion', 'fiscalité', 'analyste financier', 'risque', 'crédit'],
-    'logistique': ['logistique', 'supply chain', 'transport', 'approvisionnement', 'entrepôt', 'stock', 'manutention', 'livraison', 'import', 'export', 'douane', 'transit', 'chauffeur', 'fleet'],
-    'ingénierie': ['ingénieur', 'engineering', 'technique', 'industriel', 'mécanique', 'électrique', 'civil', 'production', 'maintenance', 'qualité', 'process', 'automatisme', 'projet', 'bureau d\'études'],
-    'design': ['design', 'graphiste', 'graphique', 'ux', 'ui', 'créatif', 'directeur artistique', 'maquette', 'photoshop', 'figma', 'illustration', 'motion', 'webdesign', 'infographie', 'brand identity'],
-    'administration': ['administratif', 'administration', 'secrétaire', 'assistant', 'bureau', 'accueil', 'office', 'coordination', 'gestion', 'archivage', 'courrier', 'standard'],
-    'télécommunications': ['télécom', 'télécommunication', 'réseau', 'fibre', 'antenne', 'mobile', 'opérateur', 'infrastructure', 'noc', 'radio', '4g', '5g'],
-    'btp': ['btp', 'bâtiment', 'construction', 'chantier', 'génie civil', 'architecte', 'conducteur de travaux', 'maçon', 'électricien', 'plombier', 'topographe', 'urbanisme', 'ouvrage'],
-    'santé': ['santé', 'médecin', 'infirmier', 'pharmacie', 'hôpital', 'clinique', 'médical', 'soins', 'laboratoire', 'biologie', 'sage-femme', 'dentiste', 'paramédical'],
+    'rh': ['rh', 'ressources humaines', 'recrutement', 'paie', 'formation', 'talent', 'gpec', 'personnel', 'human resources', 'hr', 'onboarding'],
+    'finance': ['finance', 'comptable', 'comptabilité', 'audit', 'trésorerie', 'banque', 'investissement', 'budget', 'contrôle de gestion', 'fiscalité', 'analyste financier', 'risque', 'crédit', 'syscohada', 'ohada'],
+    'comptabilité': ['comptabilité', 'comptable', 'audit', 'finance', 'trésorerie', 'budget', 'contrôle de gestion', 'fiscal', 'syscohada', 'ohada', 'assistanat comptable'],
+    'logistique': ['logistique', 'supply chain', 'transport', 'approvisionnement', 'entrepôt', 'stock', 'manutention', 'livraison', 'import', 'export', 'douane', 'transit', 'fleet'],
+    'ingénierie': ['ingénieur', 'engineering', 'technique', 'industriel', 'mécanique', 'électrique', 'civil', 'production', 'maintenance', 'qualité', 'process', 'automatisme', 'bureau d\'études'],
+    'design': ['design', 'graphiste', 'graphique', 'ux', 'ui', 'créatif', 'directeur artistique', 'maquette', 'photoshop', 'figma', 'illustration', 'motion', 'webdesign', 'infographie', 'brand identity', 'communication visuelle'],
+    'infographie': ['infographie', 'graphisme', 'graphiste', 'design', 'photoshop', 'illustrator', 'canva', 'communication visuelle', 'webmaster'],
+    'administration': ['administratif', 'administration', 'secrétaire', 'assistant', 'bureau', 'accueil', 'office', 'coordination', 'gestion', 'archivage', 'courrier', 'standard', 'assistanat', 'secrétariat'],
+    'télécommunications': ['télécom', 'télécommunication', 'télécoms', 'réseau', 'réseaux', 'fibre', 'fibre optique', 'antenne', 'opérateur', 'infrastructure', 'noc', 'radio', '4g', '5g', 'installation'],
+    'btp': ['btp', 'bâtiment', 'construction', 'chantier', 'génie civil', 'architecte', 'conducteur de travaux', 'maçon', 'électricien', 'plombier', 'topographe', 'urbanisme', 'ouvrage', 'hydraulique', 'infrastructures'],
+    'génie civil': ['génie civil', 'btp', 'bâtiment', 'construction', 'chantier', 'infrastructures', 'ouvrage'],
+    'santé': ['santé', 'médecin', 'infirmier', 'pharmacie', 'hôpital', 'clinique', 'médical', 'soins', 'laboratoire', 'biologie', 'sage-femme', 'dentiste', 'paramédical', 'aide soignant'],
     'éducation': ['éducation', 'enseignant', 'professeur', 'formateur', 'formation', 'école', 'université', 'pédagogie', 'cours', 'académique', 'tuteur', 'éducateur'],
     'juridique': ['juridique', 'droit', 'avocat', 'juriste', 'contentieux', 'contrat', 'conformité', 'compliance', 'réglementation', 'notaire', 'huissier', 'légal'],
     'banque & assurance': ['banque', 'assurance', 'crédit', 'épargne', 'investissement', 'courtier', 'souscription', 'sinistre', 'risque', 'microfinance', 'fintech', 'agent bancaire'],
-    'commerce': ['commerce', 'commercial', 'vente', 'distribution', 'magasin', 'boutique', 'caissier', 'merchandising', 'achat', 'approvisionnement', 'négoce', 'grossiste'],
-    'transport': ['transport', 'chauffeur', 'conducteur', 'routier', 'maritime', 'aérien', 'logistique', 'flotte', 'véhicule', 'livraison', 'coursier', 'dispatch'],
+    'transport': ['transport', 'chauffeur', 'conducteur', 'routier', 'maritime', 'aérien', 'flotte', 'véhicule', 'livraison', 'coursier', 'dispatch'],
     'hôtellerie': ['hôtellerie', 'restauration', 'hôtel', 'restaurant', 'cuisine', 'chef', 'serveur', 'réception', 'tourisme', 'hébergement', 'bar', 'traiteur', 'catering'],
+    'sécurité': ['sécurité', 'surveillance', 'gardiennage', 'agent de sécurité', 'vigile'],
+    'gestion de projet': ['gestion de projet', 'chef de projet', 'project manager', 'scrum', 'agile', 'management', 'pmp', 'prince2'],
   };
 
+  /// Vérifie si un tag est générique (non-sectoriel)
+  bool _isGenericTag(String tag) {
+    return _genericTags.contains(tag.toLowerCase().trim());
+  }
+
+  /// Retourne les skills de l'utilisateur en filtrant les tags génériques
+  List<String> get _sectorSkills {
+    return _userSkills.where((s) => !_isGenericTag(s)).toList();
+  }
+
   List<String> _getExpandedKeywords(String userSkill) {
-    final skillKey = userSkill.toLowerCase();
+    final skillKey = userSkill.toLowerCase().trim();
     return _skillKeywords[skillKey] ?? [skillKey];
   }
 
   int _calculateMatchScore(Map<String, dynamic> job) {
-    if (_userSkills.isEmpty) return 0;
+    // Utiliser uniquement les skills sectoriels pour le matching
+    final effectiveSkills = _sectorSkills;
+    if (effectiveSkills.isEmpty) return 50; // Si aucun secteur, score neutre pour tout montrer
 
     double maxScore = 0;
-    bool hasDirectTagMatch = false;
+    bool hasSectorMatch = false;
     
     // Normalisation basique (minuscules)
     final jobTitle = (job['job_title'] as String?)?.toLowerCase().trim() ?? '';
     final jobSpecialty = (job['specialty'] as String?)?.toLowerCase().trim() ?? '';
     final jobDescription = (job['description'] as String?)?.toLowerCase() ?? '';
-    final jobTags = List<String>.from(job['tags'] ?? []).map((t) => t.toLowerCase().trim()).toList();
+    final allJobTags = List<String>.from(job['tags'] ?? []).map((t) => t.toLowerCase().trim()).toList();
+    
+    // Filtrer les tags génériques du job aussi pour un matching plus pertinent
+    final jobSectorTags = allJobTags.where((t) => !_isGenericTag(t)).toList();
 
-    for (final skill in _userSkills) {
+    for (final skill in effectiveSkills) {
       double currentSectorScore = 0;
       final skillLower = skill.toLowerCase().trim();
       
-      // 1. MATCH DIRECT PAR TAG (PRIORITÉ ABSOLUE - Le plus fiable)
-      // Vérifie si un des tags du job correspond exactement au secteur choisi par l'utilisateur
-      for (final jobTag in jobTags) {
-        if (jobTag == skillLower || jobTag.contains(skillLower) || skillLower.contains(jobTag)) {
+      // 1. MATCH DIRECT PAR TAG SECTORIEL (PRIORITÉ ABSOLUE)
+      // Compare uniquement avec les tags sectoriels du job
+      for (final jobTag in jobSectorTags) {
+        if (jobTag == skillLower) {
+          // Match exact = score maximal
+          currentSectorScore += 300;
+          hasSectorMatch = true;
+          break;
+        } else if (jobTag.contains(skillLower) || skillLower.contains(jobTag)) {
+          // Match partiel (ex: "informatique" contenu dans "informatique de gestion")
           currentSectorScore += 200;
-          hasDirectTagMatch = true;
+          hasSectorMatch = true;
           break;
         }
       }
 
       // 2. MATCH PAR SPÉCIALITÉ (POIDS FORT)
-      if (jobSpecialty == skillLower || jobSpecialty.contains(skillLower) || skillLower.contains(jobSpecialty)) {
-        currentSectorScore += 80;
-        hasDirectTagMatch = true;
+      if (jobSpecialty.isNotEmpty) {
+        if (jobSpecialty == skillLower) {
+          currentSectorScore += 150;
+          hasSectorMatch = true;
+        } else if (jobSpecialty.contains(skillLower) || skillLower.contains(jobSpecialty)) {
+          currentSectorScore += 80;
+          hasSectorMatch = true;
+        }
       }
 
-      // 3. RECHERCHE DE MOTS-CLÉS SPÉCIFIQUES AU SECTEUR
+      // 3. RECHERCHE DE MOTS-CLÉS SPÉCIFIQUES AU SECTEUR (dans titre et tags)
       final keywords = _getExpandedKeywords(skill);
       int keywordHitsInTitle = 0;
       int keywordHitsInTags = 0;
@@ -303,35 +380,38 @@ class _SwipeScreenState extends State<SwipeScreen> {
       for (final keyword in keywords) {
         final kw = keyword.toLowerCase();
         
-        // Poids fort si présent dans le titre
+        // Poids fort si présent dans le titre du job
         if (jobTitle.contains(kw)) {
           keywordHitsInTitle++;
         }
         
-        // Poids moyen si présent dans les tags
-        if (jobTags.any((tag) => tag.contains(kw))) {
+        // Poids moyen si présent dans les tags du job
+        if (jobSectorTags.any((tag) => tag.contains(kw))) {
           keywordHitsInTags++;
         }
       }
 
-      // Calcul des points par mots-clés
+      // Les mots-clés dans le titre comptent beaucoup
       if (keywordHitsInTitle > 0) {
-        currentSectorScore += 40;
-        if (keywordHitsInTitle > 1) currentSectorScore += 15;
+        currentSectorScore += 60;
+        if (keywordHitsInTitle > 1) currentSectorScore += 20;
+        hasSectorMatch = true;
       }
+      // Les mots-clés dans les tags comptent aussi
       if (keywordHitsInTags > 0) {
-        currentSectorScore += 20;
+        currentSectorScore += 30;
+        hasSectorMatch = true;
       }
 
-      // 4. Poids léger dans la description (seulement si on a déjà un match de tag/titre)
-      if (currentSectorScore > 0) {
+      // 4. Bonus léger si la description confirme le match (seulement si déjà matché)
+      if (hasSectorMatch && currentSectorScore > 0) {
         int descHits = 0;
         for (final keyword in keywords) {
           if (jobDescription.contains(keyword.toLowerCase())) {
             descHits++;
           }
         }
-        currentSectorScore += (descHits > 0 ? 5 : 0);
+        if (descHits > 0) currentSectorScore += 5;
       }
 
       if (currentSectorScore > maxScore) {
@@ -339,10 +419,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
       }
     }
 
-    // PÉNALITÉ : Les jobs qui ne correspondent à AUCUN tag/secteur de l'utilisateur
-    // reçoivent un score négatif pour être relégués en fin de liste
-    if (!hasDirectTagMatch && maxScore < 40) {
-      return -100 + maxScore.toInt(); // Score négatif → toujours après les jobs matchés
+    // FILTRAGE STRICT : Les jobs sans AUCUN match sectoriel reçoivent
+    // un score de -100 pour être clairement séparés des offres pertinentes
+    if (!hasSectorMatch) {
+      return -100;
     }
 
     return maxScore.clamp(0, 300).toInt();
