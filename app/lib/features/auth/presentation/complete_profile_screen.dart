@@ -212,6 +212,34 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      // Bouton fixé en bas de l'écran, toujours visible
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.fromLTRB(24.w, 12.h, 24.w, MediaQuery.of(context).padding.bottom + 16.h),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: ElevatedButton(
+          onPressed: _isLoading ? null : _saveProfile,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(vertical: 20.h),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+            elevation: 4,
+            shadowColor: Theme.of(context).primaryColor.withOpacity(0.3),
+          ),
+          child: _isLoading 
+            ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+            : Text('ENREGISTRER LE PROFIL', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900, letterSpacing: 1)),
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.all(24.w),
@@ -334,21 +362,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                           }).toList(),
                         ),
               
-              SizedBox(height: 40.h),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _saveProfile,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 20.h),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
-                  elevation: 4,
-                  shadowColor: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-                ),
-                child: _isLoading 
-                  ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text('ENREGISTRER LE PROFIL', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900, letterSpacing: 1)),
-              ),
+              // Espace en bas pour éviter que le contenu soit caché par le bouton
+              SizedBox(height: 20.h),
             ],
           ),
         ),
