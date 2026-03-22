@@ -616,7 +616,9 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           ),
           if (!isPremium)
             ElevatedButton(
-              onPressed: () => context.push('/premium'),
+              onPressed: () => context.push('/premium').then((_) {
+                if (mounted) _loadProfile();
+              }),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: const Color(0xFFF97316),

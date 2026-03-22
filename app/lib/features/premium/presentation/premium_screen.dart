@@ -76,7 +76,16 @@ class _PremiumScreenState extends State<PremiumScreen> {
       }
     } catch (e) {
       debugPrint('Error activating premium: $e');
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Impossible d\'activer le premium: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 

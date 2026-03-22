@@ -242,9 +242,8 @@ serve(async (req) => {
     } = await req.json();
 
     // Normalisation du nom de l'entreprise : éviter le "Non spécifié"
-    const finalCompany = (jobCompany && jobCompany !== "Non spécifié" && jobCompany !== "Inconnu" && jobCompany !== "non spécifié") 
-      ? jobCompany 
-      : "votre entreprise";
+    const isCompanyKnown = !!(jobCompany && jobCompany.toLowerCase() !== "non spécifié" && jobCompany.toLowerCase() !== "inconnu" && jobCompany.trim() !== "");
+    const finalCompany = isCompanyKnown ? jobCompany : "votre structure ou votre entreprise";
 
     if (!cvUrl || !jobTitle) {
       return new Response(
@@ -324,9 +323,12 @@ serve(async (req) => {
       ? `\n\nVeuillez egalement trouver en piece jointe ma lettre de motivation.`
       : "";
 
+    const interestText = userSexe === "Femme" ? "interessee" : "interesse";
+    const companyContext = isCompanyKnown ? `chez ${finalCompany}` : `au sein de ${finalCompany}`;
+
     const emailBody = message 
         ? message 
-        : `Bonjour,\n\nSuite a votre annonce pour le poste de ${jobTitle} chez ${finalCompany}, je vous soumets ma candidature.\n\nMon profil correspond a vos criteres et vous trouverez mon CV en piece jointe pour plus de details sur mon parcours.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`;
+        : `Bonjour,\n\nJe suis tres ${interestText} par le poste de ${jobTitle} ${companyContext} vu sur Djossi Match.\n\nMon profil correspond a vos criteres et vous trouverez mon CV en piece jointe pour plus de details sur mon parcours.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`;
 
     // 5. Send email via Resend
     const targetEmail = "danklougod5@gmail.com"; 

@@ -524,7 +524,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
             // Petit avertissement si l'email est prioritaire mais que l'utilisateur n'a pas de CV
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('⚠️ Email prioritaire mais aucun CV trouvé dans votre profil.'),
+                content: Text('Email prioritaire mais aucun CV trouvé dans votre profil.'),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -532,7 +532,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
         } 
         else if (hasWhatsapp) {
           // Le numéro prend le relais uniquement si pas d'email
-          _showWhatsAppRedirect(job['job_title'] ?? 'ce poste', whatsapp.toString());
+          _showWhatsAppRedirect(job['job_title'] ?? 'ce poste', job['company_name'] ?? '', whatsapp.toString());
         } 
         else if (hasLink) {
           // Le lien prend le relais uniquement si ni email ni numéro
@@ -651,7 +651,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              context.push('/premium');
+              context.push('/premium').then((_) {
+                if (mounted) {
+                  setState(() => _isLoading = true);
+                  _loadData();
+                }
+              });
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF97316),
@@ -730,7 +735,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              context.push('/premium');
+              context.push('/premium').then((_) {
+                if (mounted) {
+                  setState(() => _isLoading = true);
+                  _loadData();
+                }
+              });
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF97316),
@@ -793,7 +803,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
     return numbers;
   }
 
-  void _showWhatsAppRedirect(String jobTitle, String phoneNumber) {
+  void _showWhatsAppRedirect(String jobTitle, String companyName, String phoneNumber) {
     if (!mounted) return;
 
     // Extraire tous les numéros individuels
@@ -870,7 +880,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
             onPressed: () async {
               Navigator.pop(context);
               
-              String textMessage = "Bonjour, je suis intéressé par le poste de $jobTitle vu sur Djossi Match. Veuillez trouver mon CV ci-joint.";
+              String interestText = (_sexe == 'Femme') ? 'intéressée' : 'intéressé';
+              String companyText = (companyName.isNotEmpty && companyName.toLowerCase() != 'inconnu') ? companyName : 'votre structure ou votre entreprise';
+              String textMessage = "Bonjour, je suis $interestText par le poste de $jobTitle au sein de $companyText vu sur Djossi Match. Veuillez trouver mon CV ci-joint.";
               
               final message = Uri.encodeComponent(textMessage);
               final whatsappAppUrl = Uri.parse("whatsapp://send?phone=$finalPhone&text=$message");
