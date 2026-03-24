@@ -493,7 +493,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
             ScaffoldMessenger.of(context).clearSnackBars();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('✅ Candidature enregistrée pour ${job['job_title']} — email en cours d\'envoi...'),
+                content: Text('Candidature enregistrée pour ${job['job_title']} — email en cours d\'envoi...'),
                 backgroundColor: Colors.green,
                 duration: const Duration(milliseconds: 1500),
               ),
