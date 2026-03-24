@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/services/moyapay_service.dart';
 
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
@@ -14,6 +16,8 @@ class _PremiumScreenState extends State<PremiumScreen> {
   bool _isPremium = false;
   bool _isLoading = false;
   String? _userName;
+  String? _phoneNumber;
+  String? _email;
 
   @override
   void initState() {
@@ -23,13 +27,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
   Future<void> _checkPremiumStatus() async {
     try {
-      final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) return;
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+      _email = user.email;
 
       final response = await _supabase
           .from('profiles')
-          .select('is_premium, full_name')
-          .eq('id', userId)
+          .select('is_premium, full_name, phone_number, premium_until')
+          .eq('id', user.id)
           .maybeSingle();
 
       if (response != null && mounted) {
@@ -43,6 +48,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
             _isPremium = isPremium;
           }
           _userName = response['full_name'];
+          _phoneNumber = response['phone_number'];
         });
       }
     } catch (e) {
@@ -51,139 +57,74 @@ class _PremiumScreenState extends State<PremiumScreen> {
   }
 
   Future<void> _activatePremium() async {
+    if (_phoneNumber == null || _phoneNumber!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez renseigner votre numéro de téléphone dans votre profil.')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      // Simulate payment process or just update DB for MVP
-      // Activate for 30 days
-      final expiryDate = DateTime.now().add(const Duration(days: 30));
-      await _supabase.from('profiles').update({
-        'is_premium': true,
-        'premium_until': expiryDate.toIso8601String(),
-      }).eq('id', userId);
+      // MoyaPay Webhook URL (Supabase Edge Function)
+      const notifyUrl = 'https://tbhxbfunyhbrctzfpkwf.supabase.co/functions/v1/moyapay-webhook';
 
-      await Future.delayed(const Duration(seconds: 2)); // Logic simulation
+      final response = await MoyaPayService.initiateWavePayment(
+        amount: 2000,
+        phoneNumber: _phoneNumber!,
+        email: _email ?? '',
+        firstName: _userName?.split(' ').first ?? 'Client',
+        lastName: _userName?.split(' ').length == 1 ? 'Djorssi' : _userName?.split(' ').sublist(1).join(' ') ?? 'Djorssi',
+        notifyUrl: notifyUrl,
+      );
 
-      if (mounted) {
-        setState(() {
-          _isPremium = true;
-          _isLoading = false;
+      if (response != null && response.paymentUrl != null && response.payToken != null) {
+        // Record payment attempt BEFORE redirect
+        await _supabase.from('payments').insert({
+          'user_id': userId,
+          'pay_token': response.payToken,
+          'amount': 2000,
+          'status': 'PENDING',
         });
-        
-        _showSuccessAnimation();
+
+        final uri = Uri.parse(response.paymentUrl!);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Redirection vers Wave... Revenez ici après le paiement.'),
+                duration: Duration(seconds: 10),
+              ),
+            );
+          }
+        } else {
+          throw Exception('Impossible d\'ouvrir le lien de paiement');
+        }
+      } else {
+        throw Exception('Erreur lors de l\'initialisation du paiement: ${response?.message ?? "Inconnu"}');
       }
+
+      if (mounted) setState(() => _isLoading = false);
     } catch (e) {
       debugPrint('Error activating premium: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Impossible d\'activer le premium: $e'),
+            content: Text('Erreur: $e'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
           ),
         );
       }
     }
   }
 
-  void _showSuccessAnimation() {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.8),
-      transitionDuration: const Duration(milliseconds: 400),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return ScaleTransition(
-          scale: CurvedAnimation(parent: animation, curve: Curves.elasticOut),
-          child: Center(
-            child: Container(
-              margin: EdgeInsets.symmetric(horizontal: 24.w),
-              padding: EdgeInsets.all(32.r),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(24.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFF59E0B).withOpacity(0.5),
-                    blurRadius: 30,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(20.r),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF59E0B).withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.workspace_premium_rounded, color: const Color(0xFFF59E0B), size: 100.r),
-                    ),
-                    SizedBox(height: 24.h),
-                    Text(
-                      _userName != null && _userName!.trim().isNotEmpty 
-                          ? 'FÉLICITATIONS\n${_userName!.toUpperCase()} !'
-                          : 'FÉLICITATIONS !',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 24.sp,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    SizedBox(height: 12.h),
-                    Text(
-                      'Vous êtes désormais membre PREMIUM.\nPréparez-vous à matcher avec les meilleures offres !',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        color: Colors.white70,
-                        height: 1.5,
-                      ),
-                    ),
-                    SizedBox(height: 32.h),
-                    ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context); // Close dialog
-                        Navigator.pop(context); // Go back to profile
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFF59E0B),
-                        foregroundColor: const Color(0xFF0F172A),
-                        minimumSize: const Size(double.infinity, 56),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        'EXPLORER MES AVANTAGES',
-                        style: TextStyle(
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
+  // _showSuccessAnimation can be called once the status is SUCCESS
 
   @override
   Widget build(BuildContext context) {
@@ -455,24 +396,43 @@ class _PremiumScreenState extends State<PremiumScreen> {
   Widget _buildBottomAction() {
     return Container(
       padding: EdgeInsets.all(24.r),
-      child: ElevatedButton(
-        onPressed: _isPremium || _isLoading ? null : _activatePremium,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _isPremium ? const Color(0xFF22C55E) : Colors.white,
-          foregroundColor: const Color(0xFF0F172A),
-          minimumSize: const Size(double.infinity, 64),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
-          elevation: 0,
-        ),
-        child: Text(
-          _isPremium ? 'DÉSONRMAIS PREMIUM ✓' : 'ACTIVER MAINTENANT',
-          style: TextStyle(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1,
-            color: _isPremium ? Colors.white : const Color(0xFF0F172A),
+      child: Column(
+        children: [
+          ElevatedButton(
+            onPressed: _isPremium || _isLoading ? null : _activatePremium,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _isPremium ? const Color(0xFF22C55E) : Colors.white,
+              foregroundColor: const Color(0xFF0F172A),
+              minimumSize: const Size(double.infinity, 64),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+              elevation: 0,
+            ),
+            child: Text(
+              _isPremium ? 'DÉSONRMAIS PREMIUM ✓' : (_isLoading ? 'TRAITEMENT...' : 'ACTIVER MAINTENANT'),
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+                color: _isPremium ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
           ),
-        ),
+          if (!_isPremium && !_isLoading) ...[
+            SizedBox(height: 16.h),
+            TextButton(
+              onPressed: _checkPremiumStatus,
+              child: Text(
+                'VÉRIFIER MON STATUT',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.bold,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

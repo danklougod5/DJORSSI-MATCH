@@ -12,9 +12,15 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
 }
 
+from scraper.src.utils.security import is_safe_url
+
 async def fetch_page_content(client: httpx.AsyncClient, link: str) -> dict:
     """Visits a page to get the full raw text asynchronously."""
     try:
+        if not is_safe_url(link):
+            print(f"  [WARN] Skipping unsafe URL for SSRF protection: {link}")
+            return None
+            
         if link.lower().endswith('.pdf'):
             # Placeholder for future PDF parsing
             return None

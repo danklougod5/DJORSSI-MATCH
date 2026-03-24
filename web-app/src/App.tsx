@@ -7,24 +7,18 @@ import { supabase } from './lib/supabase'
 
 function App() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [isInitializing, setIsInitializing] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Timeout helper - if getSession hangs (corrupted token/lock), force continue
-    const timeout = (ms: number) => new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Session check timeout')), ms)
-    );
+    // Sécurité : s'assurer que l'app s'affiche quoi qu'il arrive après 4s
+    const safetyTimer = setTimeout(() => {
+      setIsInitializing(false);
+    }, 4000);
 
     const checkSession = async () => {
       try {
-        const result = await Promise.race([
-          supabase.auth.getSession(),
-          timeout(10000)
-        ]) as any;
-
-        const session = result?.data?.session;
-        
+        const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           const { data: profile } = await supabase
             .from('profiles')
@@ -32,63 +26,74 @@ function App() {
             .eq('id', session.user.id)
             .single()
           
-          if (profile?.is_admin) {
-            setIsAdmin(true)
-          } else {
-            await supabase.auth.signOut()
-            setIsAdmin(false)
-          }
+          setIsAdmin(!!profile?.is_admin)
         } else {
           setIsAdmin(false)
         }
       } catch (error) {
-        console.warn('Session check failed or timed out, clearing local cache');
-        try {
-          localStorage.clear();
-          await supabase.auth.signOut();
-        } catch (e) {
-          console.error('Failed to clear session:', e);
-        }
-        setIsAdmin(false);
+        console.warn('Initial session check error:', error);
+        setIsAdmin(false)
       } finally {
-        setLoading(false)
+        setIsInitializing(false)
       }
     }
 
     checkSession()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', session.user.id)
-          .single()
-        
-        if (profile?.is_admin) {
-          setIsAdmin(true)
-        } else {
+      try {
+        if (event === 'SIGNED_IN' && session) {
+          // On ne remet PLUS isInitializing à true ici pour éviter de bloquer l'écran
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', session.user.id)
+            .single()
+          
+          setIsAdmin(!!profile?.is_admin)
+        } else if (event === 'SIGNED_OUT') {
           setIsAdmin(false)
+          if (window.location.pathname.startsWith('/admin')) {
+            navigate('/admin')
+          }
         }
-      } else if (event === 'SIGNED_OUT') {
+      } catch (e) {
+        console.error("Auth change error handled:", e)
         setIsAdmin(false)
-        navigate('/')
+      } finally {
+        // Au cas où c'est le SIGNED_IN initial qui déclenche onAuthStateChange
+        setIsInitializing(false)
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    }
   }, [navigate])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    // Reset state immediately for UI responsiveness
     setIsAdmin(false)
-    navigate('/')
+    localStorage.clear()
+    sessionStorage.clear()
+    
+    try {
+      await supabase.auth.signOut()
+    } catch (e) {
+      console.error('Error during signOut:', e)
+    } finally {
+      navigate('/admin') 
+    }
   }
 
-  if (loading) {
+  if (isInitializing) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent"></div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="font-black text-slate-400 uppercase tracking-widest text-[10px]">Chargement sécurisé...</p>
+        </div>
       </div>
     )
   }
@@ -109,7 +114,6 @@ function App() {
           } 
         />
 
-        {/* Catch all redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

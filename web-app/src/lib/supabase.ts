@@ -7,4 +7,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false, // On désactive pour tester si c'est le storage qui bloque
+    autoRefreshToken: false,
+    detectSessionInUrl: false
+  },
+  global: {
+    headers: { 'x-application-name': 'djorssi-match' }
+  }
+})

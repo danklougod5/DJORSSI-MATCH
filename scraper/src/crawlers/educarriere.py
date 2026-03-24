@@ -11,9 +11,13 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
+from scraper.src.utils.security import is_safe_url
+
 async def scrape_job_detail(client: httpx.AsyncClient, job_url: str) -> str:
     """Fetches the full detail of a job offer to get more context asynchronously."""
     try:
+        if not is_safe_url(job_url):
+            return ""
         response = await client.get(job_url, headers=HEADERS, timeout=15)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")

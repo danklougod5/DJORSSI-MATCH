@@ -19,14 +19,34 @@ class _AuthScreenState extends State<AuthScreen> {
 
   String _translateAuthError(String message) {
     final msg = message.toLowerCase();
+    
+    // Auth specific errors
     if (msg.contains('invalid login credentials')) return 'Email ou mot de passe incorrect.';
-    if (msg.contains('user already registered')) return 'Cet email est déjà utilisé.';
-    if (msg.contains('password should be at least 6 characters')) return 'Le mot de passe doit contenir au moins 6 caractères.';
+    if (msg.contains('user already registered') || 
+        msg.contains('already registered') || 
+        msg.contains('email already exists') ||
+        msg.contains('compte existe déjà')) {
+      return 'Cet utilisateur est déjà inscrit.';
+    }
+    if (msg.contains('password should be at least 6 characters')) {
+      return 'Le mot de passe doit contenir au moins 6 caractères.';
+    }
     if (msg.contains('rate limit')) return 'Trop de tentatives, veuillez réessayer plus tard.';
     if (msg.contains('email not confirmed')) return 'Veuillez confirmer votre adresse email.';
     if (msg.contains('invalid email')) return 'Adresse email invalide.';
     if (msg.contains('invalid or expired')) return 'Lien ou code invalide/expiré.';
-    return 'Erreur d\'authentification. Veuillez réessayer.';
+    if (msg.contains('signup is disabled')) return 'Les inscriptions sont temporairement désactivées.';
+    if (msg.contains('email provider is disabled')) return 'Le service d\'envoi d\'emails est désactivé.';
+    if (msg.contains('email sending failed')) return 'L\'envoi de l\'email a échoué. Veuillez contacter le support.';
+    if (msg.contains('network error') || msg.contains('failed host lookup')) {
+      return 'Erreur réseau. Vérifiez votre connexion internet.';
+    }
+    
+    // Log the raw error for better debugging in console
+    debugPrint('Unexpected Auth Error: $message');
+    
+    // If we don't know the error, we return a more informative message than a generic one
+    return 'Erreur d\'authentification : $message';
   }
 
   Future<void> _handleAuth() async {
@@ -63,6 +83,15 @@ class _AuthScreenState extends State<AuthScreen> {
         );
 
         if (response.user != null) {
+          // Détection d'un compte déjà existant (identities vide)
+          // Cela arrive souvent quand la protection contre l'énumération est activée
+          final identities = response.user!.identities ?? [];
+          if (identities.isEmpty) {
+            setState(() => _isLoading = false);
+            _showUserExistsDialog(email);
+            return;
+          }
+
           if (response.session != null) {
             // Déjà vérifié (ex: désactivation de la confirmation d'email en dev)
             await Supabase.instance.client.from('profiles').upsert({
@@ -120,10 +149,23 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } on AuthException catch (e) {
       if (mounted) {
-        if (e.message.toLowerCase().contains('email not confirmed')) {
+        final lowerMsg = e.message.toLowerCase();
+        
+        if (lowerMsg.contains('email not confirmed')) {
           context.push('/otp', extra: {'email': email});
           return;
         }
+
+        // Détection utilisateur existant lors de l'inscription
+        // Correction : Supabase renvoie les erreurs en anglais (GoTrue)
+        if (_isSignUp && (lowerMsg.contains('user already registered') || 
+                          lowerMsg.contains('already registered') ||
+                          lowerMsg.contains('email already exists') ||
+                          lowerMsg.contains('compte existe déjà'))) {
+          _showUserExistsDialog(email);
+          return;
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(_translateAuthError(e.message)),
           backgroundColor: Theme.of(context).colorScheme.error,
@@ -140,6 +182,35 @@ class _AuthScreenState extends State<AuthScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showUserExistsDialog(String email) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Compte existant'),
+        content: Text('Un compte avec l\'adresse $email existe déjà. Souhaitez-vous vous connecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() {
+                _isSignUp = false;
+              });
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Se connecter'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _resetPassword() async {

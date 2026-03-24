@@ -14,6 +14,7 @@ class CompleteProfileScreen extends StatefulWidget {
 
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _customSkillController = TextEditingController();
   List<String> _availableTags = [];
   String _searchQuery = '';
@@ -84,6 +85,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       if (profile != null && mounted) {
         setState(() {
           _nameController.text = profile['full_name'] ?? '';
+          _phoneController.text = profile['phone_number'] ?? '';
           _selectedGender = profile['sexe'];
           _cvUrl = profile['cv_url'];
           if (profile['skills'] != null) {
@@ -109,6 +111,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     _customSkillController.dispose();
     super.dispose();
   }
@@ -128,6 +131,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         final user = Supabase.instance.client.auth.currentUser;
         if (user == null) return;
 
+        // Security checking for path traversal
+        if (path.contains('..')) {
+          setState(() => _isUploadingCV = false);
+          return;
+        }
         final file = File(path);
         final fileExt = result.files.single.extension ?? 'pdf';
         final fileName = '${user.id}_cv.$fileExt';
@@ -167,9 +175,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
   Future<void> _saveProfile() async {
     final name = _nameController.text.trim();
-    if (name.isEmpty || _selectedGender == null || (_selectedTags.isEmpty && _customSkillController.text.isEmpty)) {
+    final phone = _phoneController.text.trim();
+    
+    if (name.isEmpty || phone.isEmpty || _selectedGender == null || (_selectedTags.isEmpty && _customSkillController.text.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir votre nom, choisir votre sexe et un secteur.')),
+        const SnackBar(content: Text('Veuillez remplir votre nom, téléphone, choisir votre sexe et un secteur.')),
       );
       return;
     }
@@ -186,6 +196,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         await Supabase.instance.client.from('profiles').upsert({
           'id': user.id,
           'full_name': name,
+          'phone_number': phone,
           'sexe': _selectedGender,
           'skills': skills,
           'cv_url': _cvUrl,
@@ -276,6 +287,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               ),
               
               SizedBox(height: 24.h),
+              _buildLabel('Numéro de Téléphone (Mobile Money)'),
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: _inputStyle('Ex: 0707070707', Icons.phone_android_outlined),
+              ),
+              
+              SizedBox(height: 24.h),
               _buildLabel('Votre Sexe'),
               Row(
                 children: [
@@ -340,35 +359,39 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(strokeWidth: 2)))
                   : _availableTags.isEmpty
                       ? const Center(child: Text('Aucun secteur disponible pour le moment.'))
-                      : Wrap(
-                          spacing: 8.w,
-                          runSpacing: 8.h,
-                          children: _availableTags
-                            .where((tag) => tag.toLowerCase().contains(_searchQuery.toLowerCase()))
-                            .map((tag) {
-                            final isSelected = _selectedTags.contains(tag);
-                            final themeColor = Theme.of(context).primaryColor;
-                            return FilterChip(
-                              label: Text(tag),
-                              selected: isSelected,
-                              onSelected: (_) => setState(() => isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag)),
-                              selectedColor: themeColor.withValues(alpha: 0.15),
-                              checkmarkColor: themeColor,
-                              labelStyle: TextStyle(
-                                color: isSelected ? themeColor : const Color(0xFF64748B),
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                fontSize: 13.sp,
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 1. Toujours afficher les secteurs déjà sélectionnés en haut
+                            if (_selectedTags.isNotEmpty) ...[
+                              Text('Vos sélections :', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor)),
+                              SizedBox(height: 8.h),
+                              Wrap(
+                                spacing: 8.w,
+                                runSpacing: 8.h,
+                                children: _selectedTags.map((tag) => _buildSectorChip(tag, true)).toList(),
                               ),
-                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(100.r),
-                                side: BorderSide(
-                                  color: isSelected ? themeColor : const Color(0xFFE2E8F0),
-                                  width: isSelected ? 1.5 : 1,
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                              SizedBox(height: 16.h),
+                              const Divider(),
+                              SizedBox(height: 16.h),
+                            ],
+                            
+                            // 2. Afficher les suggestions (limitées pour la performance)
+                            Text(_searchQuery.isEmpty ? 'Suggestions de secteurs :' : 'Résultats de recherche :', style: TextStyle(fontSize: 13.sp, color: Colors.grey)),
+                            SizedBox(height: 12.h),
+                            Wrap(
+                              spacing: 8.w,
+                              runSpacing: 8.h,
+                              children: _availableTags
+                                .where((tag) => 
+                                  tag.toLowerCase().contains(_searchQuery.toLowerCase()) && 
+                                  !_selectedTags.contains(tag) // On ne répète pas ceux déjà en haut
+                                )
+                                .take(30) // ON LIMITE À 30 POUR LA PERFORMANCE ⚡️
+                                .map((tag) => _buildSectorChip(tag, false))
+                                .toList(),
+                            ),
+                          ],
                         ),
               
               // Espace en bas pour éviter que le contenu soit caché par le bouton
@@ -389,6 +412,30 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     fillColor: const Color(0xFFF8FAFC),
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16.r), borderSide: BorderSide.none),
   );
+
+  Widget _buildSectorChip(String tag, bool isSelected) {
+    final themeColor = Theme.of(context).primaryColor;
+    return FilterChip(
+      label: Text(tag),
+      selected: isSelected,
+      onSelected: (_) => setState(() => isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag)),
+      selectedColor: themeColor.withValues(alpha: 0.15),
+      checkmarkColor: themeColor,
+      labelStyle: TextStyle(
+        color: isSelected ? themeColor : const Color(0xFF64748B),
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 13.sp,
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(100.r),
+        side: BorderSide(
+          color: isSelected ? themeColor : const Color(0xFFE2E8F0),
+          width: isSelected ? 1.5 : 1,
+        ),
+      ),
+    );
+  }
 
   Widget _buildGenderCard(String label, IconData icon, Color color) {
     final isSelected = _selectedGender == label;

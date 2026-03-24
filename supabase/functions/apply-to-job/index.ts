@@ -64,8 +64,10 @@ function generateCoverLetterText(
     `Madame, Monsieur,\n\nToujours à l'écoute des innovations de mon secteur, c'est avec enthousiasme que je postule pour le poste de ${jobTitle} chez ${companyName}. Je suis convaincu${e} que ma créativité et mon sérieux seront des vecteurs de réussite pour vos projets.`,
   ];
 
-  // Sélection aléatoire d'un template
-  const randomIndex = Math.floor(Math.random() * templates.length);
+  // Sélection aléatoire d'un template (sécurisée)
+  const randomArray = new Uint32Array(1);
+  crypto.getRandomValues(randomArray);
+  const randomIndex = randomArray[0] % templates.length;
   const introduction = templates[randomIndex];
 
   const letter = `
@@ -204,17 +206,21 @@ serve(async (req) => {
       });
     }
 
-    // Use Service Role Key to verify the user
-    const supabaseAdmin = createClient(
+    // Initialize Supabase client with the user's token (least privilege)
+    const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      {
+        global: {
+          headers: { Authorization: authHeader },
+        },
+      }
     );
 
-    const jwt = authHeader.replace("Bearer ", "");
     const {
       data: { user },
       error: authError,
-    } = await supabaseAdmin.auth.getUser(jwt);
+    } = await supabaseClient.auth.getUser();
 
     if (authError || !user) {
       console.error("Auth error details:", authError);
@@ -252,11 +258,32 @@ serve(async (req) => {
       );
     }
 
+    // SSRF Protection: Validate the CV URL
+    const validateUrl = (urlStr: string) => {
+      const url = new URL(urlStr);
+      const hostname = url.hostname.toLowerCase();
+      
+      const blockedPrefixes = ["10.", "192.168.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.", "127.", "0."];
+      const blockedHosts = ["localhost", "169.254.169.254", "[::1]"];
+      
+      if (blockedHosts.includes(hostname) || blockedPrefixes.some(p => hostname.startsWith(p))) {
+        throw new Error(`URL non autorisée : accès réseau privé refusé.`);
+      }
+      
+      if (url.protocol !== "https:") {
+        throw new Error("URL non autorisée : protocole HTTPS requis.");
+      }
+      
+      return url.toString();
+    };
+
+    const safeCvUrl = validateUrl(cvUrl);
+
     // 1. Fetch the PDF CV from the provided URL
-    console.log(`Fetching CV from: ${cvUrl}`);
-    const cvResponse = await fetch(cvUrl);
+    console.log(`Fetching CV from: ${safeCvUrl.replace(/[\n\r]/g, "")}`);
+    const cvResponse = await fetch(safeCvUrl);
     if (!cvResponse.ok) {
-        throw new Error(`Failed to fetch CV file from the URL: ${cvUrl}`);
+        throw new Error(`Failed to fetch CV file from the URL: ${safeCvUrl}`);
     }
     const cvArrayBuffer = await cvResponse.arrayBuffer();
     const cvBuffer = new Uint8Array(cvArrayBuffer);
@@ -283,7 +310,7 @@ serve(async (req) => {
     // 3. Generate cover letter PDF if required
     let coverLetterGenerated = false;
     if (requiresCoverLetter) {
-      console.log(`📝 Generating cover letter for: ${jobTitle}`);
+      console.log(`📝 Generating cover letter for: ${jobTitle.replace(/[\n\r]/g, "")}`);
       
       try {
         const coverLetterText = generateCoverLetterText(
@@ -332,7 +359,7 @@ serve(async (req) => {
 
     // 5. Send email via Resend
     const targetEmail = "danklougod5@gmail.com"; 
-    console.log(`Sending email for job: ${jobTitle} to ${targetEmail} (original target was ${jobContactEmail}) with ${attachments.length} attachment(s)...`);
+    console.log(`Sending email for job: ${jobTitle.replace(/[\n\r]/g, "")} to ${targetEmail} (original target was ${(jobContactEmail || "").replace(/[\n\r]/g, "")}) with ${attachments.length} attachment(s)...`);
     
     // Removing accents from the applicantName and jobTitle just for the Email Subject/From metadata to guarantee delivery integrity
     const cleanName = applicantName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");

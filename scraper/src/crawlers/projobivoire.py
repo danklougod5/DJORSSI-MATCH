@@ -12,9 +12,13 @@ HEADERS = {
     "Accept-Language": "fr-FR,fr;q=0.9",
 }
 
+from scraper.src.utils.security import is_safe_url
+
 async def fetch_projob_detail(client: httpx.AsyncClient, link: str) -> dict:
     """Fetches job details asynchronously."""
     try:
+        if not is_safe_url(link):
+            return None
         resp = await client.get(link, headers=HEADERS, timeout=15)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")

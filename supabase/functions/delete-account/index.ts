@@ -12,12 +12,6 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Setup client with the Admin/Service Role key to allow deleting users
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
     // 2. Setup standard client to verify the user's current session
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -31,11 +25,24 @@ serve(async (req) => {
     // 2. Extract Token from Authorization header
     const token = authHeader.replace('Bearer ', '');
 
-    // 3. Get the User from the token using Admin client
+    // 3. Setup standard client for verification (least privilege)
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // 4. Get the User from the token
     const {
       data: { user },
       error: authError,
-    } = await supabaseAdmin.auth.getUser(token);
+    } = await supabaseClient.auth.getUser();
+
+    // 5. Setup client with the Admin/Service Role key to allow deleting users
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
     if (authError || !user) {
       console.error("Auth Error:", authError?.message);

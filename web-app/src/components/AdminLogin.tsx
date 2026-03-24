@@ -15,20 +15,19 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  // Timeout helper for auth calls
-  const timeout = (ms: number) => new Promise((_, reject) => 
-    setTimeout(() => reject(new Error('Le serveur ne répond pas (Timeout)')), ms)
-  );
 
   const initAdmin = async () => {
     setInitLoading(true);
     setError(null);
     setSuccess(null);
     try {
+      // Nettoyer tous les verrous avant l'init
+      localStorage.clear();
+      
       // 1. Try to sign up
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email: 'admin@djossimatch.ci',
-        password: 'Djorssi2026!',
+        email: import.meta.env.VITE_ADMIN_DEFAULT_EMAIL,
+        password: import.meta.env.VITE_ADMIN_DEFAULT_PASSWORD,
       });
 
       let userId = data.user?.id;
@@ -36,8 +35,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
       // 2. If already exists, we need the ID
       if (signUpError && signUpError.message.includes('already registered')) {
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: 'admin@djossimatch.ci',
-          password: 'Djorssi2026!',
+          email: import.meta.env.VITE_ADMIN_DEFAULT_EMAIL,
+          password: import.meta.env.VITE_ADMIN_DEFAULT_PASSWORD,
         });
         
         if (signInError) throw new Error("Le compte existe déjà. Vérifiez le mot de passe.");
@@ -59,9 +58,13 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
         if (profileError) throw profileError;
       }
 
-      setSuccess("Accès Admin configuré ! Connectez-vous avec admin@djossimatch.ci / Djorssi2026!");
+      setSuccess("Accès Admin configuré ! Utilisez vos identifiants pour vous connecter.");
     } catch (err: any) {
-      setError(err.message || "Erreur d'initialisation");
+      let msg = err.message || "Erreur d'initialisation";
+      if (msg.toLowerCase().includes("user already registered")) {
+        msg = "Cet utilisateur est déjà inscrit.";
+      }
+      setError(msg);
     } finally {
       setInitLoading(false);
     }
@@ -73,32 +76,76 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
     setLoading(true);
     setError(null);
 
+    // 1. Force a clean state for auth avant la tentative
     try {
-      const { data, error: loginError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Nettoyage complet mais sécurisé
+      localStorage.clear(); 
+      sessionStorage.clear();
+    } catch (e) {
+      // Ignorer les erreurs de nettoyage
+    }
+
+    const authPromise = async () => {
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password: password.trim() 
       });
+      if (loginError) {
+        throw loginError;
+      }
+      return data;
+    };
 
-      if (loginError) throw loginError;
-
-      // Optional: Check if the user has an admin role in your profiles table
-      const { data: profile } = await supabase
+    const profilePromise = async (userId: string) => {
+      const { data: profile, error: profileErr } = await supabase
         .from('profiles')
         .select('is_admin')
-        .eq('id', data.user.id)
+        .eq('id', userId)
         .single();
+      
+      if (profileErr) throw profileErr;
+      if (!profile?.is_admin) throw new Error("Accès refusé : Vous n'êtes pas administrateur.");
+      return profile;
+    };
 
-      if (profile && profile.is_admin) {
-        // Redirection immédiate si le profil est Admin
+    // Timeout helper (30 secondes car le réseau semble lent)
+    const withTimeout = (promise: Promise<any>, ms: number, label: string) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Délai dépassé (${ms/1000}s) pour ${label}. Vérifiez votre connexion.`)), ms))
+      ]);
+    };
+
+    const translateError = (msg: string) => {
+      const lowerMsg = msg.toLowerCase();
+      if (lowerMsg.includes("invalid login credentials") || lowerMsg.includes("invalid login")) {
+        return "Email ou mot de passe incorrect.";
+      }
+      if (lowerMsg.includes("user already registered")) {
+        return "Cet utilisateur est déjà inscrit.";
+      }
+      if (lowerMsg.includes("failed to fetch")) {
+        return "Erreur de réseau : Supabase est injoignable.";
+      }
+      return msg;
+    };
+
+    try {
+      // 2. Auth call
+      const authData = await withTimeout(authPromise(), 30000, "l'authentification");
+      
+      if (authData?.user?.id) {
+        // 3. Profile check
+        await withTimeout(profilePromise(authData.user.id), 20000, "la vérification du profil");
         onLoginSuccess();
       } else {
-        // If not admin, sign them out immediately
-        await supabase.auth.signOut();
-        throw new Error("Accès refusé : Vous n'êtes pas administrateur.");
+        throw new Error("Authentification réussie mais ID utilisateur manquant.");
       }
-
     } catch (err: any) {
-      setError(err.message || "Erreur lors de la connexion");
+      console.error("Erreur complète connexion capturée:", err);
+      setError(translateError(err.message || "Erreur de connexion"));
+      // Clear session on error to avoid partial auth state
+      await supabase.auth.signOut();
     } finally {
       setLoading(false);
     }
@@ -126,7 +173,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 border-4 border-black font-bold focus:outline-none focus:bg-accent ring-0"
-                  placeholder="admin@djossimatch.ci"
+                  placeholder="votre@email.com"
                   required
                 />
               </div>
@@ -172,6 +219,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
           <div className="mt-10 pt-6 border-t-4 border-dashed border-slate-100">
              <p className="text-[10px] font-black text-slate-400 uppercase mb-3 text-center tracking-widest">Zone de Maintenance</p>
              <button 
+                type="button"
                 onClick={initAdmin}
                 disabled={initLoading}
                 className="w-full py-2 border-2 border-slate-200 text-slate-400 font-bold text-[10px] hover:border-primary hover:text-primary transition-all uppercase tracking-tighter disabled:opacity-50"

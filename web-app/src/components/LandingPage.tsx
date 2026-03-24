@@ -27,10 +27,10 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, col
 );
 
 const ComparisonRow: React.FC<{ label: string, free: React.ReactNode, premium: React.ReactNode, isPremium?: boolean }> = ({ label, free, premium, isPremium }) => (
-  <div className="grid grid-cols-3 font-bold text-xs sm:text-sm">
-    <div className="p-2 sm:p-4 border-r-2 border-black flex items-center bg-white">{label}</div>
-    <div className="p-2 sm:p-4 border-r-2 border-black text-center flex items-center justify-center bg-white">{free}</div>
-    <div className={`p-2 sm:p-4 text-center flex items-center justify-center ${isPremium ? 'bg-primary/10 text-primary' : 'bg-white'}`}>{premium}</div>
+  <div className="grid grid-cols-3 font-bold text-[10px] sm:text-sm leading-tight">
+    <div className="p-1.5 sm:p-4 border-r-2 border-black flex items-center bg-white">{label}</div>
+    <div className="p-1.5 sm:p-4 border-r-2 border-black text-center flex items-center justify-center bg-white">{free}</div>
+    <div className={`p-1.5 sm:p-4 text-center flex items-center justify-center ${isPremium ? 'bg-primary/10 text-primary' : 'bg-white'}`}>{premium}</div>
   </div>
 );
 
@@ -82,7 +82,7 @@ const LandingPage: React.FC = () => {
         <div className="absolute inset-0 bg-pattern"></div>
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 md:gap-16 items-center relative z-10 lg:pl-4">
           <div className="text-left mt-8 md:mt-0">
-            <div className="inline-block neo-brutal-tag mb-6 md:mb-8 text-xs sm:text-sm tracking-widest leading-relaxed">
+            <div className="inline-block neo-brutal-tag mb-6 md:mb-8 text-[10px] min-[400px]:text-xs sm:text-sm tracking-tight min-[400px]:tracking-widest leading-relaxed max-w-full whitespace-normal sm:whitespace-nowrap px-4 py-2">
               ⚡️ LE JOB DE TES RÊVES EN UN SWIPE
             </div>
             <h1 className="text-5xl md:text-7xl lg:text-8xl mb-6 md:mb-8 leading-[0.9] text-black italic">
@@ -102,20 +102,18 @@ const LandingPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="mt-12 md:mt-16 flex flex-wrap items-center gap-4 sm:gap-6 md:gap-8 justify-center lg:justify-start">
-              <div className="text-center shrink-0">
-                <div className="text-3xl md:text-4xl font-black italic">10K+</div>
+            <div className="mt-12 md:mt-16 grid grid-cols-3 min-[450px]:flex min-[450px]:flex-wrap items-center gap-y-8 gap-x-4 sm:gap-6 md:gap-8 justify-center lg:justify-start">
+              <div className="text-center shrink-0 border-r-2 border-black/10 min-[450px]:border-none pr-4 min-[450px]:p-0">
+                <div className="text-2xl min-[400px]:text-3xl md:text-4xl font-black italic">10K+</div>
                 <div className="text-[10px] sm:text-xs md:text-sm font-black uppercase text-slate-500 tracking-tighter">Matchs</div>
               </div>
-              <div className="w-1 h-8 md:h-12 bg-black opacity-20 rotate-12 hidden min-[350px]:block shrink-0"></div>
-              <div className="text-center shrink-0">
-                <div className="text-3xl md:text-4xl font-black italic">500+</div>
-                <div className="text-[10px] sm:text-xs md:text-sm font-black uppercase text-slate-500 tracking-tighter">Entreprises</div>
-              </div>
-              <div className="w-1 h-8 md:h-12 bg-black opacity-20 rotate-12 hidden sm:block shrink-0"></div>
-              <div className="text-center shrink-0">
-                <div className="text-3xl md:text-4xl font-black italic">24H</div>
+              <div className="text-center shrink-0 border-x-2 border-black/10 min-[450px]:border-none px-4 min-[450px]:p-0">
+                <div className="text-2xl min-[400px]:text-3xl md:text-4xl font-black italic">24H</div>
                 <div className="text-[10px] sm:text-xs md:text-sm font-black uppercase text-slate-500 tracking-tighter">Délai Moyen</div>
+              </div>
+              <div className="text-center shrink-0 border-l-2 border-black/10 min-[450px]:border-none pl-4 min-[450px]:p-0">
+                <div className="text-2xl min-[400px]:text-3xl md:text-4xl font-black italic">98%</div>
+                <div className="text-[10px] sm:text-xs md:text-sm font-black uppercase text-slate-500 tracking-tighter">Satisfaction</div>
               </div>
             </div>
           </div>
@@ -126,7 +124,7 @@ const LandingPage: React.FC = () => {
             </div>
             
             {/* Floating Tags - Keep them for extra flair */}
-            <div className="absolute -top-12 -right-4 neo-brutal-tag px-6 py-3 text-lg bg-green-400 rotate-12 shadow-xl z-20">
+            <div className="absolute -top-12 -right-4 neo-brutal-tag px-6 py-3 text-lg bg-green-400 rotate-12 shadow-xl z-20 hidden sm:block">
                HIRING! 💼
             </div>
             <div className="absolute top-1/2 -left-12 neo-brutal-tag px-6 py-3 text-lg bg-red-400 -rotate-12 shadow-xl z-20 hidden md:block">
@@ -142,7 +140,7 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <div className="mb-12 md:mb-20 text-center">
             <span className="text-secondary font-black uppercase tracking-widest text-xs md:text-sm mb-2 md:mb-4 block">LE PROCESSUS</span>
-            <h2 className="text-4xl md:text-5xl lg:text-7xl mb-6 text-black leading-tight">MÉTHODE <br/> <span className="text-primary italic">BROBROSSEUR</span></h2>
+            <h2 className="text-3xl min-[400px]:text-4xl md:text-5xl lg:text-7xl mb-6 text-black leading-tight">MÉTHODE <br/> <span className="text-primary italic uppercase">Brobrosseur</span></h2>
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
@@ -176,7 +174,7 @@ const LandingPage: React.FC = () => {
           <div className="text-center mb-12 md:mb-20">
             <h2 className="text-4xl sm:text-5xl md:text-7xl mb-4 md:mb-6 leading-none">NE RESTE <br/> PAS BLOQUÉ.</h2>
             <p className="text-lg md:text-xl font-bold max-w-2xl mx-auto px-4">
-              Le "djossi" n'attend pas. Choisis ton niveau et multiplie tes chances de décrocher ton prochain contrat.
+              Le "djorssi" n'attend pas. Choisis ton niveau et multiplie tes chances de décrocher ton prochain contrat.
             </p>
           </div>
 
@@ -188,10 +186,10 @@ const LandingPage: React.FC = () => {
               </div>
               <div className="divide-y-2 divide-black">
                 {/* Header */}
-                <div className="grid grid-cols-3 bg-slate-100 font-black text-xs uppercase tracking-tighter">
-                  <div className="p-4 border-r-2 border-black">FONCTIONNALITÉS</div>
-                  <div className="p-4 border-r-2 border-black text-center">FREE</div>
-                  <div className="p-4 text-center">PREMIUM</div>
+                <div className="grid grid-cols-3 bg-slate-100 font-black text-[9px] min-[400px]:text-[10px] sm:text-xs uppercase tracking-tighter border-b-2 border-black">
+                  <div className="p-2 sm:p-4 border-r-2 border-black flex items-center">OPTIONS</div>
+                  <div className="p-2 sm:p-4 border-r-2 border-black text-center flex items-center justify-center">FREE</div>
+                  <div className={`p-2 sm:p-4 text-center flex items-center justify-center bg-primary/10 text-primary`}>PREMIUM</div>
                 </div>
                 
                 {/* Rows */}
@@ -210,7 +208,7 @@ const LandingPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row justify-between items-start mb-6 md:mb-8 gap-4">
                    <div className="min-w-0 overflow-hidden break-words">
                     <h3 className="text-3xl md:text-4xl text-black leading-none break-words">PASS <br/> <span className="text-primary italic">PREMIUM</span></h3>
-                    <p className="text-4xl sm:text-5xl md:text-6xl font-black mt-4 whitespace-nowrap">2.000 <span className="text-xs sm:text-sm">FCFA / mois</span></p>
+                    <p className="text-3xl min-[400px]:text-4xl sm:text-5xl md:text-6xl font-black mt-4">2.000 <span className="text-xs sm:text-sm">FCFA / mois</span></p>
                    </div>
                    <div className="neo-brutal-tag bg-primary text-white scale-125 origin-top-left sm:origin-left hidden sm:block">LE TOP</div>
                 </div>
@@ -236,7 +234,7 @@ const LandingPage: React.FC = () => {
       {/* CTA Final */}
       <section className="py-16 md:py-24 px-4 md:px-6 text-center">
         <div className="max-w-4xl mx-auto">
-           <h2 className="text-5xl md:text-6xl lg:text-8xl mb-8 md:mb-12 leading-none uppercase italic">PRÊT À <br/> <span className="text-primary not-italic">BOSSÉ ?</span></h2>
+           <h2 className="text-5xl md:text-6xl lg:text-8xl mb-8 md:mb-12 leading-none uppercase italic">PRÊT À <br/> <span className="text-primary not-italic">BOSSER ?</span></h2>
            <button className="neo-brutal-btn text-lg md:text-2xl px-8 md:px-16 py-6 md:py-8 w-full sm:w-auto">TÉLÉCHARGER MAINTENANT</button>
            <p className="mt-6 md:mt-8 font-black uppercase text-xs md:text-sm tracking-widest opacity-50">Disponible sur iOS & Android</p>
         </div>
@@ -273,15 +271,14 @@ const LandingPage: React.FC = () => {
             <ul className="space-y-4 font-bold text-slate-400 text-sm">
               <li><a href="#" className="hover:text-white transition-colors">Confidentialité</a></li>
               <li><a href="#" className="hover:text-white transition-colors">CGU</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Mentions Légales</a></li>
             </ul>
           </div>
           <div>
             <h4 className="text-lg mb-6 uppercase">Contact</h4>
             <ul className="space-y-4 font-bold text-slate-400 text-sm">
-              <li>info@djossimatch.ci</li>
+              <li>danklougod5@gmail.com</li>
               <li>Abidjan, Côte d'Ivoire</li>
-              <li>+225 00 00 00 00 00</li>
+              <li>+225 07 08 17 25 31</li>
             </ul>
           </div>
         </div>

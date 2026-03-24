@@ -142,6 +142,13 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
           return;
         }
 
+        // Security Fix: Basic path traversal check
+        if (path.contains('..')) {
+          debugPrint('Erreur: Chemin de fichier invalide (tentative de traversée)');
+          setState(() => _isUploading = false);
+          return;
+        }
+
         final file = File(path);
         final fileExt = result.files.single.extension ?? 'pdf';
         final fileName = '${user.id}_cv.$fileExt';
@@ -557,80 +564,134 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
     final isPremium = _profileData?['is_premium'] ?? false;
 
     return Container(
-      padding: EdgeInsets.all(20.r),
+      clipBehavior: Clip.antiAlias, // Pour que les cercles ne dépassent pas
       decoration: BoxDecoration(
         gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: isPremium 
-            ? [const Color(0xFF0F172A), const Color(0xFF1E293B)] 
-            : [const Color(0xFFF97316), const Color(0xFFEA580C)],
+            ? [const Color(0xFF0F172A), const Color(0xFF334155)] 
+            : [const Color(0xFFF97316), const Color(0xFFEA580C), const Color(0xFFC2410C)],
         ),
-        borderRadius: BorderRadius.circular(24.r),
+        borderRadius: BorderRadius.circular(28.r),
         boxShadow: [
           BoxShadow(
             color: (isPremium ? const Color(0xFF0F172A) : const Color(0xFFF97316)).withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Container(
-            padding: EdgeInsets.all(12.r),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              isPremium ? Icons.workspace_premium_rounded : Icons.workspace_premium_outlined,
-              color: isPremium ? const Color(0xFFF59E0B) : Colors.white,
-              size: 28.r,
+          // Éléments de décoration en arrière-plan
+          Positioned(
+            right: -20.r,
+            top: -20.r,
+            child: Container(
+              width: 100.r,
+              height: 100.r,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.1),
+              ),
             ),
           ),
-          SizedBox(width: 16.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Positioned(
+            left: -10.r,
+            bottom: -30.r,
+            child: Container(
+              width: 80.r,
+              height: 80.r,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.05),
+              ),
+            ),
+          ),
+          
+          // Contenu principal
+          Padding(
+            padding: EdgeInsets.all(24.r),
+            child: Row(
               children: [
-                Text(
-                  isPremium ? 'M E M B R E   P R E M I U M' : 'PASSEZ AU PREMIUM',
-                  style: TextStyle(
+                Container(
+                  padding: EdgeInsets.all(12.r),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(16.r),
+                    border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+                  ),
+                  child: Icon(
+                    isPremium ? Icons.workspace_premium_rounded : Icons.workspace_premium_outlined,
                     color: isPremium ? const Color(0xFFF59E0B) : Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 14.sp,
-                    letterSpacing: 1.2,
+                    size: 28.r,
                   ),
                 ),
-                SizedBox(height: 4.h),
-                Text(
-                  isPremium 
-                    ? 'Tous vos avantages sont activés.' 
-                    : 'Boostez votre profil et matchez plus vite !',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 12.sp,
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isPremium ? 'M E M B R E   P R E M I U M' : 'PASSEZ AU PREMIUM',
+                        style: TextStyle(
+                          color: isPremium ? const Color(0xFFF59E0B) : Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13.sp,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        isPremium 
+                          ? 'Tous vos avantages sont activés ✓' 
+                          : 'Boostez votre profil et matchez\nplus vite avec les employeurs !',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.95),
+                          fontSize: 12.sp,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                if (!isPremium)
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => context.push('/premium').then((_) {
+                        if (mounted) _loadProfile();
+                      }),
+                      borderRadius: BorderRadius.circular(14.r),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 10.h),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14.r),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          'VOIR',
+                          style: TextStyle(
+                            color: const Color(0xFFF97316),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12.sp,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
-          if (!isPremium)
-            ElevatedButton(
-              onPressed: () => context.push('/premium').then((_) {
-                if (mounted) _loadProfile();
-              }),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFFF97316),
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-                elevation: 0,
-              ),
-              child: Text(
-                'VOIR',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.sp),
-              ),
-            ),
         ],
       ),
     );

@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://djorssi-match.ci/sitemap.xml

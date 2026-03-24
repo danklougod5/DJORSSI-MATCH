@@ -67,7 +67,10 @@ def scrape_google_jobs(page: int = 1) -> list[dict]:
         raw_text = f"Titre: {title}\nEntreprise: {company}\nLieu: {location}\n\nDescription:\n{description}"
         
         # Source URL: Prefer direct link if available, otherwise use SerpApi's share_link
-        source_url = job.get("share_link") or f"https://www.google.com/search?q={title}+{company}&ibp=htl;jobs"
+        from urllib.parse import quote_plus
+        safe_title = quote_plus(title)
+        safe_company = quote_plus(company)
+        source_url = job.get("share_link") or f"https://www.google.com/search?q={safe_title}+{safe_company}&ibp=htl;jobs"
 
         jobs.append({
             "raw_text": raw_text[:5000],

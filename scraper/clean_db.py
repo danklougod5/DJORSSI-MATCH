@@ -9,12 +9,14 @@ url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
 if not url or not key:
-    print("[ERROR] Database credentials missing in .env")
+    print("[ERROR] Database configuration missing in .env")
     exit(1)
 
 try:
     supabase: Client = create_client(url, key)
-    print(f"[INFO] Nettoyage en cours sur {url}...")
+    # Mask URL to avoid exposing project ID in logs
+    masked_url = f"{url[:12]}...{url[-10:]}" if len(url) > 22 else url
+    print(f"[INFO] Nettoyage en cours sur {masked_url}...")
     
     # On supprime toutes les offres actuelles (TOUT supprimer)
     # n.b. delete().neq() avec un UUID inexistant est le moyen standard Supabase de dire 'TOUT supprimer'

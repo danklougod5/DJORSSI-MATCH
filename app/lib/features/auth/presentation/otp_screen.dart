@@ -24,11 +24,21 @@ class _OtpScreenState extends State<OtpScreen> {
 
   String _translateAuthError(String message) {
     final msg = message.toLowerCase();
-    if (msg.contains('token has expired or is invalid') || msg.contains('invalid or expired')) {
+    
+    if (msg.contains('token has expired') || 
+        msg.contains('invalid or expired') || 
+        msg.contains('is invalid')) {
       return 'Le code est invalide ou a expiré.';
     }
     if (msg.contains('rate limit')) return 'Trop de tentatives, veuillez réessayer plus tard.';
-    return 'Erreur de vérification. Veuillez réessayer.';
+    if (msg.contains('network error') || msg.contains('failed host lookup')) {
+      return 'Erreur réseau. Vérifiez votre connexion internet.';
+    }
+    
+    // Log unexpected errors
+    debugPrint('Unexpected OTP Error: $message');
+    
+    return 'Erreur de vérification : $message';
   }
 
   @override

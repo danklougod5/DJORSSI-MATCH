@@ -9,8 +9,38 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
-print(f"Testing direct visit to: {url}")
-detail_resp = requests.get(url, headers=HEADERS, timeout=10)
+import ipaddress
+from urllib.parse import urlparse
+
+def validate_url(url_str):
+    parsed = urlparse(url_str)
+    if parsed.scheme not in ['http', 'https']:
+        raise ValueError(f"Invalid scheme: {parsed.scheme}")
+    
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("Invalid hostname")
+
+    # Block localhost and private IP ranges
+    try:
+        ip = ipaddress.ip_address(hostname)
+        if ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_multicast:
+            raise ValueError(f"URL not allowed: private address ({hostname})")
+    except ValueError:
+        # Not an IP address, check for localhost common names
+        if hostname.lower() in ['localhost', '127.0.0.1', '[::1]']:
+            raise ValueError(f"URL not allowed: {hostname}")
+
+    # For this specific debug script, we only want jobivoire.ci
+    if "jobivoire.ci" not in hostname:
+        raise ValueError(f"URL not allowed: domain not in whitelist ({hostname})")
+    
+    return url_str
+
+# Validate before use
+safe_url = validate_url(url)
+print(f"Testing direct visit to: {safe_url}")
+detail_resp = requests.get(safe_url, headers=HEADERS, timeout=10)
 detail_soup = BeautifulSoup(detail_resp.text, "html.parser")
 
 detail_content = detail_soup.find("main") or detail_soup.find("div", class_="container") or detail_soup.find("article")
