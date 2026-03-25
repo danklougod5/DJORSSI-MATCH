@@ -1,4 +1,4 @@
-# Djossi Match
+# Djorssi-Match
 
 Application mobile de mise en relation directe entre employeurs et candidats en Côte d'Ivoire.
 

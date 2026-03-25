@@ -302,7 +302,7 @@ class _AuthScreenState extends State<AuthScreen> {
               SizedBox(height: 32.h),
               
               Text(
-                'Djossi Match',
+                'Djorssi-Match',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 28.sp,
@@ -466,7 +466,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   text: TextSpan(
                     text: _isSignUp 
                       ? 'Vous avez déjà un compte ? '
-                      : 'Nouveau sur Djossi Match ? ',
+                      : 'Nouveau sur Djorssi-Match ? ',
                     style: TextStyle(color: const Color(0xFF64748B), fontSize: 14.sp),
                     children: [
                       TextSpan(

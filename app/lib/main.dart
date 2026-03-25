@@ -32,17 +32,17 @@ Future<void> main() async {
     anonKey: supabaseAnonKey,
   );
 
-  runApp(const DjossiMatchApp());
+  runApp(const DjorssiMatchApp());
 }
 
-class DjossiMatchApp extends StatefulWidget {
-  const DjossiMatchApp({super.key});
+class DjorssiMatchApp extends StatefulWidget {
+  const DjorssiMatchApp({super.key});
 
   @override
-  State<DjossiMatchApp> createState() => _DjossiMatchAppState();
+  State<DjorssiMatchApp> createState() => _DjorssiMatchAppState();
 }
 
-class _DjossiMatchAppState extends State<DjossiMatchApp> {
+class _DjorssiMatchAppState extends State<DjorssiMatchApp> {
   late final StreamSubscription<AuthState> _authSubscription;
 
   @override
@@ -70,7 +70,7 @@ class _DjossiMatchAppState extends State<DjossiMatchApp> {
       splitScreenMode: true,
       builder: (context, child) {
         return MaterialApp.router(
-          title: 'Djossi Match',
+          title: 'Djorssi-Match',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           routerConfig: AppRouter.router,

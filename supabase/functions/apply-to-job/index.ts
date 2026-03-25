@@ -355,7 +355,7 @@ serve(async (req) => {
 
     const emailBody = message 
         ? message 
-        : `Bonjour,\n\nJe suis tres ${interestText} par le poste de ${jobTitle} ${companyContext} vu sur Djossi Match.\n\nMon profil correspond a vos criteres et vous trouverez mon CV en piece jointe pour plus de details sur mon parcours.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`;
+        : `Bonjour,\\n\\nJe suis tres ${interestText} par le poste de ${jobTitle} ${companyContext} vu sur Djorssi-Match.\\n\\nMon profil correspond a vos criteres et vous trouverez mon CV en piece jointe pour plus de details sur mon parcours.${coverLetterNote}\\n\\nCordialement,\\n${applicantName}\\nEmail: ${userEmail}`;
 
     // 5. Send email via Resend
     const targetEmail = "danklougod5@gmail.com"; 
@@ -370,7 +370,7 @@ serve(async (req) => {
       : `Candidature : ${cleanTitle} - ${cleanName}`;
 
     const { data: resendData, error: resendError } = await resend.emails.send({
-      from: `${cleanName} via Djossi Match <onboarding@resend.dev>`, 
+      from: `${cleanName} via Djorssi-Match <onboarding@resend.dev>`, 
       to: [targetEmail],
       reply_to: userEmail,
       subject: emailSubject,

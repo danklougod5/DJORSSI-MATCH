@@ -372,7 +372,7 @@ class _ProfileScreenState extends State<ProfileScreen> with WidgetsBindingObserv
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Bienvenue, ${_fullName ?? 'Utilisateur Djossi'}',
+                        'Bienvenue, ${_fullName ?? 'Utilisateur Djorssi'}',
                         style: TextStyle(
                           fontSize: 22.sp,
                           fontWeight: FontWeight.w800,

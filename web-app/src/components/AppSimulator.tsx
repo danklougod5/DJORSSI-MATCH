@@ -70,7 +70,7 @@ const AppSimulator: React.FC = () => {
   const currentJob = DUMMY_JOBS[currentIndex];
 
   return (
-    <div className="relative w-full max-w-[360px] mx-auto h-[600px] flex flex-col gap-4">
+    <div className="relative w-full max-w-[360px] mx-auto h-[600px] flex flex-col gap-4 px-2">
       <div className="flex-1 relative perspective-1000">
         <AnimatePresence mode="popLayout">
           <motion.div
@@ -83,7 +83,7 @@ const AppSimulator: React.FC = () => {
               opacity: 0 
             }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="absolute inset-0 bg-white border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] rounded-3xl overflow-hidden flex flex-col"
+            className="absolute inset-y-0 inset-x-2 bg-white border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] rounded-3xl overflow-hidden flex flex-col"
           >
             {/* Image Section */}
             <div className="relative h-[65%] bg-slate-200">
@@ -153,24 +153,26 @@ const AppSimulator: React.FC = () => {
       {/* Success Popup */}
       <AnimatePresence>
         {showPopup && (
-          <motion.div
-            initial={{ y: 50, opacity: 0, scale: 0.8 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 50, opacity: 0, scale: 0.8 }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full"
-          >
-            <div className="neo-brutal-card !bg-white text-center border-[4px] shadow-xl rotate-[-2deg]">
-              <div className="w-16 h-16 bg-green-400 border-2 border-black rounded-full flex items-center justify-center mx-auto mb-4 scale-110">
-                <MessageSquare className="text-black" size={32} />
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ y: 50, opacity: 0, scale: 0.8 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 50, opacity: 0, scale: 0.8 }}
+              className="w-full max-w-[320px]"
+            >
+              <div className="neo-brutal-card !bg-white text-center border-[4px] shadow-xl rotate-[-2deg] !p-6 sm:!p-8">
+                <div className="w-16 h-16 bg-green-400 border-2 border-black rounded-full flex items-center justify-center mx-auto mb-4 scale-110">
+                  <MessageSquare className="text-black" size={32} />
+                </div>
+                <h5 className="text-xl font-black mb-2 uppercase italic">MATCH PARFAIT !</h5>
+                <p className="font-bold text-sm">Ton Djorssi a été trouvé. 📩</p>
+  
+                <div className="mt-4 pt-4 border-t-2 border-black/10">
+                  <span className="text-xs font-black text-secondary tracking-widest">PATIENTE 24H</span>
+                </div>
               </div>
-              <h5 className="text-xl font-black mb-2 uppercase italic">MATCH PARFAIT !</h5>
-              <p className="font-bold text-sm">Ton Djorssi a été trouvé. 📩</p>
-
-              <div className="mt-4 pt-4 border-t-2 border-black/10">
-                <span className="text-xs font-black text-secondary tracking-widest">PATIENTE 24H</span>
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

@@ -233,7 +233,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
           SizedBox(height: 8.h),
           Text(
             _selectedFilter == 'Tous'
-              ? 'Continuez à swiper pour trouver votre Djossi !'
+              ? 'Continuez à swiper pour trouver votre Djorssi !'
               : 'Essayez un autre filtre ou continuez à swiper.',
             style: TextStyle(color: Colors.grey.shade500),
           ),

@@ -62,7 +62,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    // Typical Djossi Match brand color (orange/accent)
+    // Typical Djorssi-Match brand color (orange/accent)
     final primaryColor = Theme.of(context).primaryColor;
 
     return Scaffold(

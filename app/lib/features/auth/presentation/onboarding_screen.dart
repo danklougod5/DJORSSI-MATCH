@@ -34,7 +34,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   _buildSlide(
                     image: 'screen-removebg-preview',
                     title: 'Swippez pour trouver\nvotre job',
-                    description: 'À droite pour postuler, à gauche pour ignorer. Trouver un Djossi n\'a jamais été aussi simple.',
+                    description: 'À droite pour postuler, à gauche pour ignorer. Trouver un Djorssi n\'a jamais été aussi simple.',
                   ),
                   _buildSlide(
                     image: 'onboarding_match new',

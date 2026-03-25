@@ -152,7 +152,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 _buildFeatureCard(
                   icon: Icons.all_inclusive_rounded,
                   title: 'SWIPES ILLIMITÉS',
-                  description: 'Ne soyez plus jamais bloqué. Swiper autant de Djossis que vous voulez par jour.',
+                  description: 'Ne soyez plus jamais bloqué. Swiper autant de Djorssis que vous voulez par jour.',
                   color: const Color(0xFFF97316),
                 ),
                 const SizedBox(height: 16),
@@ -223,7 +223,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
             icon: const Icon(Icons.close, color: Colors.white),
           ),
           Text(
-            'DJOSSI PREMIUM',
+            'DJORSSI PREMIUM',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w900,

@@ -102,7 +102,7 @@ serve(async (req) => {
 
       // Send Email via Resend
       const { data, error: sendError } = await resend.emails.send({
-        from: `Djossi Match <onboarding@resend.dev>`,
+        from: `Djorssi-Match <onboarding@resend.dev>`,
         to: [user.email],
         subject: `Nouvelle offre : ${job.job_title} chez ${job.company_name}`,
         html: `
@@ -116,7 +116,7 @@ serve(async (req) => {
               <p><strong>Lieu:</strong> ${job.location || 'Côte d\'Ivoire'}</p>
               ${job.salary_range ? `<p><strong>Salaire:</strong> ${job.salary_range}</p>` : ''}
             </div>
-            <a href="https://djossi-match.vercel.app/jobs/${job.id}" style="display: inline-block; background-color: #f97316; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Voir l'offre sur Djossi Match</a>
+            <a href="https://djorssi-match.vercel.app/jobs/${job.id}" style="display: inline-block; background-color: #f97316; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Voir l'offre sur Djorssi-Match</a>
             <p style="margin-top: 30px; font-size: 12px; color: #64748b;">
               Vous recevez cet email car vous avez activé les alertes emplois pour : ${alert.sectors.join(', ')}. 
               Vous pouvez désactiver ces alertes dans votre profil.

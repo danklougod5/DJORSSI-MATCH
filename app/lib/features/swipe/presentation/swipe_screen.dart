@@ -722,7 +722,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
             ),
             SizedBox(height: 16.h),
             const Text(
-              'Ou passez au illimité maintenant pour ne rater aucun Djossi !',
+              'Ou passez au illimité maintenant pour ne rater aucun Djorssi !',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
@@ -882,7 +882,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
               
               String interestText = (_sexe == 'Femme') ? 'intéressée' : 'intéressé';
               String companyText = (companyName.isNotEmpty && companyName.toLowerCase() != 'inconnu') ? companyName : 'votre structure ou votre entreprise';
-              String textMessage = "Bonjour, je suis $interestText par le poste de $jobTitle au sein de $companyText vu sur Djossi Match. Veuillez trouver mon CV ci-joint.";
+              String textMessage = "Bonjour, je suis $interestText par le poste de $jobTitle au sein de $companyText vu sur Djorssi-Match. Veuillez trouver mon CV ci-joint.";
               
               final message = Uri.encodeComponent(textMessage);
               final whatsappAppUrl = Uri.parse("whatsapp://send?phone=$finalPhone&text=$message");
@@ -975,7 +975,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Text(
-          'Djossi Match',
+          'Djorssi-Match',
           style: TextStyle(
             color: const Color(0xFF0F172A),
             fontWeight: FontWeight.w900,
@@ -1100,7 +1100,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
             'Plus d\'offres pour le moment !',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          const Text('Revenez plus tard pour de nouveaux Djossis.'),
+          const Text('Revenez plus tard pour de nouveaux Djorssis.'),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () {
