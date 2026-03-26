@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color primaryBlue = Color(0xFF0F172A); // Slate dark for contrast instead of blue
+  static const Color primaryBlue = Color(
+    0xFF0F172A,
+  ); // Slate dark for contrast instead of blue
   static const Color vibrantOrange = Color(0xFFF97316);
   static const Color successGreen = Color(0xFF10B981);
   static const Color errorRed = Color(0xFFEF4444);
@@ -23,9 +25,7 @@ class AppTheme {
       textTheme: GoogleFonts.outfitTextTheme(),
       cardTheme: CardThemeData(
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(32),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
         clipBehavior: Clip.antiAliasWithSaveLayer,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(

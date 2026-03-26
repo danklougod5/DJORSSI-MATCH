@@ -180,12 +180,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
                           SizedBox(height: 12.h),
                       itemBuilder: (context, index) {
                         final match = filtered[index];
-                        final job = match['jobs'];
-                        final date = DateTime.parse(match['created_at']);
 
                         // Limit to 3 matches if Freemium
                         final isLocked = !_isPremium && index >= 3;
-                        return _buildMatchCard(job, date, isLocked: isLocked);
+                        return _buildMatchCard(match, isLocked: isLocked);
                       },
                     ),
             ),
@@ -277,11 +275,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
     );
   }
 
-  Widget _buildMatchCard(
-    Map<String, dynamic>? job,
-    DateTime date, {
-    bool isLocked = false,
-  }) {
+  Widget _buildMatchCard(Map<String, dynamic> match, {bool isLocked = false}) {
+    final job = match['jobs'];
+    final date = DateTime.parse(match['created_at']);
+
     if (isLocked) {
       return Container(
         decoration: BoxDecoration(
@@ -358,7 +355,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
         borderRadius: BorderRadius.circular(20.r),
         child: InkWell(
           onTap: () {
-            // Afficher détails si besoin
+            context.push('/match-details', extra: {'match': match});
           },
           child: Padding(
             padding: EdgeInsets.all(16.r),

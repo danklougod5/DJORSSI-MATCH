@@ -34,12 +34,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   _buildSlide(
                     image: 'screen-removebg-preview',
                     title: 'Swippez pour trouver\nvotre job',
-                    description: 'À droite pour postuler, à gauche pour ignorer. Trouver un Djorssi n\'a jamais été aussi simple.',
+                    description:
+                        'À droite pour postuler, à gauche pour ignorer. Trouver un Djorssi n\'a jamais été aussi simple.',
                   ),
                   _buildSlide(
                     image: 'onboarding_match new',
                     title: 'Un Match, Une Opportunité',
-                    description: 'Dès qu\'une entreprise est intéressée par votre profil, c\'est un match ! Vous pouvez alors discuter.',
+                    description:
+                        'Dès qu\'une entreprise est intéressée par votre profil, c\'est un match ! Vous pouvez alors discuter.',
                   ),
                 ],
               ),
@@ -51,7 +53,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildSlide({required String image, required String title, required String description}) {
+  Widget _buildSlide({
+    required String image,
+    required String title,
+    required String description,
+  }) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 40.w),
       child: Column(
@@ -109,7 +115,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 height: 8.h,
                 width: _currentPage == index ? 24.w : 8.w,
                 decoration: BoxDecoration(
-                  color: _currentPage == index ? const Color(0xFFF97316) : const Color(0xFFE2E8F0),
+                  color: _currentPage == index
+                      ? const Color(0xFFF97316)
+                      : const Color(0xFFE2E8F0),
                   borderRadius: BorderRadius.circular(4.r),
                 ),
               );
@@ -134,7 +142,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 foregroundColor: Colors.white,
                 padding: EdgeInsets.symmetric(vertical: 20.h),
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20.r),
+                ),
               ),
               child: Text(
                 _currentPage < 1 ? 'SUIVANT' : 'COMMENCER',

@@ -19,36 +19,44 @@ class _AuthScreenState extends State<AuthScreen> {
 
   String _translateAuthError(String message) {
     final msg = message.toLowerCase();
-    
+
     // Auth specific errors
-    if (msg.contains('invalid login credentials')) return 'Email ou mot de passe incorrect.';
-    if (msg.contains('user already registered') || 
-        msg.contains('already registered') || 
+    if (msg.contains('invalid login credentials'))
+      return 'Email ou mot de passe incorrect.';
+    if (msg.contains('user already registered') ||
+        msg.contains('already registered') ||
         msg.contains('email already exists') ||
         msg.contains('compte existe déjà')) {
       return 'Cet utilisateur est déjà inscrit.';
     }
-    if (msg.contains('password should be at least 6 characters')) {
-      return 'Le mot de passe doit contenir au moins 6 caractères.';
+    if (msg.contains('password should be at least 6 characters') ||
+        msg.contains('password should be at least 8 characters')) {
+      return 'Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre.';
     }
-    if (msg.contains('rate limit')) return 'Trop de tentatives, veuillez réessayer plus tard.';
-    if (msg.contains('email not confirmed')) return 'Veuillez confirmer votre adresse email.';
-    if (msg.contains('invalid email') || 
-        msg.contains('invalid format') || 
+    if (msg.contains('rate limit'))
+      return 'Trop de tentatives, veuillez réessayer plus tard.';
+    if (msg.contains('email not confirmed'))
+      return 'Veuillez confirmer votre adresse email.';
+    if (msg.contains('invalid email') ||
+        msg.contains('invalid format') ||
         msg.contains('unable to validate email address')) {
       return 'Adresse email invalide.';
     }
-    if (msg.contains('invalid or expired')) return 'Lien ou code invalide/expiré.';
-    if (msg.contains('signup is disabled')) return 'Les inscriptions sont temporairement désactivées.';
-    if (msg.contains('email provider is disabled')) return 'Le service d\'envoi d\'emails est désactivé.';
-    if (msg.contains('email sending failed')) return 'L\'envoi de l\'email a échoué. Veuillez contacter le support.';
+    if (msg.contains('invalid or expired'))
+      return 'Lien ou code invalide/expiré.';
+    if (msg.contains('signup is disabled'))
+      return 'Les inscriptions sont temporairement désactivées.';
+    if (msg.contains('email provider is disabled'))
+      return 'Le service d\'envoi d\'emails est désactivé.';
+    if (msg.contains('email sending failed'))
+      return 'L\'envoi de l\'email a échoué. Veuillez contacter le support.';
     if (msg.contains('network error') || msg.contains('failed host lookup')) {
       return 'Erreur réseau. Vérifiez votre connexion internet.';
     }
-    
+
     // Log the raw error for better debugging in console
     debugPrint('Unexpected Auth Error: $message');
-    
+
     // If we don't know the error, we return a more informative message than a generic one
     return 'Erreur d\'authentification : $message';
   }
@@ -66,9 +74,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
     final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
     if (!emailRegex.hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Adresse email invalide.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Adresse email invalide.')));
       return;
     }
 
@@ -79,20 +87,54 @@ class _AuthScreenState extends State<AuthScreen> {
       );
       return;
     }
+    if (_isSignUp) {
+      if (password.length < 8) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Le mot de passe doit contenir au moins 8 caractères.',
+            ),
+          ),
+        );
+        return;
+      }
+      if (!password.contains(RegExp(r'[A-Z]'))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Le mot de passe doit contenir au moins une majuscule.',
+            ),
+          ),
+        );
+        return;
+      }
+      if (!password.contains(RegExp(r'[0-9]'))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Le mot de passe doit contenir au moins un chiffre.'),
+          ),
+        );
+        return;
+      }
+    }
 
     setState(() => _isLoading = true);
-    
+
     try {
       if (_isSignUp) {
         // Inscription
-        final response = await Supabase.instance.client.auth.signUp(
-          email: email,
-          password: password,
-          data: {'full_name': fullName},
-        ).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () => throw Exception('Délai d\'attente dépassé pour l\'inscription. Vérifiez votre connexion internet.'),
-        );
+        final response = await Supabase.instance.client.auth
+            .signUp(
+              email: email,
+              password: password,
+              data: {'full_name': fullName},
+            )
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => throw Exception(
+                'Délai d\'attente dépassé pour l\'inscription. Vérifiez votre connexion internet.',
+              ),
+            );
 
         if (response.user != null) {
           // Détection d'un compte déjà existant (identities vide)
@@ -106,13 +148,15 @@ class _AuthScreenState extends State<AuthScreen> {
 
           if (response.session != null) {
             // Déjà vérifié (ex: désactivation de la confirmation d'email en dev)
-            await Supabase.instance.client.from('profiles').upsert({
-              'id': response.user!.id,
-              'full_name': fullName,
-            }).timeout(
-              const Duration(seconds: 10),
-              onTimeout: () => throw Exception('Délai d\'attente dépassé pour la création du profil.'),
-            );
+            await Supabase.instance.client
+                .from('profiles')
+                .upsert({'id': response.user!.id, 'full_name': fullName})
+                .timeout(
+                  const Duration(seconds: 10),
+                  onTimeout: () => throw Exception(
+                    'Délai d\'attente dépassé pour la création du profil.',
+                  ),
+                );
             if (mounted) {
               context.go('/complete-profile');
             }
@@ -120,22 +164,30 @@ class _AuthScreenState extends State<AuthScreen> {
             // Attente de confirmation email
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Un code de confirmation a été envoyé à votre email.')),
+                const SnackBar(
+                  content: Text(
+                    'Un code de confirmation a été envoyé à votre email.',
+                  ),
+                ),
               );
-              context.push('/otp', extra: {'email': email, 'fullName': fullName});
+              context.push(
+                '/otp',
+                extra: {'email': email, 'fullName': fullName},
+              );
             }
           }
         }
       } else {
         // Connexion classique
-        final response = await Supabase.instance.client.auth.signInWithPassword(
-          email: email,
-          password: password,
-        ).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () => throw Exception('Délai d\'attente dépassé pour la connexion. Vérifiez votre internet.'),
-        );
-        
+        final response = await Supabase.instance.client.auth
+            .signInWithPassword(email: email, password: password)
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => throw Exception(
+                'Délai d\'attente dépassé pour la connexion. Vérifiez votre internet.',
+              ),
+            );
+
         if (mounted && response.user != null) {
           // Vérifier si le profil est déjà complété
           final profile = await Supabase.instance.client
@@ -145,12 +197,14 @@ class _AuthScreenState extends State<AuthScreen> {
               .maybeSingle()
               .timeout(
                 const Duration(seconds: 10),
-                onTimeout: () => throw Exception('Délai de vérification du profil dépassé.'),
+                onTimeout: () =>
+                    throw Exception('Délai de vérification du profil dépassé.'),
               );
-          
-          final isProfileComplete = profile != null && 
-                                   profile['full_name'] != null && 
-                                   (profile['skills'] as List?)?.isNotEmpty == true;
+
+          final isProfileComplete =
+              profile != null &&
+              profile['full_name'] != null &&
+              (profile['skills'] as List?)?.isNotEmpty == true;
 
           if (isProfileComplete) {
             context.go('/');
@@ -162,7 +216,7 @@ class _AuthScreenState extends State<AuthScreen> {
     } on AuthException catch (e) {
       if (mounted) {
         final lowerMsg = e.message.toLowerCase();
-        
+
         if (lowerMsg.contains('email not confirmed')) {
           context.push('/otp', extra: {'email': email});
           return;
@@ -170,26 +224,31 @@ class _AuthScreenState extends State<AuthScreen> {
 
         // Détection utilisateur existant lors de l'inscription
         // Correction : Supabase renvoie les erreurs en anglais (GoTrue)
-        if (_isSignUp && (lowerMsg.contains('user already registered') || 
-                          lowerMsg.contains('already registered') ||
-                          lowerMsg.contains('email already exists') ||
-                          lowerMsg.contains('compte existe déjà'))) {
+        if (_isSignUp &&
+            (lowerMsg.contains('user already registered') ||
+                lowerMsg.contains('already registered') ||
+                lowerMsg.contains('email already exists') ||
+                lowerMsg.contains('compte existe déjà'))) {
           _showUserExistsDialog(email);
           return;
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(_translateAuthError(e.message)),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_translateAuthError(e.message)),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 4),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -201,7 +260,9 @@ class _AuthScreenState extends State<AuthScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Compte existant'),
-        content: Text('Un compte avec l\'adresse $email existe déjà. Souhaitez-vous vous connecter ?'),
+        content: Text(
+          'Un compte avec l\'adresse $email existe déjà. Souhaitez-vous vous connecter ?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -236,21 +297,25 @@ class _AuthScreenState extends State<AuthScreen> {
 
     final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
     if (!emailRegex.hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Adresse e-mail invalide.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Adresse e-mail invalide.')));
       return;
     }
 
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(
-        email,
-        redirectTo: 'com.djossimatch://login-callback',
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => throw Exception('Délai d\'attente dépassé pour la réinitialisation de mot de passe.'),
-      );
+      await Supabase.instance.client.auth
+          .resetPasswordForEmail(
+            email,
+            redirectTo: 'com.djossimatch://login-callback',
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw Exception(
+              'Délai d\'attente dépassé pour la réinitialisation de mot de passe.',
+            ),
+          );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -272,7 +337,9 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: ${e.toString().replaceAll('Exception: ', '')}'),
+            content: Text(
+              'Erreur: ${e.toString().replaceAll('Exception: ', '')}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -301,7 +368,7 @@ class _AuthScreenState extends State<AuthScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(height: 40.h),
-              
+
               // App Logo
               Center(
                 child: Container(
@@ -327,9 +394,9 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ),
               ),
-              
+
               SizedBox(height: 32.h),
-              
+
               Text(
                 'Djorssi-Match',
                 textAlign: TextAlign.center,
@@ -339,13 +406,13 @@ class _AuthScreenState extends State<AuthScreen> {
                   color: const Color(0xFF0F172A),
                 ),
               ),
-              
+
               SizedBox(height: 8.h),
-              
+
               Text(
-                _isSignUp 
-                  ? 'Créez votre compte en quelques secondes'
-                  : 'Trouvez votre prochaine opportunité\nen toute simplicité.',
+                _isSignUp
+                    ? 'Créez votre compte en quelques secondes'
+                    : 'Trouvez votre prochaine opportunité\nen toute simplicité.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 15.sp,
@@ -353,7 +420,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   height: 1.5,
                 ),
               ),
-              
+
               SizedBox(height: 48.h),
 
               Container(
@@ -378,14 +445,22 @@ class _AuthScreenState extends State<AuthScreen> {
                         decoration: InputDecoration(
                           labelText: 'Nom et Prénom',
                           labelStyle: TextStyle(color: const Color(0xFF94A3B8)),
-                          prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF94A3B8)),
+                          prefixIcon: const Icon(
+                            Icons.person_outline,
+                            color: Color(0xFF94A3B8),
+                          ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16.r),
-                            borderSide: BorderSide(color: const Color(0xFFE2E8F0)),
+                            borderSide: BorderSide(
+                              color: const Color(0xFFE2E8F0),
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16.r),
-                            borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
+                            borderSide: BorderSide(
+                              color: Theme.of(context).primaryColor,
+                              width: 2,
+                            ),
                           ),
                         ),
                       ),
@@ -398,14 +473,22 @@ class _AuthScreenState extends State<AuthScreen> {
                       decoration: InputDecoration(
                         labelText: 'Adresse e-mail',
                         labelStyle: TextStyle(color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF94A3B8)),
+                        prefixIcon: const Icon(
+                          Icons.email_outlined,
+                          color: Color(0xFF94A3B8),
+                        ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide(color: const Color(0xFFE2E8F0)),
+                          borderSide: BorderSide(
+                            color: const Color(0xFFE2E8F0),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).primaryColor,
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
@@ -418,14 +501,22 @@ class _AuthScreenState extends State<AuthScreen> {
                       decoration: InputDecoration(
                         labelText: 'Mot de passe',
                         labelStyle: TextStyle(color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(Icons.lock_outline_rounded, color: Color(0xFF94A3B8)),
+                        prefixIcon: const Icon(
+                          Icons.lock_outline_rounded,
+                          color: Color(0xFF94A3B8),
+                        ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide(color: const Color(0xFFE2E8F0)),
+                          borderSide: BorderSide(
+                            color: const Color(0xFFE2E8F0),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).primaryColor,
+                            width: 2,
+                          ),
                         ),
                       ),
                     ),
@@ -461,20 +552,23 @@ class _AuthScreenState extends State<AuthScreen> {
                             borderRadius: BorderRadius.circular(16.r),
                           ),
                         ),
-                        child: _isLoading 
-                          ? SizedBox(
-                              height: 20.h, 
-                              width: 20.h, 
-                              child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                            )
-                          : Text(
-                              _isSignUp ? 'S\'inscrire' : 'Se connecter',
-                              style: TextStyle(
-                                fontSize: 16.sp, 
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
+                        child: _isLoading
+                            ? SizedBox(
+                                height: 20.h,
+                                width: 20.h,
+                                child: const CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                _isSignUp ? 'S\'inscrire' : 'Se connecter',
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
-                            ),
                       ),
                     ),
                   ],
@@ -493,10 +587,13 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 child: RichText(
                   text: TextSpan(
-                    text: _isSignUp 
-                      ? 'Vous avez déjà un compte ? '
-                      : 'Nouveau sur Djorssi-Match ? ',
-                    style: TextStyle(color: const Color(0xFF64748B), fontSize: 14.sp),
+                    text: _isSignUp
+                        ? 'Vous avez déjà un compte ? '
+                        : 'Nouveau sur Djorssi-Match ? ',
+                    style: TextStyle(
+                      color: const Color(0xFF64748B),
+                      fontSize: 14.sp,
+                    ),
                     children: [
                       TextSpan(
                         text: _isSignUp ? 'Connectez-vous' : 'S\'inscrire',

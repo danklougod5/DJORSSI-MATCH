@@ -34,10 +34,14 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
 
       // 1. Fetch dynamic tags
       try {
-        final tagsResponse = await _supabase.from('jobs').select('tags').timeout(
-          const Duration(seconds: 10),
-          onTimeout: () => throw Exception('Délai d\'attente dépassé (secteurs)'),
-        );
+        final tagsResponse = await _supabase
+            .from('jobs')
+            .select('tags')
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () =>
+                  throw Exception('Délai d\'attente dépassé (secteurs)'),
+            );
         final Set<String> uniqueTags = {};
         for (var row in tagsResponse as List) {
           if (row['tags'] != null) {
@@ -56,7 +60,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           .select('is_premium, skills')
           .eq('id', user.id)
           .maybeSingle();
-      
+
       if (profile != null) {
         _isPremium = profile['is_premium'] ?? false;
       }
@@ -76,12 +80,14 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           for (var s in sectors) {
             if (_availableSectors.contains(s)) _selectedSectors.add(s);
           }
-          
+
           // Fallback : si rien n'est sélectionné mais que l'alerte est active, on pourrait pré-remplir
-          if (_selectedSectors.isEmpty && profile != null && profile['skills'] != null) {
-             for (var s in List<String>.from(profile['skills'])) {
-               if (_availableSectors.contains(s)) _selectedSectors.add(s);
-             }
+          if (_selectedSectors.isEmpty &&
+              profile != null &&
+              profile['skills'] != null) {
+            for (var s in List<String>.from(profile['skills'])) {
+              if (_availableSectors.contains(s)) _selectedSectors.add(s);
+            }
           }
         });
       } else if (profile != null && profile['skills'] != null) {
@@ -160,7 +166,12 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
       bottomNavigationBar: (_isLoading || !_isPremium)
           ? null
           : Container(
-              padding: EdgeInsets.fromLTRB(24.w, 12.h, 24.w, MediaQuery.of(context).padding.bottom + 16.h),
+              padding: EdgeInsets.fromLTRB(
+                24.w,
+                12.h,
+                24.w,
+                MediaQuery.of(context).padding.bottom + 16.h,
+              ),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
@@ -174,7 +185,9 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
               child: _buildSaveButton(),
             ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFF97316)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFF97316)),
+            )
           : Stack(
               children: [
                 SingleChildScrollView(
@@ -201,9 +214,12 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                         ),
                       ),
                       SizedBox(height: 24.h),
-                      _availableSectors.isEmpty 
-                        ? const Text("Aucun secteur disponible pour le moment.", style: TextStyle(color: Colors.grey))
-                        : _buildSectorsGrid(),
+                      _availableSectors.isEmpty
+                          ? const Text(
+                              "Aucun secteur disponible pour le moment.",
+                              style: TextStyle(color: Colors.grey),
+                            )
+                          : _buildSectorsGrid(),
                       // Espace en bas pour que le contenu ne soit pas caché par le bouton
                       SizedBox(height: 20.h),
                     ],
@@ -278,7 +294,9 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                     backgroundColor: const Color(0xFFF97316),
                     foregroundColor: Colors.white,
                     padding: EdgeInsets.symmetric(vertical: 16.h),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16.r),
+                    ),
                     elevation: 0,
                   ),
                   child: Text(
@@ -295,7 +313,10 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                 onPressed: () => Navigator.pop(context),
                 child: Text(
                   'Plus tard',
-                  style: TextStyle(color: const Color(0xFF94A3B8), fontSize: 13.sp),
+                  style: TextStyle(
+                    color: const Color(0xFF94A3B8),
+                    fontSize: 13.sp,
+                  ),
                 ),
               ),
             ],
@@ -359,7 +380,9 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           Switch.adaptive(
             value: _alertsEnabled,
             activeColor: const Color(0xFFF97316),
-            onChanged: _isPremium ? (val) => setState(() => _alertsEnabled = val) : null,
+            onChanged: _isPremium
+                ? (val) => setState(() => _alertsEnabled = val)
+                : null,
           ),
         ],
       ),
@@ -389,7 +412,9 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           selectedColor: const Color(0xFFF97316).withOpacity(0.15),
           checkmarkColor: const Color(0xFFF97316),
           labelStyle: TextStyle(
-            color: isSelected ? const Color(0xFFF97316) : const Color(0xFF64748B),
+            color: isSelected
+                ? const Color(0xFFF97316)
+                : const Color(0xFF64748B),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             fontSize: 13.sp,
           ),
@@ -397,7 +422,9 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(100.r),
             side: BorderSide(
-              color: isSelected ? const Color(0xFFF97316) : const Color(0xFFE2E8F0),
+              color: isSelected
+                  ? const Color(0xFFF97316)
+                  : const Color(0xFFE2E8F0),
               width: isSelected ? 1.5 : 1,
             ),
           ),
@@ -415,14 +442,19 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           backgroundColor: const Color(0xFF0F172A),
           foregroundColor: Colors.white,
           padding: EdgeInsets.symmetric(vertical: 20.h),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.r),
+          ),
           elevation: 0,
         ),
         child: _isSaving
             ? const SizedBox(
                 height: 24,
                 width: 24,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
               )
             : Text(
                 'ENREGISTRER LES PRÉFÉRENCES',

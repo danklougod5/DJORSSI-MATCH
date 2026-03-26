@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:djossimatch/core/theme/app_theme.dart';
 import 'package:djossimatch/features/swipe/presentation/swipe_screen.dart';
 import 'package:djossimatch/features/matches/presentation/matches_screen.dart';
@@ -12,6 +13,7 @@ import 'package:djossimatch/core/routing/app_router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('fr_FR', null);
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -24,13 +26,12 @@ Future<void> main() async {
   final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];
 
   if (supabaseUrl == null || supabaseAnonKey == null) {
-    throw Exception('Les clés Supabase sont introuvables dans le fichier .env (SUPABASE_URL et SUPABASE_ANON_KEY)');
+    throw Exception(
+      'Les clés Supabase sont introuvables dans le fichier .env (SUPABASE_URL et SUPABASE_ANON_KEY)',
+    );
   }
 
-  await Supabase.initialize(
-    url: supabaseUrl,
-    anonKey: supabaseAnonKey,
-  );
+  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
 
   runApp(const DjorssiMatchApp());
 }
@@ -48,7 +49,9 @@ class _DjorssiMatchAppState extends State<DjorssiMatchApp> {
   @override
   void initState() {
     super.initState();
-    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
       final AuthChangeEvent event = data.event;
       if (event == AuthChangeEvent.passwordRecovery) {
         AppRouter.router.go('/reset-password');

@@ -17,10 +17,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   String _translateAuthError(String message) {
     final msg = message.toLowerCase();
-    if (msg.contains('password should be at least 6 characters')) {
-      return 'Le mot de passe doit contenir au moins 6 caractères.';
+    if (msg.contains('password should be at least 6 characters') ||
+        msg.contains('password should be at least 8 characters')) {
+      return 'Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre.';
     }
-    if (msg.contains('rate limit')) return 'Trop de tentatives, veuillez réessayer plus tard.';
+    if (msg.contains('rate limit'))
+      return 'Trop de tentatives, veuillez réessayer plus tard.';
     return 'Erreur lors de la réinitialisation. Veuillez réessayer.';
   }
 
@@ -37,14 +39,38 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Les mots de passe ne correspondent pas.')),
+        const SnackBar(
+          content: Text('Les mots de passe ne correspondent pas.'),
+        ),
       );
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Le mot de passe doit faire au moins 6 caractères.')),
+        const SnackBar(
+          content: Text('Le mot de passe doit faire au moins 8 caractères.'),
+        ),
+      );
+      return;
+    }
+
+    if (!password.contains(RegExp(r'[A-Z]'))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Le mot de passe doit contenir au moins une majuscule.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!password.contains(RegExp(r'[0-9]'))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le mot de passe doit contenir au moins un chiffre.'),
+        ),
       );
       return;
     }
@@ -54,7 +80,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(password: password),
       );
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -171,9 +197,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             borderRadius: BorderRadius.circular(16.r),
                           ),
                         ),
-                        child: _isLoading 
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Mettre à jour'),
+                        child: _isLoading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text('Mettre à jour'),
                       ),
                     ),
                   ],
