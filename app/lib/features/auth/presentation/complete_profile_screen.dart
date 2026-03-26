@@ -18,7 +18,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final TextEditingController _customSkillController = TextEditingController();
   List<String> _availableTags = [];
   String _searchQuery = '';
-  
+
   final Set<String> _selectedTags = {};
   bool _isLoading = false;
   String? _cvUrl;
@@ -35,18 +35,23 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   Future<void> _loadData() async {
     // 1. Récupération dynamique des tags existants dans la base de données
     try {
-      final tagsResponse = await Supabase.instance.client.from('jobs').select('tags').timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw Exception('Délai d\'attente dépassé pour le chargement des secteurs.'),
-      );
+      final tagsResponse = await Supabase.instance.client
+          .from('jobs')
+          .select('tags')
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw Exception(
+              'Délai d\'attente dépassé pour le chargement des secteurs.',
+            ),
+          );
       final Set<String> uniqueTags = {};
-      
+
       for (var row in tagsResponse as List) {
         if (row['tags'] != null) {
           uniqueTags.addAll(List<String>.from(row['tags']));
         }
       }
-      
+
       if (mounted) {
         setState(() {
           _availableTags = uniqueTags.toList()..sort();
@@ -58,7 +63,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       if (mounted) {
         setState(() => _isLoadingTags = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur de connexion : Impossible de charger les secteurs. Veuillez vérifier votre internet.')),
+          const SnackBar(
+            content: Text(
+              'Erreur de connexion : Impossible de charger les secteurs. Veuillez vérifier votre internet.',
+            ),
+          ),
         );
       }
     }
@@ -91,9 +100,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           if (profile['skills'] != null) {
             final skills = List<String>.from(profile['skills']);
             for (var skill in skills) {
-               if (_availableTags.contains(skill)) {
-                 _selectedTags.add(skill);
-               }
+              if (_availableTags.contains(skill)) {
+                _selectedTags.add(skill);
+              }
             }
           }
         });
@@ -102,7 +111,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       debugPrint('Erreur lors du chargement du profil: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur de connexion : Impossible de charger votre profil.')),
+          const SnackBar(
+            content: Text(
+              'Erreur de connexion : Impossible de charger votre profil.',
+            ),
+          ),
         );
       }
     }
@@ -141,16 +154,23 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         final fileName = '${user.id}_cv.$fileExt';
         const filePath = 'cvs';
 
-        await Supabase.instance.client.storage.from('cv_files').upload(
-          '$filePath/$fileName',
-          file,
-          fileOptions: const FileOptions(upsert: true),
-        ).timeout(
-          const Duration(seconds: 30),
-          onTimeout: () => throw Exception('Délai d\'attente dépassé. Veuillez vérifier votre connexion internet.'),
-        );
+        await Supabase.instance.client.storage
+            .from('cv_files')
+            .upload(
+              '$filePath/$fileName',
+              file,
+              fileOptions: const FileOptions(upsert: true),
+            )
+            .timeout(
+              const Duration(seconds: 30),
+              onTimeout: () => throw Exception(
+                'Délai d\'attente dépassé. Veuillez vérifier votre connexion internet.',
+              ),
+            );
 
-        final String publicUrl = Supabase.instance.client.storage.from('cv_files').getPublicUrl('$filePath/$fileName');
+        final String publicUrl = Supabase.instance.client.storage
+            .from('cv_files')
+            .getPublicUrl('$filePath/$fileName');
 
         setState(() {
           _cvUrl = publicUrl;
@@ -167,7 +187,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       setState(() => _isUploadingCV = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur upload CV: Une connexion stable est requise.')),
+          SnackBar(
+            content: Text(
+              'Erreur upload CV: Une connexion stable est requise.',
+            ),
+          ),
         );
       }
     }
@@ -176,10 +200,36 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   Future<void> _saveProfile() async {
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
-    
-    if (name.isEmpty || phone.isEmpty || _selectedGender == null || (_selectedTags.isEmpty && _customSkillController.text.isEmpty)) {
+
+    if (name.isEmpty ||
+        phone.isEmpty ||
+        _selectedGender == null ||
+        (_selectedTags.isEmpty && _customSkillController.text.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez remplir votre nom, téléphone, choisir votre sexe et un secteur.')),
+        const SnackBar(
+          content: Text(
+            'Veuillez remplir votre nom, téléphone, choisir votre sexe et un secteur.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Validation du numéro de téléphone (Norme CI - 10 chiffres)
+    String cleanPhone = phone.replaceAll(RegExp(r'\s+'), '');
+    if (cleanPhone.startsWith('+225')) {
+      cleanPhone = cleanPhone.substring(4);
+    } else if (cleanPhone.startsWith('00225')) {
+      cleanPhone = cleanPhone.substring(5);
+    }
+
+    if (!RegExp(r'^\d{10}$').hasMatch(cleanPhone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Le numéro de téléphone doit contenir exactement 10 chiffres (ex: 0707070707).',
+          ),
+        ),
       );
       return;
     }
@@ -190,22 +240,29 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       if (user != null) {
         final skills = _selectedTags.toList();
         if (_customSkillController.text.isNotEmpty) {
-          skills.addAll(_customSkillController.text.split(',').map((e) => e.trim()));
+          skills.addAll(
+            _customSkillController.text.split(',').map((e) => e.trim()),
+          );
         }
 
-        await Supabase.instance.client.from('profiles').upsert({
-          'id': user.id,
-          'full_name': name,
-          'phone_number': phone,
-          'sexe': _selectedGender,
-          'skills': skills,
-          'cv_url': _cvUrl,
-          'updated_at': DateTime.now().toIso8601String(),
-        }).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () => throw Exception('Délai d\'attente dépassé. Vérifiez votre connexion internet.'),
-        );
-        
+        await Supabase.instance.client
+            .from('profiles')
+            .upsert({
+              'id': user.id,
+              'full_name': name,
+              'phone_number': cleanPhone,
+              'sexe': _selectedGender,
+              'skills': skills,
+              'cv_url': _cvUrl,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () => throw Exception(
+                'Délai d\'attente dépassé. Vérifiez votre connexion internet.',
+              ),
+            );
+
         if (mounted) {
           // Si on peut revenir en arrière (appelé depuis ProfileScreen via push),
           // on pop pour retourner au profil et déclencher le rechargement
@@ -220,7 +277,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur: Connexion internet instable. Veuillez réessayer.')),
+          const SnackBar(
+            content: Text(
+              'Erreur: Connexion internet instable. Veuillez réessayer.',
+            ),
+          ),
         );
       }
     } finally {
@@ -234,7 +295,12 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       backgroundColor: Colors.white,
       // Bouton fixé en bas de l'écran, toujours visible
       bottomNavigationBar: Container(
-        padding: EdgeInsets.fromLTRB(24.w, 12.h, 24.w, MediaQuery.of(context).padding.bottom + 16.h),
+        padding: EdgeInsets.fromLTRB(
+          24.w,
+          12.h,
+          24.w,
+          MediaQuery.of(context).padding.bottom + 16.h,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -251,13 +317,29 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
             backgroundColor: Theme.of(context).primaryColor,
             foregroundColor: Colors.white,
             padding: EdgeInsets.symmetric(vertical: 20.h),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20.r),
+            ),
             elevation: 4,
             shadowColor: Theme.of(context).primaryColor.withOpacity(0.3),
           ),
-          child: _isLoading 
-            ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-            : Text('ENREGISTRER LE PROFIL', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900, letterSpacing: 1)),
+          child: _isLoading
+              ? const SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : Text(
+                  'ENREGISTRER LE PROFIL',
+                  style: TextStyle(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
         ),
       ),
       body: SafeArea(
@@ -269,7 +351,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               SizedBox(height: 20.h),
               Text(
                 'Finalisons votre profil',
-                style: TextStyle(fontSize: 28.sp, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                style: TextStyle(
+                  fontSize: 28.sp,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF0F172A),
+                ),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 12.h),
@@ -279,35 +365,46 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 40.h),
-              
+
               _buildLabel('Nom Complet'),
               TextField(
                 controller: _nameController,
                 decoration: _inputStyle('Ex: Jean Marc', Icons.person_outline),
               ),
-              
+
               SizedBox(height: 24.h),
               _buildLabel('Numéro de Téléphone (Mobile Money)'),
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: _inputStyle('Ex: 0707070707', Icons.phone_android_outlined),
+                decoration: _inputStyle(
+                  'Ex: 0707070707',
+                  Icons.phone_android_outlined,
+                ),
               ),
-              
+
               SizedBox(height: 24.h),
               _buildLabel('Votre Sexe'),
               Row(
                 children: [
                   Expanded(
-                    child: _buildGenderCard('Homme', Icons.male, const Color(0xFF3B82F6)),
+                    child: _buildGenderCard(
+                      'Homme',
+                      Icons.male,
+                      const Color(0xFF3B82F6),
+                    ),
                   ),
                   SizedBox(width: 16.w),
                   Expanded(
-                    child: _buildGenderCard('Femme', Icons.female, const Color(0xFFEC4899)),
+                    child: _buildGenderCard(
+                      'Femme',
+                      Icons.female,
+                      const Color(0xFFEC4899),
+                    ),
                   ),
                 ],
               ),
-              
+
               SizedBox(height: 24.h),
               _buildLabel('Votre CV (Obligatoire)'),
               GestureDetector(
@@ -315,26 +412,50 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 child: Container(
                   padding: EdgeInsets.all(20.r),
                   decoration: BoxDecoration(
-                    color: _cvUrl != null ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                    color: _cvUrl != null
+                        ? const Color(0xFFF0FDF4)
+                        : const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(20.r),
-                    border: Border.all(color: _cvUrl != null ? const Color(0xFF22C55E) : const Color(0xFFE2E8F0), width: 2),
+                    border: Border.all(
+                      color: _cvUrl != null
+                          ? const Color(0xFF22C55E)
+                          : const Color(0xFFE2E8F0),
+                      width: 2,
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.cloud_upload_outlined, color: _cvUrl != null ? const Color(0xFF22C55E) : const Color(0xFFF97316)),
+                      Icon(
+                        Icons.cloud_upload_outlined,
+                        color: _cvUrl != null
+                            ? const Color(0xFF22C55E)
+                            : const Color(0xFFF97316),
+                      ),
                       SizedBox(width: 16.w),
                       Expanded(
                         child: Text(
-                          _cvUrl != null ? 'CV déjà ajouté !' : 'Cliquez pour ajouter votre CV',
-                          style: TextStyle(fontWeight: FontWeight.w600, color: _cvUrl != null ? const Color(0xFF166534) : const Color(0xFF0F172A)),
+                          _cvUrl != null
+                              ? 'CV déjà ajouté !'
+                              : 'Cliquez pour ajouter votre CV',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: _cvUrl != null
+                                ? const Color(0xFF166534)
+                                : const Color(0xFF0F172A),
+                          ),
                         ),
                       ),
-                      if (_isUploadingCV) const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                      if (_isUploadingCV)
+                        const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
                     ],
                   ),
                 ),
               ),
-              
+
               SizedBox(height: 24.h),
               _buildLabel('Secteurs d\'activité'),
               // Barre de recherche pour les tags
@@ -347,53 +468,79 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     filled: true,
                     fillColor: const Color(0xFFF8FAFC),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16.r), 
-                      borderSide: BorderSide.none
+                      borderRadius: BorderRadius.circular(16.r),
+                      borderSide: BorderSide.none,
                     ),
                   ),
                 ),
                 SizedBox(height: 12.h),
               ],
-              
+
               _isLoadingTags
-                  ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(strokeWidth: 2)))
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
                   : _availableTags.isEmpty
-                      ? const Center(child: Text('Aucun secteur disponible pour le moment.'))
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 1. Toujours afficher les secteurs déjà sélectionnés en haut
-                            if (_selectedTags.isNotEmpty) ...[
-                              Text('Vos sélections :', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor)),
-                              SizedBox(height: 8.h),
-                              Wrap(
-                                spacing: 8.w,
-                                runSpacing: 8.h,
-                                children: _selectedTags.map((tag) => _buildSectorChip(tag, true)).toList(),
-                              ),
-                              SizedBox(height: 16.h),
-                              const Divider(),
-                              SizedBox(height: 16.h),
-                            ],
-                            
-                            // 2. Afficher les suggestions (limitées pour la performance)
-                            Text(_searchQuery.isEmpty ? 'Suggestions de secteurs :' : 'Résultats de recherche :', style: TextStyle(fontSize: 13.sp, color: Colors.grey)),
-                            SizedBox(height: 12.h),
-                            Wrap(
-                              spacing: 8.w,
-                              runSpacing: 8.h,
-                              children: _availableTags
-                                .where((tag) => 
-                                  tag.toLowerCase().contains(_searchQuery.toLowerCase()) && 
-                                  !_selectedTags.contains(tag) // On ne répète pas ceux déjà en haut
-                                )
-                                .take(30) // ON LIMITE À 30 POUR LA PERFORMANCE ⚡️
-                                .map((tag) => _buildSectorChip(tag, false))
-                                .toList(),
+                  ? const Center(
+                      child: Text('Aucun secteur disponible pour le moment.'),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. Toujours afficher les secteurs déjà sélectionnés en haut
+                        if (_selectedTags.isNotEmpty) ...[
+                          Text(
+                            'Vos sélections :',
+                            style: TextStyle(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).primaryColor,
                             ),
-                          ],
+                          ),
+                          SizedBox(height: 8.h),
+                          Wrap(
+                            spacing: 8.w,
+                            runSpacing: 8.h,
+                            children: _selectedTags
+                                .map((tag) => _buildSectorChip(tag, true))
+                                .toList(),
+                          ),
+                          SizedBox(height: 16.h),
+                          const Divider(),
+                          SizedBox(height: 16.h),
+                        ],
+
+                        // 2. Afficher les suggestions (limitées pour la performance)
+                        Text(
+                          _searchQuery.isEmpty
+                              ? 'Suggestions de secteurs :'
+                              : 'Résultats de recherche :',
+                          style: TextStyle(fontSize: 13.sp, color: Colors.grey),
                         ),
-              
+                        SizedBox(height: 12.h),
+                        Wrap(
+                          spacing: 8.w,
+                          runSpacing: 8.h,
+                          children: _availableTags
+                              .where(
+                                (tag) =>
+                                    tag.toLowerCase().contains(
+                                      _searchQuery.toLowerCase(),
+                                    ) &&
+                                    !_selectedTags.contains(
+                                      tag,
+                                    ), // On ne répète pas ceux déjà en haut
+                              )
+                              .take(30) // ON LIMITE À 30 POUR LA PERFORMANCE ⚡️
+                              .map((tag) => _buildSectorChip(tag, false))
+                              .toList(),
+                        ),
+                      ],
+                    ),
+
               // Espace en bas pour éviter que le contenu soit caché par le bouton
               SizedBox(height: 20.h),
             ],
@@ -403,14 +550,23 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     );
   }
 
-  Widget _buildLabel(String text) => Padding(padding: EdgeInsets.only(bottom: 8.h), child: Text(text, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp)));
+  Widget _buildLabel(String text) => Padding(
+    padding: EdgeInsets.only(bottom: 8.h),
+    child: Text(
+      text,
+      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp),
+    ),
+  );
 
   InputDecoration _inputStyle(String hint, IconData icon) => InputDecoration(
     hintText: hint,
     prefixIcon: Icon(icon, color: Colors.grey),
     filled: true,
     fillColor: const Color(0xFFF8FAFC),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16.r), borderSide: BorderSide.none),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16.r),
+      borderSide: BorderSide.none,
+    ),
   );
 
   Widget _buildSectorChip(String tag, bool isSelected) {
@@ -418,7 +574,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     return FilterChip(
       label: Text(tag),
       selected: isSelected,
-      onSelected: (_) => setState(() => isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag)),
+      onSelected: (_) => setState(
+        () => isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag),
+      ),
       selectedColor: themeColor.withValues(alpha: 0.15),
       checkmarkColor: themeColor,
       labelStyle: TextStyle(
@@ -444,7 +602,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 16.h),
         decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+          color: isSelected
+              ? color.withValues(alpha: 0.1)
+              : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(16.r),
           border: Border.all(
             color: isSelected ? color : const Color(0xFFE2E8F0),
@@ -453,7 +613,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         ),
         child: Column(
           children: [
-            Icon(icon, color: isSelected ? color : const Color(0xFF64748B), size: 28.sp),
+            Icon(
+              icon,
+              color: isSelected ? color : const Color(0xFF64748B),
+              size: 28.sp,
+            ),
             SizedBox(height: 8.h),
             Text(
               label,

@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:djossimatch/core/cache/local_cache.dart';
+import 'package:djossimatch/core/services/match_notifier.dart';
 
 class MatchesScreen extends StatefulWidget {
   const MatchesScreen({super.key});
@@ -24,6 +26,20 @@ class _MatchesScreenState extends State<MatchesScreen> {
   void initState() {
     super.initState();
     _loadMatches();
+    MatchNotifier.stream.addListener(_onNewMatch);
+  }
+
+  void _onNewMatch() {
+    // Eviter de spammer les rechargements s'il y a de multiples événements
+    if (mounted) {
+      _loadMatches();
+    }
+  }
+
+  @override
+  void dispose() {
+    MatchNotifier.stream.removeListener(_onNewMatch);
+    super.dispose();
   }
 
   Future<void> _loadMatches() async {
@@ -49,7 +65,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
           .select('is_premium')
           .eq('id', userId)
           .maybeSingle();
-          
+
       final isPremium = profileResponse?['is_premium'] ?? false;
       final premiumUntilRaw = profileResponse?['premium_until'];
       if (isPremium && premiumUntilRaw != null) {
@@ -66,7 +82,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
           .order('created_at', ascending: false);
 
       final matchesList = List<Map<String, dynamic>>.from(response);
-      
+
       // Sauvegarder dans le cache
       await LocalCache.save(LocalCache.matchesKey, matchesList);
 
@@ -83,7 +99,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
         if (_matches.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Mode hors-ligne : affichage des matches en cache.'),
+              content: Text(
+                'Mode hors-ligne : affichage des matches en cache.',
+              ),
               backgroundColor: Colors.orange,
               duration: Duration(seconds: 3),
             ),
@@ -115,7 +133,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFFF97316)));
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFF97316)),
+      );
     }
 
     final filtered = _filteredMatches;
@@ -146,7 +166,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
                   ? SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       child: Container(
-                        height: 500.h, // Hauteur suffisante pour permettre le scroll
+                        height: 500
+                            .h, // Hauteur suffisante pour permettre le scroll
                         alignment: Alignment.center,
                         child: _buildEmptyState(),
                       ),
@@ -155,12 +176,13 @@ class _MatchesScreenState extends State<MatchesScreen> {
                       padding: EdgeInsets.all(16.r),
                       physics: const AlwaysScrollableScrollPhysics(),
                       itemCount: filtered.length,
-                      separatorBuilder: (context, index) => SizedBox(height: 12.h),
+                      separatorBuilder: (context, index) =>
+                          SizedBox(height: 12.h),
                       itemBuilder: (context, index) {
                         final match = filtered[index];
                         final job = match['jobs'];
                         final date = DateTime.parse(match['created_at']);
-                        
+
                         // Limit to 3 matches if Freemium
                         final isLocked = !_isPremium && index >= 3;
                         return _buildMatchCard(job, date, isLocked: isLocked);
@@ -174,7 +196,12 @@ class _MatchesScreenState extends State<MatchesScreen> {
   }
 
   Widget _buildFilterBar() {
-    final filters = ['Tous', 'Aujourd\'hui', '7 derniers jours', '30 derniers jours'];
+    final filters = [
+      'Tous',
+      'Aujourd\'hui',
+      '7 derniers jours',
+      '30 derniers jours',
+    ];
     return Container(
       height: 60.h,
       color: Colors.white,
@@ -198,14 +225,18 @@ class _MatchesScreenState extends State<MatchesScreen> {
               backgroundColor: Colors.grey.shade50,
               selectedColor: const Color(0xFFF97316).withOpacity(0.1),
               labelStyle: TextStyle(
-                color: isSelected ? const Color(0xFFF97316) : Colors.grey.shade600,
+                color: isSelected
+                    ? const Color(0xFFF97316)
+                    : Colors.grey.shade600,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 fontSize: 13.sp,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20.r),
                 side: BorderSide(
-                  color: isSelected ? const Color(0xFFF97316) : Colors.grey.shade200,
+                  color: isSelected
+                      ? const Color(0xFFF97316)
+                      : Colors.grey.shade200,
                   width: 1,
                 ),
               ),
@@ -225,16 +256,20 @@ class _MatchesScreenState extends State<MatchesScreen> {
           Icon(Icons.favorite_border, size: 80.r, color: Colors.grey.shade300),
           SizedBox(height: 16.h),
           Text(
-            _selectedFilter == 'Tous' 
-              ? 'Aucun match pour le moment'
-              : 'Aucun match pour cette période',
-            style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, color: Colors.grey.shade600),
+            _selectedFilter == 'Tous'
+                ? 'Aucun match pour le moment'
+                : 'Aucun match pour cette période',
+            style: TextStyle(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey.shade600,
+            ),
           ),
           SizedBox(height: 8.h),
           Text(
             _selectedFilter == 'Tous'
-              ? 'Continuez à swiper pour trouver votre Djorssi !'
-              : 'Essayez un autre filtre ou continuez à swiper.',
+                ? 'Continuez à swiper pour trouver votre Djorssi !'
+                : 'Essayez un autre filtre ou continuez à swiper.',
             style: TextStyle(color: Colors.grey.shade500),
           ),
         ],
@@ -242,13 +277,20 @@ class _MatchesScreenState extends State<MatchesScreen> {
     );
   }
 
-  Widget _buildMatchCard(Map<String, dynamic>? job, DateTime date, {bool isLocked = false}) {
+  Widget _buildMatchCard(
+    Map<String, dynamic>? job,
+    DateTime date, {
+    bool isLocked = false,
+  }) {
     if (isLocked) {
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20.r),
-          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3), width: 1.5),
+          border: Border.all(
+            color: const Color(0xFFF59E0B).withOpacity(0.3),
+            width: 1.5,
+          ),
         ),
         child: InkWell(
           onTap: () => context.push('/premium'),
@@ -262,7 +304,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
                     color: const Color(0xFF0F172A),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.lock_rounded, color: const Color(0xFFF59E0B), size: 24.r),
+                  child: Icon(
+                    Icons.lock_rounded,
+                    color: const Color(0xFFF59E0B),
+                    size: 24.r,
+                  ),
                 ),
                 SizedBox(width: 16.w),
                 Expanded(
@@ -327,9 +373,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
                   ),
                   child: Center(
                     child: Text(
-                      ((job?['company_name']?.toString().isNotEmpty == true) 
-                          ? job!['company_name'].toString()[0] 
-                          : 'C').toUpperCase(),
+                      ((job?['company_name']?.toString().isNotEmpty == true)
+                              ? job!['company_name'].toString()[0]
+                              : 'C')
+                          .toUpperCase(),
                       style: TextStyle(
                         fontSize: 24.sp,
                         fontWeight: FontWeight.bold,
@@ -364,11 +411,18 @@ class _MatchesScreenState extends State<MatchesScreen> {
                       SizedBox(height: 8.h),
                       Row(
                         children: [
-                          Icon(Icons.calendar_today, size: 12.r, color: Colors.grey.shade400),
+                          Icon(
+                            Icons.calendar_today,
+                            size: 12.r,
+                            color: Colors.grey.shade400,
+                          ),
                           SizedBox(width: 4.w),
                           Text(
                             'Matché le ${DateFormat('dd/MM/yyyy').format(date)}',
-                            style: TextStyle(fontSize: 12.sp, color: Colors.grey.shade400),
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              color: Colors.grey.shade400,
+                            ),
                           ),
                         ],
                       ),
@@ -376,7 +430,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
                   ),
                 ),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 10.w,
+                    vertical: 4.h,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF97316).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10.r),

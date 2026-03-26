@@ -33,7 +33,11 @@ class _AuthScreenState extends State<AuthScreen> {
     }
     if (msg.contains('rate limit')) return 'Trop de tentatives, veuillez réessayer plus tard.';
     if (msg.contains('email not confirmed')) return 'Veuillez confirmer votre adresse email.';
-    if (msg.contains('invalid email')) return 'Adresse email invalide.';
+    if (msg.contains('invalid email') || 
+        msg.contains('invalid format') || 
+        msg.contains('unable to validate email address')) {
+      return 'Adresse email invalide.';
+    }
     if (msg.contains('invalid or expired')) return 'Lien ou code invalide/expiré.';
     if (msg.contains('signup is disabled')) return 'Les inscriptions sont temporairement désactivées.';
     if (msg.contains('email provider is disabled')) return 'Le service d\'envoi d\'emails est désactivé.';
@@ -56,6 +60,14 @@ class _AuthScreenState extends State<AuthScreen> {
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Veuillez remplir tous les champs')),
+      );
+      return;
+    }
+
+    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    if (!emailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Adresse email invalide.')),
       );
       return;
     }
@@ -222,6 +234,14 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
+    final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+    if (!emailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Adresse e-mail invalide.')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       await Supabase.instance.client.auth.resetPasswordForEmail(
@@ -239,11 +259,20 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         );
       }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_translateAuthError(e.message)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text('Erreur: ${e.toString().replaceAll('Exception: ', '')}'),
             backgroundColor: Colors.red,
           ),
         );

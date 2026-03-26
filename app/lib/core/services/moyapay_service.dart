@@ -30,7 +30,7 @@ class MoyaPayResponse {
 
 class MoyaPayService {
   static final String _baseUrl = 'https://services.moya-pay.com/v1';
-  static final String _apiKey = dotenv.env['MOYAPAY_API_KEY'] ?? '';
+  static String get _apiKey => dotenv.env['MOYAPAY_API_KEY'] ?? '';
 
   static Future<MoyaPayResponse?> initiateWavePayment({
     required double amount,

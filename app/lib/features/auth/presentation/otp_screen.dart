@@ -7,37 +7,37 @@ class OtpScreen extends StatefulWidget {
   final String email;
   final String? fullName;
 
-  const OtpScreen({
-    super.key,
-    required this.email,
-    this.fullName,
-  });
+  const OtpScreen({super.key, required this.email, this.fullName});
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
 }
 
 class _OtpScreenState extends State<OtpScreen> {
-  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _controllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
 
   String _translateAuthError(String message) {
     final msg = message.toLowerCase();
-    
-    if (msg.contains('token has expired') || 
-        msg.contains('invalid or expired') || 
+
+    if (msg.contains('token has expired') ||
+        msg.contains('invalid or expired') ||
         msg.contains('is invalid')) {
       return 'Le code est invalide ou a expiré.';
     }
-    if (msg.contains('rate limit')) return 'Trop de tentatives, veuillez réessayer plus tard.';
+    if (msg.contains('rate limit'))
+      return 'Trop de tentatives, veuillez réessayer plus tard.';
     if (msg.contains('network error') || msg.contains('failed host lookup')) {
       return 'Erreur réseau. Vérifiez votre connexion internet.';
     }
-    
+
     // Log unexpected errors
     debugPrint('Unexpected OTP Error: $message');
-    
+
     return 'Erreur de vérification : $message';
   }
 
@@ -56,7 +56,9 @@ class _OtpScreenState extends State<OtpScreen> {
     final otp = _controllers.map((c) => c.text).join();
     if (otp.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez entrer le code de confirmation complet')),
+        const SnackBar(
+          content: Text('Veuillez entrer le code de confirmation complet'),
+        ),
       );
       return;
     }
@@ -64,45 +66,51 @@ class _OtpScreenState extends State<OtpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await Supabase.instance.client.auth.verifyOTP(
-        email: widget.email,
-        token: otp,
-        type: OtpType.signup,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => throw Exception('Délai d\'attente dépassé pour la vérification.'),
-      );
+      final response = await Supabase.instance.client.auth
+          .verifyOTP(email: widget.email, token: otp, type: OtpType.signup)
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw Exception(
+              'Délai d\'attente dépassé pour la vérification.',
+            ),
+          );
 
       if (response.user != null) {
         // If we have full name from signup, ensure profile exists
         if (widget.fullName != null) {
-          await Supabase.instance.client.from('profiles').upsert({
-            'id': response.user!.id,
-            'full_name': widget.fullName,
-          }).timeout(
-            const Duration(seconds: 10),
-            onTimeout: () => throw Exception('Délai d\'attente dépassé pour la création du profil.'),
-          );
+          await Supabase.instance.client
+              .from('profiles')
+              .upsert({'id': response.user!.id, 'full_name': widget.fullName})
+              .timeout(
+                const Duration(seconds: 10),
+                onTimeout: () => throw Exception(
+                  'Délai d\'attente dépassé pour la création du profil.',
+                ),
+              );
         }
-        
+
         if (mounted) {
           context.go('/complete-profile');
         }
       }
     } on AuthException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(_translateAuthError(e.message)),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_translateAuthError(e.message)),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(e.toString().replaceAll('Exception: ', '')),
-          backgroundColor: Theme.of(context).colorScheme.error,
-          duration: const Duration(seconds: 4),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -112,16 +120,21 @@ class _OtpScreenState extends State<OtpScreen> {
   Future<void> _resendCode() async {
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client.auth.resend(
-        type: OtpType.signup,
-        email: widget.email,
-      ).timeout(
-        const Duration(seconds: 15),
-        onTimeout: () => throw Exception('Délai d\'attente dépassé pour l\'envoi du code.'),
-      );
+      await Supabase.instance.client.auth
+          .resend(type: OtpType.signup, email: widget.email)
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () => throw Exception(
+              'Délai d\'attente dépassé pour l\'envoi du code.',
+            ),
+          );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Un nouveau code a été envoyé à votre adresse e-mail')),
+          const SnackBar(
+            content: Text(
+              'Un nouveau code a été envoyé à votre adresse e-mail',
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -146,7 +159,10 @@ class _OtpScreenState extends State<OtpScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A)),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF0F172A),
+          ),
           onPressed: () => context.pop(),
         ),
       ),
@@ -176,8 +192,36 @@ class _OtpScreenState extends State<OtpScreen> {
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 48.h),
-              
+              SizedBox(height: 12.h),
+              Container(
+                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 16.w),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.timer_outlined,
+                      size: 16.r,
+                      color: Colors.red.shade400,
+                    ),
+                    SizedBox(width: 8.w),
+                    Text(
+                      'Attention, ce code expire dans 10 minutes',
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: Colors.red.shade400,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 32.h),
+
               // OTP Input Fields
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -202,11 +246,16 @@ class _OtpScreenState extends State<OtpScreen> {
                         contentPadding: EdgeInsets.zero,
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.r),
-                          borderSide: BorderSide(color: const Color(0xFFE2E8F0)),
+                          borderSide: BorderSide(
+                            color: const Color(0xFFE2E8F0),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12.r),
-                          borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).primaryColor,
+                            width: 2,
+                          ),
                         ),
                         filled: true,
                         fillColor: Colors.white,
@@ -225,9 +274,9 @@ class _OtpScreenState extends State<OtpScreen> {
                   );
                 }),
               ),
-              
+
               SizedBox(height: 40.h),
-              
+
               ElevatedButton(
                 onPressed: _isLoading ? null : _verifyOtp,
                 style: ElevatedButton.styleFrom(
@@ -239,30 +288,36 @@ class _OtpScreenState extends State<OtpScreen> {
                     borderRadius: BorderRadius.circular(16.r),
                   ),
                 ),
-                child: _isLoading 
-                  ? SizedBox(
-                      height: 20.h, 
-                      width: 20.h, 
-                      child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                    )
-                  : Text(
-                      'Vérifier le code',
-                      style: TextStyle(
-                        fontSize: 16.sp, 
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
+                child: _isLoading
+                    ? SizedBox(
+                        height: 20.h,
+                        width: 20.h,
+                        child: const CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(
+                        'Vérifier le code',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                    ),
               ),
-              
+
               SizedBox(height: 32.h),
-              
+
               TextButton(
                 onPressed: _isLoading ? null : _resendCode,
                 child: RichText(
                   text: TextSpan(
                     text: 'Vous n\'avez pas reçu le code ? ',
-                    style: TextStyle(color: const Color(0xFF64748B), fontSize: 14.sp),
+                    style: TextStyle(
+                      color: const Color(0xFF64748B),
+                      fontSize: 14.sp,
+                    ),
                     children: [
                       TextSpan(
                         text: 'Renvoyer',
