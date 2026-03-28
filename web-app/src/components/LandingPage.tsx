@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, CheckCircle, Smartphone, Globe, MessageSquare, PlayCircle, Briefcase, X, Menu } from 'lucide-react';
 import AppSimulator from './AppSimulator';
@@ -274,14 +275,14 @@ const LandingPage: React.FC = () => {
           <div>
             <h4 className="text-lg mb-6 uppercase">Legal</h4>
             <ul className="space-y-4 font-bold text-slate-400 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">Confidentialité</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">CGU</a></li>
+              <li><Link to="/privacy" className="hover:text-white transition-colors">Confidentialité</Link></li>
+              <li><Link to="/terms" className="hover:text-white transition-colors">CGU</Link></li>
             </ul>
           </div>
           <div>
             <h4 className="text-lg mb-6 uppercase">Contact</h4>
             <ul className="space-y-4 font-bold text-slate-400 text-sm">
-              <li>danklougod5@gmail.com</li>
+              <li>contact@djorssi-match.com</li>
               <li>Abidjan, Côte d'Ivoire</li>
               <li>+225 07 08 17 25 31</li>
             </ul>

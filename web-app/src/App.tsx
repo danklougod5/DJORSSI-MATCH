@@ -4,6 +4,7 @@ import LandingPage from './components/LandingPage'
 import AdminDashboard from './components/AdminDashboard'
 import AdminLogin from './components/AdminLogin'
 import { supabase } from './lib/supabase'
+import { TermsOfService, PrivacyPolicy } from './components/LegalPages'
 
 function App() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
@@ -113,6 +114,9 @@ function App() {
             )
           } 
         />
+
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
