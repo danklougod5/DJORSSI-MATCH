@@ -279,6 +279,33 @@ class _MatchesScreenState extends State<MatchesScreen> {
     final job = match['jobs'];
     final date = DateTime.parse(match['created_at']);
 
+    // Display correct status badge based on job apply type
+    final whatsapp = job?['whatsapp_number'];
+    final email = job?['contact_email'];
+    final appLink =
+        job?['application_link'] ??
+        (job?['raw_data'] != null
+            ? job!['raw_data']['application_link']
+            : null);
+
+    final hasEmail = email != null && email.toString().trim().isNotEmpty;
+    final hasWhatsapp =
+        whatsapp != null && whatsapp.toString().trim().isNotEmpty;
+    final hasLink = appLink != null && appLink.toString().trim().isNotEmpty;
+
+    final actionTaken = match['status'] == 'action_taken';
+
+    String badgeText = 'CV Envoyé';
+    if (!hasEmail) {
+      if (hasWhatsapp) {
+        badgeText = actionTaken ? 'Contacté sur WA' : 'À contacter';
+      } else if (hasLink) {
+        badgeText = actionTaken ? 'Lien visité' : 'Lien Externe';
+      } else {
+        badgeText = 'Profil envoyé';
+      }
+    }
+
     if (isLocked) {
       return Container(
         decoration: BoxDecoration(
@@ -390,9 +417,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
                       Text(
                         job?['job_title'] ?? 'Inconnu',
                         style: TextStyle(
-                          fontSize: 16.sp,
+                          fontSize: 15
+                              .sp, // Slightly reduced to prevent wrapping issues
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF0F172A),
+                          height: 1.3, // Prevents text overlapping vertically
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -403,7 +432,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
                         style: TextStyle(
                           fontSize: 14.sp,
                           color: Colors.grey.shade600,
+                          height: 1.2,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       SizedBox(height: 8.h),
                       Row(
@@ -436,7 +468,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                     borderRadius: BorderRadius.circular(10.r),
                   ),
                   child: Text(
-                    'CV Envoyé',
+                    badgeText,
                     style: TextStyle(
                       color: const Color(0xFFF97316),
                       fontSize: 11.sp,

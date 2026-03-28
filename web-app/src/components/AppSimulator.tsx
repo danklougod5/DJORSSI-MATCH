@@ -165,7 +165,7 @@ const AppSimulator: React.FC = () => {
                   <MessageSquare className="text-black" size={32} />
                 </div>
                 <h5 className="text-xl font-black mb-2 uppercase italic">MATCH PARFAIT !</h5>
-                <p className="font-bold text-sm">Ton Djorssi a été trouvé. 📩</p>
+                <p className="font-bold text-sm">Ton CV a été envoyé au recruteur. 📩</p>
   
                 <div className="mt-4 pt-4 border-t-2 border-black/10">
                   <span className="text-xs font-black text-secondary tracking-widest">PATIENTE 24H</span>

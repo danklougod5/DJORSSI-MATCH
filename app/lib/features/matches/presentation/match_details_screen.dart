@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MatchDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> match;
@@ -19,6 +20,45 @@ class MatchDetailsScreen extends StatelessWidget {
     final contractType = job?['contract_type'];
     final experience = job?['experience'];
     final requiredLevel = job?['required_level'];
+
+    final whatsapp = job?['whatsapp_number'];
+    final email = job?['contact_email'];
+    final appLink =
+        job?['application_link'] ??
+        (job?['raw_data'] != null
+            ? job!['raw_data']['application_link']
+            : null);
+
+    final hasEmail = email != null && email.toString().trim().isNotEmpty;
+    final hasWhatsapp =
+        whatsapp != null && whatsapp.toString().trim().isNotEmpty;
+    final hasLink = appLink != null && appLink.toString().trim().isNotEmpty;
+
+    final actionTaken = match['status'] == 'action_taken';
+
+    String statusText = 'Candidature envoyée';
+    IconData statusIcon = Icons.check_circle_outline;
+    Color statusColor = Colors.green;
+
+    if (!hasEmail) {
+      if (hasWhatsapp) {
+        statusText = actionTaken
+            ? 'Contact initié sur WhatsApp'
+            : 'Contacter le recruteur';
+        statusIcon = actionTaken
+            ? Icons.check_circle_outline
+            : Icons.chat_bubble_outline;
+        statusColor = actionTaken ? Colors.green : const Color(0xFFF97316);
+      } else if (hasLink) {
+        statusText = actionTaken
+            ? 'Lien de candidature visité'
+            : 'Lien externe (à finaliser)';
+        statusIcon = actionTaken ? Icons.check_circle_outline : Icons.link;
+        statusColor = actionTaken ? Colors.green : Colors.blue;
+      } else {
+        statusText = 'Profil envoyé au recruteur';
+      }
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -129,17 +169,13 @@ class MatchDetailsScreen extends StatelessWidget {
                   SizedBox(height: 8.h),
                   Row(
                     children: [
-                      Icon(
-                        Icons.check_circle_outline,
-                        size: 16.r,
-                        color: Colors.green,
-                      ),
+                      Icon(statusIcon, size: 16.r, color: statusColor),
                       SizedBox(width: 8.w),
                       Text(
-                        'Candidature envoyée',
+                        statusText,
                         style: TextStyle(
                           fontSize: 14.sp,
-                          color: Colors.green,
+                          color: statusColor,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -207,10 +243,113 @@ class MatchDetailsScreen extends StatelessWidget {
             ),
 
             SizedBox(height: 40.h),
+
+            if (hasWhatsapp || hasLink || hasEmail)
+              SizedBox(
+                width: double.infinity,
+                height: 56.h,
+                child: ElevatedButton(
+                  onPressed: () => _handleApplyAgain(
+                    context,
+                    hasEmail,
+                    email?.toString(),
+                    hasWhatsapp,
+                    whatsapp?.toString(),
+                    hasLink,
+                    appLink?.toString(),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF97316),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16.r),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'Postuler à nouveau',
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+
+            SizedBox(height: 40.h),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _handleApplyAgain(
+    BuildContext context,
+    bool hasEmail,
+    String? email,
+    bool hasWhatsapp,
+    String? whatsapp,
+    bool hasLink,
+    String? appLink,
+  ) async {
+    if (hasEmail && email != null) {
+      final Uri emailUri = Uri(
+        scheme: 'mailto',
+        path: email.trim(),
+        query: 'subject=Candidature',
+      );
+      try {
+        if (await canLaunchUrl(emailUri)) {
+          await launchUrl(emailUri);
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Impossible d\'ouvrir votre application mail'),
+            ),
+          );
+        }
+      } catch (_) {}
+    } else if (hasWhatsapp && whatsapp != null) {
+      final cleaned = whatsapp.replaceAll(RegExp(r'[\s\-\.\(\)]+'), '');
+      final matchNums = RegExp(r'\d+').allMatches(cleaned);
+      if (matchNums.isNotEmpty) {
+        String num = matchNums.first.group(0)!;
+        if (num.length <= 10) num = '225$num';
+        final Uri waAppUri = Uri.parse('whatsapp://send?phone=$num');
+        final Uri waWebUri = Uri.parse('https://wa.me/$num');
+
+        try {
+          if (await canLaunchUrl(waAppUri)) {
+            await launchUrl(waAppUri, mode: LaunchMode.externalApplication);
+          } else if (await canLaunchUrl(waWebUri)) {
+            await launchUrl(waWebUri, mode: LaunchMode.externalApplication);
+          } else if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Application WhatsApp non trouvée")),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Erreur d'ouverture WhatsApp")),
+            );
+          }
+        }
+      }
+    } else if (hasLink && appLink != null) {
+      try {
+        final Uri url = Uri.parse(appLink);
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        } else if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Impossible d'ouvrir le lien externe"),
+            ),
+          );
+        }
+      } catch (_) {}
+    }
   }
 
   Widget _buildInfoTile(IconData icon, String label, String value) {

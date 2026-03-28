@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, CheckCircle, Smartphone, Globe, MessageSquare, PlayCircle, Briefcase, X, Menu } from 'lucide-react';
 import AppSimulator from './AppSimulator';
 
@@ -36,6 +37,7 @@ const ComparisonRow: React.FC<{ label: string, free: React.ReactNode, premium: R
 
 const LandingPage: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background selection:bg-accent selection:text-black">
@@ -96,7 +98,10 @@ const LandingPage: React.FC = () => {
                 COMMENCER
                 <ArrowRight size={24} className="group-hover:translate-x-1 transition-transform hidden sm:block" />
               </button>
-              <button className="neo-brutal-btn-secondary flex items-center justify-center gap-3 w-full sm:w-auto">
+              <button 
+                onClick={() => setIsVideoModalOpen(true)}
+                className="neo-brutal-btn-secondary flex items-center justify-center gap-3 w-full sm:w-auto"
+              >
                 <PlayCircle size={24} />
                 DÉMO VIDEO
               </button>
@@ -283,9 +288,46 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-white/10 text-center text-slate-600 font-bold text-sm">
-           © 2026 DJORSSI-MATCH. FAIT AVEC ❤️ À ABIDJAN.
+           © 2026 DJORSSI-MATCH.
         </div>
       </footer>
+
+      {/* Video Modal */}
+      <AnimatePresence>
+        {isVideoModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsVideoModalOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-black border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] rounded-3xl overflow-hidden z-10"
+            >
+              <button 
+                onClick={() => setIsVideoModalOpen(false)}
+                className="absolute top-6 right-6 z-50 p-2 bg-black/50 backdrop-blur-md hover:bg-black/70 transition-all border-2 border-white/50 text-white rounded-full animate-pulse"
+              >
+                <X size={20} strokeWidth={4} />
+              </button>
+              <div className="aspect-[9/19] relative">
+                <video 
+                  src="/demo.mp4" 
+                  className="w-full h-full object-cover" 
+                  controls 
+                  autoPlay
+                  playsInline
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

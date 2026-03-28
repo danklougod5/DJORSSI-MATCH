@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
@@ -643,6 +644,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                             ),
                           ),
                     onTap: () => context.push('/job-alerts'),
+                  ),
+                  _buildOptionTile(
+                    icon: Icons.info_outline_rounded,
+                    title: 'À propos',
+                    subtitle: 'Visiter notre site web',
+                    color: Colors.blue,
+                    onTap: () async {
+                      final url = Uri.parse('https://www.djorssi-match.com/');
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(
+                          url,
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }
+                    },
                   ),
                   _buildOptionTile(
                     icon: Icons.logout_rounded,

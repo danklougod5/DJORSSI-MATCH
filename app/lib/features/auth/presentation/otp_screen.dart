@@ -209,12 +209,16 @@ class _OtpScreenState extends State<OtpScreen> {
                       color: Colors.red.shade400,
                     ),
                     SizedBox(width: 8.w),
-                    Text(
-                      'Attention, ce code expire dans 10 minutes',
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        color: Colors.red.shade400,
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Text(
+                        'Attention, ce code expire dans 10 minutes',
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: Colors.red.shade400,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 2,
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ],

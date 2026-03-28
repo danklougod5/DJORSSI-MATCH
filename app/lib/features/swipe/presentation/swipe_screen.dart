@@ -832,6 +832,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
     }
 
     if (direction == CardSwiperDirection.right) {
+      // Bloquer le Swipe Droite si l'utilisateur n'a pas mis de CV
+      if (_cvUrl == null || _cvUrl!.isEmpty) {
+        _showMissingCvDialog();
+        return false; // Renvoie la carte au centre
+      }
+
       _handleSwipe(previousIndex, 'right');
     } else if (direction == CardSwiperDirection.left) {
       _handleSwipe(previousIndex, 'left');
@@ -900,31 +906,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
         debugPrint('*** [DIAGNOSTIC] URL CV: $_cvUrl ***');
 
-        // 4. Ajouter l'email à la file d'attente (NON BLOQUANT)
-        if (_cvUrl != null && _cvUrl!.isNotEmpty) {
-          _enqueueEmail(job);
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).clearSnackBars();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Candidature enregistrée pour ${job['job_title']} — email en cours d\'envoi...',
-                ),
-                backgroundColor: Colors.green,
-                duration: const Duration(milliseconds: 1500),
-              ),
-            );
-          }
-        } else {
-          debugPrint('*** [DIAGNOSTIC] ÉCHEC: PAS DE CV DANS LE PROFIL ***');
-        }
-
-        // Priorité des redirections sur Match (Swipe Right) selon la demande utilisateur :
-        // 1. Email (priorité absolue, géré en arrière-plan via _enqueueEmail)
-        // 2. WhatsApp (si pas d'email)
-        // 3. Lien externe (si ni email ni WhatsApp)
-
         final whatsapp = job['whatsapp_number'];
         final email = job['contact_email'];
         final appLink =
@@ -938,19 +919,24 @@ class _SwipeScreenState extends State<SwipeScreen> {
             whatsapp != null && whatsapp.toString().trim().isNotEmpty;
         final hasLink = appLink != null && appLink.toString().trim().isNotEmpty;
 
+        // Priorité des redirections sur Match (Swipe Right) :
         if (hasEmail) {
-          // L'email est prioritaire. L'envoi est déjà initié par _enqueueEmail plus haut.
-          // On n'affiche pas de redirection WhatsApp ou Lien si l'email existe.
-          if (mounted && _cvUrl == null) {
-            // Petit avertissement si l'email est prioritaire mais que l'utilisateur n'a pas de CV
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Email prioritaire mais aucun CV trouvé dans votre profil.',
+          // L'email est prioritaire.
+          if (_cvUrl != null && _cvUrl!.isNotEmpty) {
+            _enqueueEmail(job);
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Candidature enregistrée pour ${job['job_title']} — email en cours d\'envoi...',
+                  ),
+                  backgroundColor: Colors.green,
+                  duration: const Duration(milliseconds: 1500),
                 ),
-                backgroundColor: Colors.orange,
-              ),
-            );
+              );
+            }
           }
         } else if (hasWhatsapp) {
           // Le numéro prend le relais uniquement si pas d'email
@@ -958,24 +944,33 @@ class _SwipeScreenState extends State<SwipeScreen> {
             job['job_title'] ?? 'ce poste',
             job['company_name'] ?? '',
             whatsapp.toString(),
+            job['id'].toString(),
           );
         } else if (hasLink) {
           // Le lien prend le relais uniquement si ni email ni numéro
+          if (mounted) {
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Postulé par lien externe'),
+                backgroundColor: Colors.blue,
+                duration: Duration(milliseconds: 1500),
+              ),
+            );
+          }
           _showApplicationLinkRedirect(
             job['job_title'] ?? 'ce poste',
             appLink.toString(),
+            job['id'].toString(),
           );
         } else if (mounted) {
+          // Aucun moyen de contact précis (Fallback)
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                _cvUrl != null
-                    ? 'Candidature enregistrée pour ${job['job_title']}'
-                    : 'Profil envoyé (pensez à ajouter votre CV dans le profil)',
-              ),
-              backgroundColor: _cvUrl != null ? Colors.green : Colors.orange,
-              duration: const Duration(milliseconds: 1500),
+            const SnackBar(
+              content: Text('Profil envoyé au recruteur'),
+              backgroundColor: Colors.green,
+              duration: Duration(milliseconds: 1500),
             ),
           );
         }
@@ -1014,11 +1009,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
       final job = _emailQueue.removeAt(0);
 
       try {
-        final session = _supabase.auth.currentSession;
-        final token = session?.accessToken;
-
-        debugPrint('*** [QUEUE] Envoi email pour: ${job['job_title']} ***');
-
         final response = await _supabase.functions.invoke(
           'apply-to-job',
           body: {
@@ -1033,7 +1023,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
             'coverLetterInstructions': job['cover_letter_instructions'],
             'jobDescription': job['description'],
           },
-          headers: {'Authorization': 'Bearer ${token ?? ''}'},
         );
 
         debugPrint(
@@ -1065,6 +1054,48 @@ class _SwipeScreenState extends State<SwipeScreen> {
     _isProcessingQueue = false;
     debugPrint(
       '*** [QUEUE] File d\'attente vidée. Tous les emails envoyés. ***',
+    );
+  }
+
+  void _showMissingCvDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24.r),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.description_outlined, color: Color(0xFFF97316)),
+            SizedBox(width: 10.w),
+            const Text(
+              'CV Manquant',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Afin de postuler aux offres, vous devez d\'abord téléverser votre CV dans l\'onglet de votre profil.',
+          style: TextStyle(height: 1.5),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF97316),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              'Compris',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1166,12 +1197,15 @@ class _SwipeScreenState extends State<SwipeScreen> {
                     color: Color(0xFF64748B),
                   ),
                   SizedBox(width: 8.w),
-                  Text(
-                    'Nouveaux swipes dans $hours\h $minutes\min',
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF64748B),
+                  Expanded(
+                    child: Text(
+                      'Nouveaux swipes dans $hours\h $minutes\min',
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF64748B),
+                      ),
+                      maxLines: 2,
                     ),
                   ),
                 ],
@@ -1272,6 +1306,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
     String jobTitle,
     String companyName,
     String phoneNumber,
+    String jobId,
   ) {
     if (!mounted) return;
 
@@ -1356,6 +1391,16 @@ class _SwipeScreenState extends State<SwipeScreen> {
             onPressed: () async {
               Navigator.pop(context);
 
+              final userId = _supabase.auth.currentUser?.id;
+              if (userId != null) {
+                _supabase
+                    .from('applications')
+                    .update({'status': 'action_taken'})
+                    .eq('user_id', userId)
+                    .eq('job_id', jobId)
+                    .catchError((_) => null);
+              }
+
               String interestText = (_sexe == 'Femme')
                   ? 'intéressée'
                   : 'intéressé';
@@ -1412,7 +1457,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
     );
   }
 
-  void _showApplicationLinkRedirect(String jobTitle, String urlString) {
+  void _showApplicationLinkRedirect(
+    String jobTitle,
+    String urlString,
+    String jobId,
+  ) {
     if (!mounted) return;
 
     showDialog(
@@ -1454,6 +1503,17 @@ class _SwipeScreenState extends State<SwipeScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
+
+              final userId = _supabase.auth.currentUser?.id;
+              if (userId != null) {
+                _supabase
+                    .from('applications')
+                    .update({'status': 'action_taken'})
+                    .eq('user_id', userId)
+                    .eq('job_id', jobId)
+                    .catchError((_) => null);
+              }
+
               final url = Uri.parse(urlString);
               if (await canLaunchUrl(url)) {
                 await launchUrl(url, mode: LaunchMode.externalApplication);

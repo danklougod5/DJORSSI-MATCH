@@ -56,10 +56,39 @@ class _PremiumScreenState extends State<PremiumScreen> {
     }
   }
 
+  Future<void> _refreshPremiumStatus() async {
+    setState(() => _isLoading = true);
+    await _checkPremiumStatus();
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (_isPremium) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Félicitations ! Votre compte est passé Premium.'),
+            backgroundColor: Color(0xFF22C55E),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Le paiement n\'a pas encore été validé. Réessayez dans un instant.',
+            ),
+            backgroundColor: Color(0xFFF97316),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _activatePremium() async {
     if (_phoneNumber == null || _phoneNumber!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Veuillez renseigner votre numéro de téléphone dans votre profil.')),
+        const SnackBar(
+          content: Text(
+            'Veuillez renseigner votre numéro de téléphone dans votre profil.',
+          ),
+        ),
       );
       return;
     }
@@ -70,18 +99,23 @@ class _PremiumScreenState extends State<PremiumScreen> {
       if (userId == null) return;
 
       // MoyaPay Webhook URL (Supabase Edge Function)
-      const notifyUrl = 'https://tbhxbfunyhbrctzfpkwf.supabase.co/functions/v1/moyapay-webhook';
+      const notifyUrl =
+          'https://tbhxbfunyhbrctzfpkwf.supabase.co/functions/v1/moyapay-webhook';
 
       final response = await MoyaPayService.initiateWavePayment(
         amount: 2000,
         phoneNumber: _phoneNumber!,
         email: _email ?? '',
         firstName: _userName?.split(' ').first ?? 'Client',
-        lastName: _userName?.split(' ').length == 1 ? 'Djorssi' : _userName?.split(' ').sublist(1).join(' ') ?? 'Djorssi',
+        lastName: _userName?.split(' ').length == 1
+            ? 'Djorssi'
+            : _userName?.split(' ').sublist(1).join(' ') ?? 'Djorssi',
         notifyUrl: notifyUrl,
       );
 
-      if (response != null && response.paymentUrl != null && response.payToken != null) {
+      if (response != null &&
+          response.paymentUrl != null &&
+          response.payToken != null) {
         // Record payment attempt BEFORE redirect
         await _supabase.from('payments').insert({
           'user_id': userId,
@@ -93,11 +127,13 @@ class _PremiumScreenState extends State<PremiumScreen> {
         final uri = Uri.parse(response.paymentUrl!);
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
-          
+
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Redirection vers Wave... Revenez ici après le paiement.'),
+                content: Text(
+                  'Redirection vers Wave... Revenez ici après le paiement.',
+                ),
                 duration: Duration(seconds: 10),
               ),
             );
@@ -106,7 +142,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
           throw Exception('Impossible d\'ouvrir le lien de paiement');
         }
       } else {
-        throw Exception('Erreur lors de l\'initialisation du paiement: ${response?.message ?? "Inconnu"}');
+        throw Exception(
+          'Erreur lors de l\'initialisation du paiement: ${response?.message ?? "Inconnu"}',
+        );
       }
 
       if (mounted) setState(() => _isLoading = false);
@@ -115,10 +153,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -152,35 +187,40 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 _buildFeatureCard(
                   icon: Icons.all_inclusive_rounded,
                   title: 'SWIPES ILLIMITÉS',
-                  description: 'Ne soyez plus jamais bloqué. Swiper autant de Djorssis que vous voulez par jour.',
+                  description:
+                      'Ne soyez plus jamais bloqué. Swiper autant de Djorssis que vous voulez par jour.',
                   color: const Color(0xFFF97316),
                 ),
                 const SizedBox(height: 16),
                 _buildFeatureCard(
                   icon: Icons.history_rounded,
                   title: 'HISTORIQUE DÉVERROUILLÉ',
-                  description: 'Ne soyez plus limité à vos 3 derniers matches. Consultez l\'intégralité de vos candidatures.',
+                  description:
+                      'Ne soyez plus limité à vos 3 derniers matches. Consultez l\'intégralité de vos candidatures.',
                   color: const Color(0xFFF59E0B),
                 ),
                 const SizedBox(height: 16),
                 _buildFeatureCard(
                   icon: Icons.verified_rounded,
                   title: 'BADGE "CANDIDAT CERTIFIÉ"',
-                  description: 'Un signal de confiance unique pour rassurer les employeurs sur votre sérieux.',
+                  description:
+                      'Un signal de confiance unique pour rassurer les employeurs sur votre sérieux.',
                   color: const Color(0xFFF97316),
                 ),
                 const SizedBox(height: 16),
                 _buildFeatureCard(
                   icon: Icons.undo_rounded,
                   title: 'RETOUR EN ARRIÈRE',
-                  description: 'Vous avez swipé trop vite ? Annulez votre dernier geste instantanément.',
+                  description:
+                      'Vous avez swipé trop vite ? Annulez votre dernier geste instantanément.',
                   color: const Color(0xFFFB923C),
                 ),
                 const SizedBox(height: 16),
                 _buildFeatureCard(
                   icon: Icons.notifications_active_rounded,
                   title: 'ALERTES EMPLOIS PAR EMAIL',
-                  description: 'Soyez le premier informé ! Recevez un email dès qu\'un job correspondant est publié.',
+                  description:
+                      'Soyez le premier informé ! Recevez un email dès qu\'un job correspondant est publié.',
                   color: const Color(0xFFF97316),
                 ),
                 const SizedBox(height: 40),
@@ -194,7 +234,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
           if (_isLoading)
             Container(
               color: Colors.black54,
-              child: const Center(child: CircularProgressIndicator(color: Color(0xFFF97316))),
+              child: const Center(
+                child: CircularProgressIndicator(color: Color(0xFFF97316)),
+              ),
             ),
         ],
       ),
@@ -205,10 +247,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
 
@@ -246,7 +285,11 @@ class _PremiumScreenState extends State<PremiumScreen> {
             color: const Color(0xFFF97316).withOpacity(0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(Icons.stars_rounded, color: const Color(0xFFF97316), size: 64.r),
+          child: Icon(
+            Icons.stars_rounded,
+            color: const Color(0xFFF97316),
+            size: 64.r,
+          ),
         ),
         SizedBox(height: 24.h),
         Text(
@@ -262,11 +305,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
         Text(
           'Multipliez par 10 vos chances de trouver\nle job de vos rêves à Abidjan.',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 15.sp,
-            color: Colors.white70,
-            height: 1.5,
-          ),
+          style: TextStyle(fontSize: 15.sp, color: Colors.white70, height: 1.5),
         ),
       ],
     );
@@ -379,13 +418,16 @@ class _PremiumScreenState extends State<PremiumScreen> {
             ],
           ),
           SizedBox(height: 16.h),
-          Text(
-            'Abonnement de 30 jours renouvelable.\nMoins cher qu\'un ticket de bus par jour.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 13.sp,
-              fontStyle: FontStyle.italic,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              'Abonnement de 30 jours renouvelable.\nMoins cher que ton jeton de gbaka par jour !',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 13.sp,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ),
         ],
@@ -401,14 +443,20 @@ class _PremiumScreenState extends State<PremiumScreen> {
           ElevatedButton(
             onPressed: _isPremium || _isLoading ? null : _activatePremium,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _isPremium ? const Color(0xFF22C55E) : Colors.white,
+              backgroundColor: _isPremium
+                  ? const Color(0xFF22C55E)
+                  : Colors.white,
               foregroundColor: const Color(0xFF0F172A),
               minimumSize: const Size(double.infinity, 64),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.r),
+              ),
               elevation: 0,
             ),
             child: Text(
-              _isPremium ? 'DÉSONRMAIS PREMIUM ✓' : (_isLoading ? 'TRAITEMENT...' : 'ACTIVER MAINTENANT'),
+              _isPremium
+                  ? 'DÉSONRMAIS PREMIUM ✓'
+                  : (_isLoading ? 'TRAITEMENT...' : 'ACTIVER MAINTENANT'),
               style: TextStyle(
                 fontSize: 16.sp,
                 fontWeight: FontWeight.w900,
@@ -420,7 +468,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
           if (!_isPremium && !_isLoading) ...[
             SizedBox(height: 16.h),
             TextButton(
-              onPressed: _checkPremiumStatus,
+              onPressed: _isLoading ? null : _refreshPremiumStatus,
               child: Text(
                 'VÉRIFIER MON STATUT',
                 style: TextStyle(

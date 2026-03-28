@@ -8,6 +8,7 @@ interface OverviewTabProps {
   userTypeData: any[];
   dailyActivity: any[];
   recentUsersList: any[];
+  topSectors: any[];
   COLORS: string[];
   setActiveTab: (tab: any) => void;
 }
@@ -17,6 +18,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   userTypeData,
   dailyActivity,
   recentUsersList,
+  topSectors,
   COLORS,
   setActiveTab
 }) => {
@@ -62,9 +64,30 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
            </div>
         </div>
 
+        {/* Top Sectors list */}
+        <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm min-w-0 flex flex-col">
+           <h3 className="text-lg mb-6">Secteurs les plus choisis</h3>
+           <div className="flex-1 overflow-y-auto w-full custom-scrollbar space-y-3 pr-2" style={{ maxHeight: 'calc(100% - 2rem)' }}>
+              {topSectors.map((sector, index) => (
+                 <div key={index} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                       <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                          {index + 1}
+                       </div>
+                       <span className="text-sm font-medium text-slate-700 truncate">{sector.name}</span>
+                    </div>
+                    <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-md shrink-0">
+                       {sector.count} <Users size={10} className="inline ml-0.5" />
+                    </span>
+                 </div>
+              ))}
+              {topSectors.length === 0 && <p className="text-slate-400 text-sm italic text-center py-10">Aucune donnée</p>}
+           </div>
+        </div>
+
         {/* Bar Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm min-w-0">
-           <h3 className="text-lg mb-6">Activité Feedback (7 derniers jours)</h3>
+        <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm min-w-0">
+           <h3 className="text-lg mb-6">Activité Feedback (7j)</h3>
            <div className="h-64 text-xs w-full">
               <ResponsiveContainer width="99%" height="100%" minWidth={0}>
                 <BarChart data={dailyActivity}>

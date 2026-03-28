@@ -77,6 +77,19 @@ class _DjorssiMatchAppState extends State<DjorssiMatchApp> {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           routerConfig: AppRouter.router,
+          builder: (context, routerChild) {
+            final mediaQuery = MediaQuery.of(context);
+            // On limite l'échelle de texte pour éviter que les très grandes polices
+            // du système (accessibilité) ne cassent le design.
+            final scale = mediaQuery.textScaler.clamp(
+              minScaleFactor: 1.0,
+              maxScaleFactor: 1.15,
+            );
+            return MediaQuery(
+              data: mediaQuery.copyWith(textScaler: scale),
+              child: routerChild!,
+            );
+          },
         );
       },
     );

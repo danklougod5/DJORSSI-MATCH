@@ -32,8 +32,8 @@ class AppRouter {
 
       if (!isAuth) {
         // Not logged in -> can only be on Splash, Onboarding, Auth or OTP
-        if (state.matchedLocation != '/splash' && 
-            state.matchedLocation != '/onboarding' && 
+        if (state.matchedLocation != '/splash' &&
+            state.matchedLocation != '/onboarding' &&
             state.matchedLocation != '/auth' &&
             state.matchedLocation != '/otp' &&
             state.matchedLocation != '/reset-password') {
@@ -43,7 +43,9 @@ class AppRouter {
       }
 
       // Logged in
-      if (isGoingToAuth || state.matchedLocation == '/onboarding' || state.matchedLocation == '/otp') {
+      if (isGoingToAuth ||
+          state.matchedLocation == '/onboarding' ||
+          state.matchedLocation == '/otp') {
         return '/';
       }
       return null;
@@ -53,10 +55,7 @@ class AppRouter {
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
       ),
-      GoRoute(
-        path: '/auth',
-        builder: (context, state) => const AuthScreen(),
-      ),
+      GoRoute(path: '/auth', builder: (context, state) => const AuthScreen()),
       GoRoute(
         path: '/reset-password',
         builder: (context, state) => const ResetPasswordScreen(),
@@ -98,7 +97,9 @@ class AppRouter {
         path: '/',
         builder: (context, state) {
           final tab = state.uri.queryParameters['tab'];
-          final initialIndex = tab == 'profile' ? 2 : (tab == 'matches' ? 1 : 0);
+          final initialIndex = tab == 'profile'
+              ? 2
+              : (tab == 'matches' ? 1 : 0);
           return MainNavigationScreen(initialIndex: initialIndex);
         },
       ),

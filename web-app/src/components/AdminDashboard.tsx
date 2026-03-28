@@ -61,6 +61,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const [editingJob, setEditingJob] = useState<any | null>(null);
 
   const [dailyActivity, setDailyActivity] = useState<any[]>([]);
+  const [topSectors, setTopSectors] = useState<any[]>([]);
 
   const userTypeData = [
     { name: 'Freemium', value: stats.totalUsers - stats.premiumUsers },
@@ -156,6 +157,28 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         return { name: dayLabel, count: fbCount + unsubCount };
       });
       setDailyActivity(activity);
+
+      const { data: allProfiles } = await supabase.from('profiles').select('skills');
+      if (allProfiles) {
+        const sectorCounts: Record<string, number> = {};
+        allProfiles.forEach(p => {
+          if (Array.isArray(p.skills)) {
+             p.skills.forEach(s => {
+               if(s) sectorCounts[s] = (sectorCounts[s] || 0) + 1;
+             });
+          } else if (typeof p.skills === 'string' && p.skills) {
+             const skills = p.skills.split(',').map(s => s.trim());
+             skills.forEach(s => {
+               if (s) sectorCounts[s] = (sectorCounts[s] || 0) + 1;
+             });
+          }
+        });
+        const sorted = Object.entries(sectorCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([name, count]) => ({ name, count }));
+        setTopSectors(sorted);
+      }
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -532,6 +555,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             userTypeData={userTypeData} 
             dailyActivity={dailyActivity} 
             recentUsersList={recentUsersList} 
+            topSectors={topSectors}
             COLORS={COLORS} 
             setActiveTab={setActiveTab} 
           />

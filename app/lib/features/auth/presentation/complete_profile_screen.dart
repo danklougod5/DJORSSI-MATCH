@@ -52,9 +52,36 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         }
       }
 
+      // Fetch popular sectors across profiles to order tags
+      final profilesResponse = await Supabase.instance.client
+          .from('profiles')
+          .select('skills')
+          .limit(1000);
+
+      final Map<String, int> sectorCounts = {};
+      for (var row in profilesResponse as List) {
+        if (row['skills'] != null) {
+          for (var skill in List<String>.from(row['skills'])) {
+            if (skill.isNotEmpty) {
+              sectorCounts[skill] = (sectorCounts[skill] ?? 0) + 1;
+            }
+          }
+        }
+      }
+
+      final List<String> sortedTags = uniqueTags.toList();
+      sortedTags.sort((a, b) {
+        final countA = sectorCounts[a] ?? 0;
+        final countB = sectorCounts[b] ?? 0;
+        if (countA != countB) {
+          return countB.compareTo(countA); // Descending count
+        }
+        return a.compareTo(b); // Alphabetical
+      });
+
       if (mounted) {
         setState(() {
-          _availableTags = uniqueTags.toList()..sort();
+          _availableTags = sortedTags;
           _isLoadingTags = false;
         });
       }
