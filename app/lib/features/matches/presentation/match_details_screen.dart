@@ -1,17 +1,26 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class MatchDetailsScreen extends StatelessWidget {
+class MatchDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> match;
 
   const MatchDetailsScreen({super.key, required this.match});
 
   @override
+  State<MatchDetailsScreen> createState() => _MatchDetailsScreenState();
+}
+
+class _MatchDetailsScreenState extends State<MatchDetailsScreen> {
+  final SupabaseClient _supabase = Supabase.instance.client;
+
+  @override
   Widget build(BuildContext context) {
-    final job = match['jobs'] as Map<String, dynamic>?;
-    final date = DateTime.parse(match['created_at']);
+    final job = widget.match['jobs'] as Map<String, dynamic>?;
+    final date = DateTime.parse(widget.match['created_at']);
     final companyName = job?['company_name'] ?? 'Inconnu';
     final jobTitle = job?['job_title'] ?? 'Poste Inconnu';
     final salary = job?['salary'] ?? 'Non spécifié';
@@ -34,7 +43,7 @@ class MatchDetailsScreen extends StatelessWidget {
         whatsapp != null && whatsapp.toString().trim().isNotEmpty;
     final hasLink = appLink != null && appLink.toString().trim().isNotEmpty;
 
-    final actionTaken = match['status'] == 'action_taken';
+    final actionTaken = widget.match['status'] == 'action_taken';
 
     String statusText = 'Candidature envoyée';
     IconData statusIcon = Icons.check_circle_outline;
@@ -293,22 +302,92 @@ class MatchDetailsScreen extends StatelessWidget {
     String? appLink,
   ) async {
     if (hasEmail && email != null) {
-      final Uri emailUri = Uri(
-        scheme: 'mailto',
-        path: email.trim(),
-        query: 'subject=Candidature',
-      );
       try {
-        if (await canLaunchUrl(emailUri)) {
-          await launchUrl(emailUri);
-        } else if (context.mounted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Candidature en cours de renvoi...'),
+          ),
+        );
+
+        // 1. Refresh session
+        await _supabase.auth.refreshSession();
+
+        final userId = _supabase.auth.currentUser?.id;
+        final session = _supabase.auth.currentSession;
+
+        if (userId == null || session == null) {
+          throw Exception('Auth session missing or user not found');
+        }
+
+        // 2. Fetch profile
+        final profile = await _supabase
+            .from('profiles')
+            .select('cv_url, full_name, sexe')
+            .eq('id', userId)
+            .single();
+
+        final String? cvUrl = profile['cv_url'];
+        if (cvUrl == null || cvUrl.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Veuillez ajouter votre CV sur votre profil'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        final job = widget.match['jobs'];
+
+        // 3. Invoke function WITHOUT explicit headers first
+        // as it works in swipe_screen.dart
+        final response = await _supabase.functions.invoke(
+          'apply-to-job',
+          body: {
+            'jobTitle': job['job_title'],
+            'jobCompany': job['company_name'],
+            'jobContactEmail': email.trim(),
+            'cvUrl': cvUrl,
+            'userName': profile['full_name'],
+            'userSexe': profile['sexe'],
+            'message': null,
+            'requiresCoverLetter': job['requires_cover_letter'] ?? false,
+            'coverLetterInstructions': job['cover_letter_instructions'],
+            'jobDescription': job['description'],
+          },
+        );
+
+        debugPrint('RESPONSE APPLY AGAIN: ${response.status} - ${response.data}');
+
+        if (response.status == 200 || response.status == 201) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Candidature renvoyée avec succès !'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else {
+          throw Exception('Server returned ${response.status}: ${response.data}');
+        }
+      } catch (e) {
+        debugPrint('ERROR APPLY AGAIN: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Impossible d\'ouvrir votre application mail'),
+              content: Text('Détail : $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
             ),
           );
         }
-      } catch (_) {}
+      }
     } else if (hasWhatsapp && whatsapp != null) {
       final cleaned = whatsapp.replaceAll(RegExp(r'[\s\-\.\(\)]+'), '');
       final matchNums = RegExp(r'\d+').allMatches(cleaned);
