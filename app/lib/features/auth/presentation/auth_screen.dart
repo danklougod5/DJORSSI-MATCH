@@ -16,6 +16,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _fullNameController = TextEditingController();
   bool _isLoading = false;
   bool _isSignUp = false;
+  bool _obscurePassword = true;
 
   String _translateAuthError(String message) {
     final msg = message.toLowerCase();
@@ -495,7 +496,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     SizedBox(height: 16.h),
                     TextField(
                       controller: _passwordController,
-                      obscureText: true,
+                      obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
                       onSubmitted: (_) => _handleAuth(),
                       decoration: InputDecoration(
@@ -504,6 +505,19 @@ class _AuthScreenState extends State<AuthScreen> {
                         prefixIcon: const Icon(
                           Icons.lock_outline_rounded,
                           color: Color(0xFF94A3B8),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16.r),

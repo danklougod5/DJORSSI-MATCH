@@ -74,19 +74,15 @@ function App() {
   }, [navigate])
 
   const handleLogout = async () => {
-    // Reset state immediately for UI responsiveness
-    setIsAdmin(false)
-    localStorage.clear()
-    sessionStorage.clear()
-    
     try {
-      await supabase.auth.signOut()
+      await supabase.auth.signOut();
     } catch (e) {
-      console.error('Error during signOut:', e)
+      console.error('Error during signOut:', e);
     } finally {
-      navigate('/admin') 
+      setIsAdmin(false);
+      navigate('/admin');
     }
-  }
+  };
 
   if (isInitializing) {
     return (

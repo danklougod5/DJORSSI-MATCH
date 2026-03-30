@@ -21,8 +21,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
     setError(null);
     setSuccess(null);
     try {
-      // Nettoyer tous les verrous avant l'init
-      localStorage.clear();
+      // Nettoyer uniquement au lieu de tout détruire
+      await supabase.auth.signOut();
       
       // 1. Try to sign up
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -76,44 +76,119 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
     setLoading(true);
     setError(null);
 
-    // 1. Force a clean state for auth avant la tentative
-    try {
-      // Nettoyage complet mais sécurisé
-      localStorage.clear(); 
-      sessionStorage.clear();
-    } catch (e) {
-      // Ignorer les erreurs de nettoyage
-    }
-
-    const authPromise = async () => {
-      const { data, error: loginError } = await supabase.auth.signInWithPassword({ 
-        email: email.trim(), 
-        password: password.trim() 
-      });
-      if (loginError) {
-        throw loginError;
+    // Test de connectivité immédiat pour diagnostiquer
+    const checkSupabase = async () => {
+      try {
+        const start = Date.now();
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/`, { 
+          method: 'GET',
+          headers: { 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY }
+        });
+        const duration = Date.now() - start;
+        console.log(`[NETWORK TEST] Supabase REST: status ${res.status}, temps ${duration}ms`);
+      } catch (err: any) {
+        console.error(`[NETWORK TEST] Supabase REST INJOIGNABLE:`, err.message);
       }
-      return data;
     };
 
-    const profilePromise = async (userId: string) => {
-      const { data: profile, error: profileErr } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', userId)
-        .single();
+    const authAttempt = async () => {
+      console.log(`[AUTH] Tentative de connexion directe (fetch) pour ${email.trim()}...`);
+      const start = Date.now();
+      try {
+        // Bypass SDK — appel direct à l'API auth car le SDK se bloque
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        
+        const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+          },
+          body: JSON.stringify({
+            email: email.trim(),
+            password: password.trim(),
+          }),
+        });
+
+        const duration = Date.now() - start;
+        const result = await response.json();
+        console.log(`[AUTH] Réponse reçue en ${duration}ms, status: ${response.status}`);
+
+        if (!response.ok) {
+          throw new Error(result.error_description || result.msg || result.error || 'Erreur d\'authentification');
+        }
+
+        // Injecter la session dans le client Supabase SDK - NE PAS ATTENDRE (A WAIT), cela deadlock le SDK parfois
+        if (result.access_token && result.refresh_token) {
+          console.log(`[AUTH] Token obtenu, injection asynchrone dans le SDK...`);
+          supabase.auth.setSession({
+            access_token: result.access_token,
+            refresh_token: result.refresh_token,
+          }).catch((err: any) => console.warn('[AUTH] setSession background catch:', err.message));
+        }
+
+        return { user: result.user, session: result };
+      } catch (e: any) {
+        const duration = Date.now() - start;
+        console.error(`[AUTH fail] Erreur après ${duration}ms:`, e.message);
+        throw e;
+      }
+    };
+
+    const profilePromise = async (userId: string, accessToken: string) => {
+      console.log(`[PROFILE] Vérification des droits pour ${userId} (via fetch) ...`);
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
-      if (profileErr) throw profileErr;
+      const response = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=is_admin`, {
+        method: 'GET',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Erreur lors de la vérification du profil');
+      }
+
+      const data = await response.json();
+      const profile = data[0];
+      
       if (!profile?.is_admin) throw new Error("Accès refusé : Vous n'êtes pas administrateur.");
       return profile;
     };
 
-    // Timeout helper (30 secondes car le réseau semble lent)
+    // Timeout dynamique (60s puis 120s puis 180s)
     const withTimeout = (promise: Promise<any>, ms: number, label: string) => {
       return Promise.race([
         promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`Délai dépassé (${ms/1000}s) pour ${label}. Vérifiez votre connexion.`)), ms))
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`Délai dépassé (${ms/1000}s) pour ${label}.`)), ms))
       ]);
+    };
+
+    // Retry helper for shaky network
+    const withRetry = async <T,>(fn: (attempt: number) => Promise<T>, retries: number, label: string): Promise<T> => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          return await fn(attempt);
+        } catch (err: any) {
+          const isTimeout = err.message?.includes('Délai dépassé');
+          const isNetwork = err.message?.toLowerCase().includes('failed to fetch') || err.message?.toLowerCase().includes('network');
+          console.error(`[RETRY DEBUG] Échec tentative ${attempt}/${retries} (${label}):`, err.message);
+          
+          if ((isTimeout || isNetwork) && attempt < retries) {
+            const delay = attempt * 3000;
+            console.warn(`Nouvelle tentative dans ${delay/1000}s...`);
+            await new Promise(r => setTimeout(r, delay)); 
+            continue;
+          }
+          throw err;
+        }
+      }
+      throw new Error(`Échec final après ${retries} tentatives.`);
     };
 
     const translateError = (msg: string) => {
@@ -121,30 +196,54 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
       if (lowerMsg.includes("invalid login credentials") || lowerMsg.includes("invalid login")) {
         return "Email ou mot de passe incorrect.";
       }
-      if (lowerMsg.includes("user already registered")) {
-        return "Cet utilisateur est déjà inscrit.";
+      if (lowerMsg.includes("failed to fetch") || lowerMsg.includes("network")) {
+        return "Impossible de contacter le serveur. Votre connexion internet est-elle active ?";
       }
-      if (lowerMsg.includes("failed to fetch")) {
-        return "Erreur de réseau : Supabase est injoignable.";
+      if (lowerMsg.includes("délai dépassé")) {
+        return "Connexion trop lente (3 minutes sans réponse). Veuillez changer de réseau ou réessayer.";
       }
       return msg;
     };
 
     try {
-      // 2. Auth call
-      const authData = await withTimeout(authPromise(), 30000, "l'authentification");
+      await checkSupabase();
       
-      if (authData?.user?.id) {
-        // 3. Profile check
-        await withTimeout(profilePromise(authData.user.id), 20000, "la vérification du profil");
-        onLoginSuccess();
+      // Tentative Auth avec timeouts progressifs (60s, 120s, 180s)
+      const authData = await withRetry(
+        (att) => withTimeout(authAttempt(), att === 1 ? 60000 : att === 2 ? 120000 : 180000, "l'authentification"),
+        3,
+        "l'authentification"
+      );
+      
+      if (authData?.user?.id && authData?.session?.access_token) {
+        // Vérification profil via fetch
+        await withRetry(
+          () => withTimeout(profilePromise(authData.user.id, authData.session.access_token), 45000, "la vérification du profil"),
+          2,
+          "la vérification du profil"
+        );
+        
+        // Bypass the SDK hang completely by writing directly to localStorage
+        console.log("[LOGIN] Authentification validée ! Mise à jour du stockage local...");
+        try {
+          localStorage.setItem('djorssi-admin-v2-auth', JSON.stringify(authData.session));
+          // Provide a non-blocking attempt to notify the SDK just in case, but don't await it
+          supabase.auth.setSession({
+            access_token: authData.session.access_token,
+            refresh_token: authData.session.refresh_token,
+          }).catch(console.warn);
+        } catch (storageErr) {
+          console.warn("[LOGIN] Avertissement accès localStorage: ", storageErr);
+        }
+
+        // Use standard window.location to force a full app reload with the new session
+        window.location.href = '/admin';
       } else {
-        throw new Error("Authentification réussie mais ID utilisateur manquant.");
+        throw new Error("Authentification réussie mais données manquantes.");
       }
     } catch (err: any) {
-      console.error("Erreur complète connexion capturée:", err);
+      console.error("ERREUR CRITIQUE CONNEXION:", err);
       setError(translateError(err.message || "Erreur de connexion"));
-      // Clear session on error to avoid partial auth state
       await supabase.auth.signOut();
     } finally {
       setLoading(false);

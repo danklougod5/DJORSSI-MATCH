@@ -50,7 +50,7 @@ const LandingPage: React.FC = () => {
                <img src="/logo.png" alt="Djorssi-Match Logo" className="h-full w-auto object-contain" />
             </div>
             <span className="font-heading text-xl md:text-2xl font-black uppercase tracking-tighter">
-              DJORSSI<span className="text-primary hidden sm:inline">-MATCH</span>
+              Djorssi<span className="text-primary hidden sm:inline">-Match</span>
             </span>
           </div>
 
@@ -89,7 +89,7 @@ const LandingPage: React.FC = () => {
               ⚡️ LE JOB DE TES RÊVES EN UN SWIPE
             </div>
             <h1 className="text-5xl md:text-7xl lg:text-8xl mb-6 md:mb-8 leading-[0.9] text-black italic">
-              TROUVE TON <span className="text-primary not-italic">DJORSSI</span> MAINTENANT.
+              TROUVE TON <span className="text-primary not-italic">Djorssi</span> MAINTENANT.
             </h1>
             <p className="text-lg md:text-xl font-bold mb-8 md:mb-12 max-w-xl border-l-4 md:border-l-8 border-black pl-4 md:pl-6 leading-snug">
               Plus besoin de CV interminables ou d'e-mails ignorés. Connecte-toi directement avec les meilleurs employeurs de Côte d'Ivoire.
@@ -254,7 +254,7 @@ const LandingPage: React.FC = () => {
               <div className="h-10 flex items-center justify-center">
                 <img src="/logo.png" alt="Djorssi-Match Logo" className="h-full w-auto object-contain" />
               </div>
-              <span className="font-heading text-xl font-black uppercase tracking-tighter">DJORSSI-MATCH</span>
+              <span className="font-heading text-xl font-black uppercase tracking-tighter">Djorssi-Match</span>
             </div>
             <p className="font-medium text-slate-400 max-w-sm mb-8">
               La plateforme n°1 de mise en relation directe pour l'emploi en Côte d'Ivoire.
@@ -289,7 +289,7 @@ const LandingPage: React.FC = () => {
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-white/10 text-center text-slate-600 font-bold text-sm">
-           © 2026 DJORSSI-MATCH.
+           © 2026 Djorssi-Match.
         </div>
       </footer>
 

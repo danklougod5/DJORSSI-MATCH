@@ -6,6 +6,7 @@ import {
   Plus,
   TrendingUp,
   MessageSquare,
+  AlertCircle,
   Settings
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -59,6 +60,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const [jobsList, setJobsList] = useState<any[]>([]);
   const [jobsSearch, setJobsSearch] = useState('');
   const [editingJob, setEditingJob] = useState<any | null>(null);
+  const [deleteProgress, setDeleteProgress] = useState<{current: number, total: number} | null>(null);
 
   const [dailyActivity, setDailyActivity] = useState<any[]>([]);
   const [topSectors, setTopSectors] = useState<any[]>([]);
@@ -100,7 +102,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         .limit(100);
 
       if (userData) {
-        setRecentUsersList(userData.map(u => ({
+        setRecentUsersList(userData.map((u: any) => ({
           id: u.id,
           name: u.full_name || 'Anonyme',
           premium: u.is_premium,
@@ -161,14 +163,14 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       const { data: allProfiles } = await supabase.from('profiles').select('skills');
       if (allProfiles) {
         const sectorCounts: Record<string, number> = {};
-        allProfiles.forEach(p => {
+        allProfiles.forEach((p: any) => {
           if (Array.isArray(p.skills)) {
-             p.skills.forEach(s => {
+             p.skills.forEach((s: string) => {
                if(s) sectorCounts[s] = (sectorCounts[s] || 0) + 1;
              });
           } else if (typeof p.skills === 'string' && p.skills) {
-             const skills = p.skills.split(',').map(s => s.trim());
-             skills.forEach(s => {
+             const skills = p.skills.split(',').map((s: string) => s.trim());
+             skills.forEach((s: string) => {
                if (s) sectorCounts[s] = (sectorCounts[s] || 0) + 1;
              });
           }
@@ -269,6 +271,90 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleBulkDeleteJobs = async (jobIds: string[]): Promise<boolean> => {
+    if (!window.confirm(`Voulez-vous vraiment supprimer ces ${jobIds.length} offres d'emploi ?`)) {
+      return false;
+    }
+    setIsLoading(true);
+    setDeleteProgress({ current: 0, total: jobIds.length });
+    setErrorMessage('');
+    setSuccessMessage('');
+    console.log('[BULK DELETE] Starting deletion of', jobIds.length, 'jobs:', jobIds);
+    
+    try {
+      // Delete one by one for better RLS compatibility and progress tracking
+      let deleted = 0;
+      let errors: string[] = [];
+      
+      for (const jobId of jobIds) {
+        console.log('[BULK DELETE] Deleting job:', jobId);
+        const { error } = await supabase.from('jobs').delete().eq('id', jobId);
+        if (error) {
+          console.error('[BULK DELETE] Error deleting job', jobId, ':', error);
+          errors.push(`${jobId}: ${error.message}`);
+        } else {
+          deleted++;
+        }
+        // Update progress after each deletion
+        setDeleteProgress({ current: deleted + errors.length, total: jobIds.length });
+        console.log(`[BULK DELETE] Progress: ${deleted + errors.length}/${jobIds.length}`);
+      }
+      
+      if (deleted > 0) {
+        setSuccessMessage(`${deleted}/${jobIds.length} offres supprimées avec succès !`);
+        setJobsList(prev => prev.filter(j => !jobIds.includes(j.id)));
+      }
+      
+      if (errors.length > 0) {
+        setErrorMessage(`Erreurs: ${errors.length} échecs.`);
+        console.error('[BULK DELETE] Errors:', errors);
+      }
+      
+      // Refresh from server to be sure
+      await fetchJobs();
+      return true;
+    } catch (err: any) {
+      console.error('[BULK DELETE] Fatal error:', err);
+      setErrorMessage(err.message || "Erreur de suppression groupée");
+      return false;
+    } finally {
+      setIsLoading(false);
+      setDeleteProgress(null);
+    }
+  };
+
+  const handleCleanupExpiredJobs = async () => {
+    const parseLocalDate = (dateStr: string) => {
+      if (!dateStr || typeof dateStr !== 'string') return null;
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        const d = new Date(year, month, day);
+        if (!isNaN(d.getTime())) return d;
+      }
+      let d = new Date(dateStr);
+      if (!isNaN(d.getTime())) return d;
+      return null;
+    };
+
+    const now = new Date();
+    const expiredIds = jobsList
+      .filter(job => {
+        const d = parseLocalDate(job.deadline);
+        return d && d < now;
+      })
+      .map(j => j.id);
+
+    if (expiredIds.length === 0) {
+      setSuccessMessage("Aucune offre expirée à nettoyer !");
+      return;
+    }
+
+    await handleBulkDeleteJobs(expiredIds);
   };
 
   const handleUpdateJob = async (e: React.FormEvent) => {
@@ -549,6 +635,63 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
            </div>
         </header>
 
+        {deleteProgress && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+            <div className="bg-white rounded-3xl p-10 max-w-md w-full shadow-2xl border-4 border-black animate-in fade-in zoom-in duration-300">
+               <div className="flex flex-col items-center text-center">
+                  <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                    <Briefcase className="text-red-500" size={32} />
+                  </div>
+                  <h3 className="text-2xl font-black uppercase tracking-tighter mb-2">Suppression en cours...</h3>
+                  <p className="text-slate-500 font-bold mb-8">Veuillez ne pas fermer cette page pendant l'opération.</p>
+                  
+                  <div className="w-full bg-slate-100 h-6 rounded-full overflow-hidden border-2 border-black mb-4">
+                    <div 
+                      className="h-full bg-red-500 transition-all duration-500 ease-out shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
+                      style={{ width: `${Math.round((deleteProgress.current / deleteProgress.total) * 100)}%` }}
+                    />
+                  </div>
+                  
+                  <div className="flex justify-between w-full font-black text-sm uppercase tracking-widest text-slate-400">
+                    <span>{Math.round((deleteProgress.current / deleteProgress.total) * 100)}% Complété</span>
+                    <span>{deleteProgress.current} / {deleteProgress.total}</span>
+                  </div>
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Global Notifications */}
+        <div className="mb-8 space-y-4">
+          {successMessage && (
+            <div className="bg-green-50 border-2 border-green-500/20 p-4 rounded-xl flex items-center justify-between gap-3 text-green-700 font-bold animate-in slide-in-from-top-4 duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <Plus className="rotate-45" size={16} /> 
+                </div>
+                {successMessage}
+              </div>
+              <button onClick={() => setSuccessMessage('')} className="p-1 hover:bg-green-100 rounded-lg transition-colors">
+                <Plus className="rotate-45" size={18} />
+              </button>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="bg-red-50 border-2 border-red-500/20 p-4 rounded-xl flex items-center justify-between gap-3 text-red-700 font-bold animate-in slide-in-from-top-4 duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <AlertCircle size={16} />
+                </div>
+                {errorMessage}
+              </div>
+              <button onClick={() => setErrorMessage('')} className="p-1 hover:bg-red-100 rounded-lg transition-colors">
+                <Plus className="rotate-45" size={18} />
+              </button>
+            </div>
+          )}
+        </div>
+
         {activeTab === 'overview' && (
           <OverviewTab 
             stats={stats} 
@@ -599,6 +742,9 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             setJobsSearch={setJobsSearch}
             setEditingJob={setEditingJob}
             handleDeleteJob={handleDeleteJob}
+            handleBulkDeleteJobs={handleBulkDeleteJobs}
+            fetchJobs={fetchJobs}
+            handleCleanupExpiredJobs={handleCleanupExpiredJobs}
           />
         )}
 
