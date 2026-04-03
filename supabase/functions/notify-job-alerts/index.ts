@@ -98,13 +98,14 @@ serve(async (req) => {
         return { user_id: alert.user_id, status: 'error', error: 'No email' };
       }
 
-      console.log(`Sending alert for job "${job.job_title}" to ${user.email}`);
+      const senderEmail = Deno.env.get("SENDER_EMAIL") || "contact@djorssi-match.com";
 
       // Send Email via Resend
       const { data, error: sendError } = await resend.emails.send({
-        from: `Djorssi-Match <onboarding@resend.dev>`,
+        from: `Djorssi-Match <${senderEmail}>`,
         to: [user.email],
         subject: `Nouvelle offre : ${job.job_title} chez ${job.company_name}`,
+        text: `Bonjour,\n\nUne nouvelle offre d'emploi correspondant à vos secteurs d'intérêt vient d'être publiée :\n\n- Poste: ${job.job_title}\n- Entreprise: ${job.company_name}\n- Lieu: ${job.location || 'Côte d\'Ivoire'}\n${job.salary_range ? `- Salaire: ${job.salary_range}\n` : ''}\nVoir l'offre sur Djorssi-Match : https://djorssi-match.vercel.app/jobs/${job.id}\n\nVous recevez cet email car vous avez activé les alertes emplois pour : ${alert.sectors.join(', ')}.`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
             <h2 style="color: #f97316;">Nouveau Job Match !</h2>

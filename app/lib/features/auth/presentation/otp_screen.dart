@@ -21,24 +21,30 @@ class _OtpScreenState extends State<OtpScreen> {
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
 
-  String _translateAuthError(String message) {
-    final msg = message.toLowerCase();
+  String _translateAuthError(Object error) {
+    final String message = error.toString().toLowerCase();
 
-    if (msg.contains('token has expired') ||
-        msg.contains('invalid or expired') ||
-        msg.contains('is invalid')) {
+    if (message.contains('token has expired') ||
+        message.contains('invalid or expired') ||
+        message.contains('is invalid')) {
       return 'Le code est invalide ou a expiré.';
     }
-    if (msg.contains('rate limit'))
+    if (message.contains('rate limit')) {
       return 'Trop de tentatives, veuillez réessayer plus tard.';
-    if (msg.contains('network error') || msg.contains('failed host lookup')) {
-      return 'Erreur réseau. Vérifiez votre connexion internet.';
+    }
+    if (message.contains('network error') ||
+        message.contains('failed host lookup') ||
+        message.contains('socketexception') ||
+        message.contains('clientexception') ||
+        message.contains('authretryablefetchexception')) {
+      return 'Erreur réseau. Veuillez vérifier votre connexion internet.';
     }
 
-    // Log unexpected errors
-    debugPrint('Unexpected OTP Error: $message');
+    // Log unexpected errors for debugging
+    debugPrint('Unexpected OTP Error: $error');
 
-    return 'Erreur de vérification : $message';
+    // Clean up the error message if it started with "Exception: "
+    return 'Erreur : ${error.toString().replaceAll('Exception: ', '')}';
   }
 
   @override
@@ -93,20 +99,11 @@ class _OtpScreenState extends State<OtpScreen> {
           context.go('/complete-profile');
         }
       }
-    } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_translateAuthError(e.message)),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
+            content: Text(_translateAuthError(e)),
             backgroundColor: Theme.of(context).colorScheme.error,
             duration: const Duration(seconds: 4),
           ),
@@ -132,7 +129,7 @@ class _OtpScreenState extends State<OtpScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Un nouveau code a été envoyé à votre adresse e-mail',
+              'Un nouveau code a été envoyé. Vérifiez vos spams si vous ne le voyez pas.',
             ),
           ),
         );
@@ -141,7 +138,7 @@ class _OtpScreenState extends State<OtpScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
+            content: Text(_translateAuthError(e)),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -315,23 +312,36 @@ class _OtpScreenState extends State<OtpScreen> {
 
               TextButton(
                 onPressed: _isLoading ? null : _resendCode,
-                child: RichText(
-                  text: TextSpan(
-                    text: 'Vous n\'avez pas reçu le code ? ',
-                    style: TextStyle(
-                      color: const Color(0xFF64748B),
-                      fontSize: 14.sp,
-                    ),
-                    children: [
-                      TextSpan(
-                        text: 'Renvoyer',
+                child: Column(
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        text: 'Vous n\'avez pas reçu le code ? ',
                         style: TextStyle(
-                          color: Theme.of(context).primaryColor,
-                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF64748B),
+                          fontSize: 14.sp,
                         ),
+                        children: [
+                          TextSpan(
+                            text: 'Renvoyer',
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    SizedBox(height: 8.h),
+                    Text(
+                      '(Pensez à vérifier vos courriers indésirables/spams)',
+                      style: TextStyle(
+                        color: const Color(0xFF94A3B8),
+                        fontSize: 12.sp,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

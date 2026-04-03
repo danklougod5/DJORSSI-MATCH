@@ -17,15 +17,25 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
-  String _translateAuthError(String message) {
-    final msg = message.toLowerCase();
-    if (msg.contains('password should be at least 6 characters') ||
-        msg.contains('password should be at least 8 characters')) {
+  String _translateAuthError(Object error) {
+    final String message = error.toString().toLowerCase();
+    if (message.contains('password should be at least 6 characters') ||
+        message.contains('password should be at least 8 characters')) {
       return 'Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre.';
     }
-    if (msg.contains('rate limit'))
+    if (message.contains('rate limit')) {
       return 'Trop de tentatives, veuillez réessayer plus tard.';
-    return 'Erreur lors de la réinitialisation. Veuillez réessayer.';
+    }
+    if (message.contains('network error') ||
+        message.contains('failed host lookup') ||
+        message.contains('socketexception') ||
+        message.contains('clientexception') ||
+        message.contains('authretryablefetchexception')) {
+      return 'Erreur réseau. Veuillez vérifier votre connexion internet.';
+    }
+
+    debugPrint('Unexpected Reset Password Error: $error');
+    return 'Erreur : ${error.toString().replaceAll('Exception: ', '')}';
   }
 
   Future<void> _updatePassword() async {
@@ -92,20 +102,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         );
         context.go('/auth');
       }
-    } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_translateAuthError(e.message)),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Une erreur est survenue.'),
+          SnackBar(
+            content: Text(_translateAuthError(e)),
             backgroundColor: Colors.red,
           ),
         );

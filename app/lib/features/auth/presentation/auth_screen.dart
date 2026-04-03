@@ -18,48 +18,59 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isSignUp = false;
   bool _obscurePassword = true;
 
-  String _translateAuthError(String message) {
-    final msg = message.toLowerCase();
+  String _translateAuthError(Object error) {
+    final String message = error.toString().toLowerCase();
 
     // Auth specific errors
-    if (msg.contains('invalid login credentials'))
+    if (message.contains('invalid login credentials')) {
       return 'Email ou mot de passe incorrect.';
-    if (msg.contains('user already registered') ||
-        msg.contains('already registered') ||
-        msg.contains('email already exists') ||
-        msg.contains('compte existe déjà')) {
+    }
+    if (message.contains('user already registered') ||
+        message.contains('already registered') ||
+        message.contains('email already exists') ||
+        message.contains('compte existe déjà')) {
       return 'Cet utilisateur est déjà inscrit.';
     }
-    if (msg.contains('password should be at least 6 characters') ||
-        msg.contains('password should be at least 8 characters')) {
+    if (message.contains('password should be at least 6 characters') ||
+        message.contains('password should be at least 8 characters')) {
       return 'Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre.';
     }
-    if (msg.contains('rate limit'))
+    if (message.contains('rate limit')) {
       return 'Trop de tentatives, veuillez réessayer plus tard.';
-    if (msg.contains('email not confirmed'))
+    }
+    if (message.contains('email not confirmed')) {
       return 'Veuillez confirmer votre adresse email.';
-    if (msg.contains('invalid email') ||
-        msg.contains('invalid format') ||
-        msg.contains('unable to validate email address')) {
+    }
+    if (message.contains('invalid email') ||
+        message.contains('invalid format') ||
+        message.contains('unable to validate email address')) {
       return 'Adresse email invalide.';
     }
-    if (msg.contains('invalid or expired'))
+    if (message.contains('invalid or expired')) {
       return 'Lien ou code invalide/expiré.';
-    if (msg.contains('signup is disabled'))
+    }
+    if (message.contains('signup is disabled')) {
       return 'Les inscriptions sont temporairement désactivées.';
-    if (msg.contains('email provider is disabled'))
+    }
+    if (message.contains('email provider is disabled')) {
       return 'Le service d\'envoi d\'emails est désactivé.';
-    if (msg.contains('email sending failed'))
+    }
+    if (message.contains('email sending failed')) {
       return 'L\'envoi de l\'email a échoué. Veuillez contacter le support.';
-    if (msg.contains('network error') || msg.contains('failed host lookup')) {
-      return 'Erreur réseau. Vérifiez votre connexion internet.';
+    }
+    if (message.contains('network error') ||
+        message.contains('failed host lookup') ||
+        message.contains('socketexception') ||
+        message.contains('clientexception') ||
+        message.contains('authretryablefetchexception')) {
+      return 'Erreur réseau. Veuillez vérifier votre connexion internet.';
     }
 
     // Log the raw error for better debugging in console
-    debugPrint('Unexpected Auth Error: $message');
+    debugPrint('Unexpected Auth Error: $error');
 
     // If we don't know the error, we return a more informative message than a generic one
-    return 'Erreur d\'authentification : $message';
+    return 'Erreur : ${error.toString().replaceAll('Exception: ', '')}';
   }
 
   Future<void> _handleAuth() async {
@@ -167,7 +178,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Un code de confirmation a été envoyé à votre email.',
+                    'Un code a été envoyé. Vérifiez vos spams si vous ne le voyez pas.',
                   ),
                 ),
               );
@@ -214,38 +225,11 @@ class _AuthScreenState extends State<AuthScreen> {
           }
         }
       }
-    } on AuthException catch (e) {
-      if (mounted) {
-        final lowerMsg = e.message.toLowerCase();
-
-        if (lowerMsg.contains('email not confirmed')) {
-          context.push('/otp', extra: {'email': email});
-          return;
-        }
-
-        // Détection utilisateur existant lors de l'inscription
-        // Correction : Supabase renvoie les erreurs en anglais (GoTrue)
-        if (_isSignUp &&
-            (lowerMsg.contains('user already registered') ||
-                lowerMsg.contains('already registered') ||
-                lowerMsg.contains('email already exists') ||
-                lowerMsg.contains('compte existe déjà'))) {
-          _showUserExistsDialog(email);
-          return;
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_translateAuthError(e.message)),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
+            content: Text(_translateAuthError(e)),
             backgroundColor: Theme.of(context).colorScheme.error,
             duration: const Duration(seconds: 4),
           ),
@@ -320,17 +304,10 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Un lien de réinitialisation a été envoyé.'),
+            content: Text(
+              'Lien envoyé ! Vérifiez vos spams si vous ne le recevez pas.',
+            ),
             backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } on AuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_translateAuthError(e.message)),
-            backgroundColor: Colors.red,
           ),
         );
       }
@@ -338,9 +315,7 @@ class _AuthScreenState extends State<AuthScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Erreur: ${e.toString().replaceAll('Exception: ', '')}',
-            ),
+            content: Text(_translateAuthError(e)),
             backgroundColor: Colors.red,
           ),
         );

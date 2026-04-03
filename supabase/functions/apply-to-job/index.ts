@@ -367,8 +367,14 @@ ${applicantName}
 Email: ${userEmail}`;
 
     // 5. Send email via Resend
-    const targetEmail = "danklougod5@gmail.com";
-    console.log(`Sending email for job: ${jobTitle.replace(/[\n\r]/g, "")} to ${targetEmail} (original target was ${(jobContactEmail || "").replace(/[\n\r]/g, "")}) with ${attachments.length} attachment(s)...`);
+    if (!jobContactEmail || jobContactEmail.trim() === "") {
+      return new Response(
+        JSON.stringify({ error: "Aucune adresse email de recruteur fournie pour cette offre." }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+    const targetEmail = jobContactEmail.trim();
+    console.log(`Sending email for job: ${jobTitle.replace(/[\n\r]/g, "")} to ${targetEmail} with ${attachments.length} attachment(s)...`);
 
     // Removing accents from the applicantName and jobTitle just for the Email Subject/From metadata to guarantee delivery integrity
     const cleanName = applicantName.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -378,7 +384,7 @@ Email: ${userEmail}`;
       ? `Candidature : ${cleanTitle} - ${cleanName} (CV + Lettre de Motivation)`
       : `Candidature : ${cleanTitle} - ${cleanName}`;
 
-    const senderEmail = Deno.env.get("SENDER_EMAIL") || "candidature@djorssi-match.com";
+    const senderEmail = Deno.env.get("SENDER_EMAIL") || "contact@djorssi-match.com";
 
     const { data: resendData, error: resendError } = await resend.emails.send({
       from: `${cleanName} via Djorssi-Match <${senderEmail}>`,
