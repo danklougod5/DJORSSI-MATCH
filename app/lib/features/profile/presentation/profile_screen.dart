@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../../core/utils/error_translator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 
@@ -194,7 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       setState(() => _isUploading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur lors de l\'upload : $e')),
+          SnackBar(content: Text(ErrorTranslator.translate(e))),
         );
       }
     }

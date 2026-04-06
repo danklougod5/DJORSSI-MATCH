@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/utils/error_translator.dart';
 
 class OtpScreen extends StatefulWidget {
   final String email;
@@ -20,35 +22,43 @@ class _OtpScreenState extends State<OtpScreen> {
   );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
+  Timer? _timer;
+  int _secondsRemaining = 60;
+  bool _canResend = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    setState(() {
+      _secondsRemaining = 60;
+      _canResend = false;
+    });
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_secondsRemaining == 0) {
+        setState(() {
+          _canResend = true;
+          _timer?.cancel();
+        });
+      } else {
+        setState(() {
+          _secondsRemaining--;
+        });
+      }
+    });
+  }
 
   String _translateAuthError(Object error) {
-    final String message = error.toString().toLowerCase();
-
-    if (message.contains('token has expired') ||
-        message.contains('invalid or expired') ||
-        message.contains('is invalid')) {
-      return 'Le code est invalide ou a expiré.';
-    }
-    if (message.contains('rate limit')) {
-      return 'Trop de tentatives, veuillez réessayer plus tard.';
-    }
-    if (message.contains('network error') ||
-        message.contains('failed host lookup') ||
-        message.contains('socketexception') ||
-        message.contains('clientexception') ||
-        message.contains('authretryablefetchexception')) {
-      return 'Erreur réseau. Veuillez vérifier votre connexion internet.';
-    }
-
-    // Log unexpected errors for debugging
-    debugPrint('Unexpected OTP Error: $error');
-
-    // Clean up the error message if it started with "Exception: "
-    return 'Erreur : ${error.toString().replaceAll('Exception: ', '')}';
+    return ErrorTranslator.translate(error);
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
     for (var controller in _controllers) {
       controller.dispose();
     }
@@ -115,6 +125,8 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
   Future<void> _resendCode() async {
+    if (!_canResend) return;
+
     setState(() => _isLoading = true);
     try {
       await Supabase.instance.client.auth
@@ -125,6 +137,9 @@ class _OtpScreenState extends State<OtpScreen> {
               'Délai d\'attente dépassé pour l\'envoi du code.',
             ),
           );
+      
+      _startTimer();
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -311,7 +326,7 @@ class _OtpScreenState extends State<OtpScreen> {
               SizedBox(height: 32.h),
 
               TextButton(
-                onPressed: _isLoading ? null : _resendCode,
+                onPressed: (_isLoading || !_canResend) ? null : _resendCode,
                 child: Column(
                   children: [
                     RichText(
@@ -323,9 +338,11 @@ class _OtpScreenState extends State<OtpScreen> {
                         ),
                         children: [
                           TextSpan(
-                            text: 'Renvoyer',
+                            text: _canResend ? 'Renvoyer' : 'Attendez ${_secondsRemaining}s',
                             style: TextStyle(
-                              color: Theme.of(context).primaryColor,
+                              color: _canResend 
+                                ? Theme.of(context).primaryColor 
+                                : const Color(0xFF94A3B8),
                               fontWeight: FontWeight.w600,
                             ),
                           ),

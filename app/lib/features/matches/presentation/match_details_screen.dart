@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/utils/error_translator.dart';
 
 class MatchDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> match;
@@ -381,7 +382,7 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen> {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Détail : $e'),
+              content: Text(ErrorTranslator.translate(e)),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 4),
             ),

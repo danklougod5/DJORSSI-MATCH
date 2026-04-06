@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/utils/error_translator.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -19,58 +20,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _obscurePassword = true;
 
   String _translateAuthError(Object error) {
-    final String message = error.toString().toLowerCase();
-
-    // Auth specific errors
-    if (message.contains('invalid login credentials')) {
-      return 'Email ou mot de passe incorrect.';
-    }
-    if (message.contains('user already registered') ||
-        message.contains('already registered') ||
-        message.contains('email already exists') ||
-        message.contains('compte existe déjà')) {
-      return 'Cet utilisateur est déjà inscrit.';
-    }
-    if (message.contains('password should be at least 6 characters') ||
-        message.contains('password should be at least 8 characters')) {
-      return 'Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre.';
-    }
-    if (message.contains('rate limit')) {
-      return 'Trop de tentatives, veuillez réessayer plus tard.';
-    }
-    if (message.contains('email not confirmed')) {
-      return 'Veuillez confirmer votre adresse email.';
-    }
-    if (message.contains('invalid email') ||
-        message.contains('invalid format') ||
-        message.contains('unable to validate email address')) {
-      return 'Adresse email invalide.';
-    }
-    if (message.contains('invalid or expired')) {
-      return 'Lien ou code invalide/expiré.';
-    }
-    if (message.contains('signup is disabled')) {
-      return 'Les inscriptions sont temporairement désactivées.';
-    }
-    if (message.contains('email provider is disabled')) {
-      return 'Le service d\'envoi d\'emails est désactivé.';
-    }
-    if (message.contains('email sending failed')) {
-      return 'L\'envoi de l\'email a échoué. Veuillez contacter le support.';
-    }
-    if (message.contains('network error') ||
-        message.contains('failed host lookup') ||
-        message.contains('socketexception') ||
-        message.contains('clientexception') ||
-        message.contains('authretryablefetchexception')) {
-      return 'Erreur réseau. Veuillez vérifier votre connexion internet.';
-    }
-
-    // Log the raw error for better debugging in console
-    debugPrint('Unexpected Auth Error: $error');
-
-    // If we don't know the error, we return a more informative message than a generic one
-    return 'Erreur : ${error.toString().replaceAll('Exception: ', '')}';
+    return ErrorTranslator.translate(error);
   }
 
   Future<void> _handleAuth() async {

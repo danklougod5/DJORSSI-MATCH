@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import '../../../core/utils/error_translator.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -90,10 +91,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       if (mounted) {
         setState(() => _isLoadingTags = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Erreur de connexion : Impossible de charger les secteurs. Veuillez vérifier votre internet.',
-            ),
+          SnackBar(
+            content: Text(ErrorTranslator.translate(e)),
           ),
         );
       }
@@ -138,10 +137,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       debugPrint('Erreur lors du chargement du profil: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Erreur de connexion : Impossible de charger votre profil.',
-            ),
+          SnackBar(
+            content: Text(ErrorTranslator.translate(e)),
           ),
         );
       }
@@ -215,9 +212,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Erreur upload CV: Une connexion stable est requise.',
-            ),
+            content: Text(ErrorTranslator.translate(e)),
           ),
         );
       }
@@ -304,10 +299,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Erreur: Connexion internet instable. Veuillez réessayer.',
-            ),
+          SnackBar(
+            content: Text(ErrorTranslator.translate(e)),
           ),
         );
       }

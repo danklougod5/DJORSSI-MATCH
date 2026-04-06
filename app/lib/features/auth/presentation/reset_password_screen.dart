@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/utils/error_translator.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -18,24 +19,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _obscureConfirmPassword = true;
 
   String _translateAuthError(Object error) {
-    final String message = error.toString().toLowerCase();
-    if (message.contains('password should be at least 6 characters') ||
-        message.contains('password should be at least 8 characters')) {
-      return 'Le mot de passe doit contenir au moins 8 caractères, une majuscule et un chiffre.';
-    }
-    if (message.contains('rate limit')) {
-      return 'Trop de tentatives, veuillez réessayer plus tard.';
-    }
-    if (message.contains('network error') ||
-        message.contains('failed host lookup') ||
-        message.contains('socketexception') ||
-        message.contains('clientexception') ||
-        message.contains('authretryablefetchexception')) {
-      return 'Erreur réseau. Veuillez vérifier votre connexion internet.';
-    }
-
-    debugPrint('Unexpected Reset Password Error: $error');
-    return 'Erreur : ${error.toString().replaceAll('Exception: ', '')}';
+    return ErrorTranslator.translate(error);
   }
 
   Future<void> _updatePassword() async {
