@@ -297,10 +297,45 @@ class DjossiSwipeCard extends StatelessWidget {
 
                               if (applicationLink != null &&
                                   applicationLink!.isNotEmpty)
-                                _buildDetailBadge(
-                                  Icons.link,
-                                  "Candidature via lien externe",
-                                  color: Colors.blue.shade300,
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 12.w,
+                                    vertical: 8.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0EA5E9), // Bleu vif
+                                    borderRadius: BorderRadius.circular(10.r),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.open_in_new,
+                                        size: 16.r,
+                                        color: Colors.white,
+                                      ),
+                                      SizedBox(width: 6.w),
+                                      Flexible(
+                                        child: Text(
+                                          "Candidature via lien externe",
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13.sp,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                             ],
                           ),
