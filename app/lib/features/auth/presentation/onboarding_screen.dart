@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:djossimatch/features/auth/presentation/widgets/automatic_postulation_visual.dart';
+import 'package:djossimatch/features/auth/presentation/widgets/swipe_onboarding_visual.dart';
+import 'package:djossimatch/features/auth/presentation/widgets/match_onboarding_visual.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -12,6 +15,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  final int _totalPages = 3;
 
   @override
   void dispose() {
@@ -32,16 +36,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onPageChanged: (index) => setState(() => _currentPage = index),
                 children: [
                   _buildSlide(
-                    image: 'screen-removebg-preview',
-                    title: 'Swippez pour trouver\nvotre job',
+                    customVisual: const SwipeOnboardingVisual(),
+                    title: 'Swippez les meilleures offres',
                     description:
-                        'À droite pour postuler, à gauche pour ignorer. Trouver un Djorssi n\'a jamais été aussi simple.',
+                        'À droite pour postuler, à gauche pour ignorer. C\'est aussi simple que ça.',
                   ),
                   _buildSlide(
-                    image: 'onboarding_match new',
-                    title: 'Un Match, Une Opportunité',
+                    customVisual: const AutomaticPostulationVisual(),
+                    title: 'Swipez, c\'est postulé !',
                     description:
-                        'Dès qu\'une entreprise est intéressée par votre profil, c\'est un match ! Vous pouvez alors discuter.',
+                        'En swipant à droite, votre CV et votre lettre de motivation sont envoyés instantanément au recruteur.',
+                  ),
+                  _buildSlide(
+                    customVisual: const MatchOnboardingVisual(),
+                    title: 'Un match = Une postulation',
+                    description:
+                        'Dès qu\'un recruteur valide votre profil, c\'est un match ! Cela signifie que vous avez postulé avec succès.',
                   ),
                 ],
               ),
@@ -54,7 +64,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildSlide({
-    required String image,
+    String? image,
+    Widget? customVisual,
     required String title,
     required String description,
   }) {
@@ -63,17 +74,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // If images are missing, we should handle it gracefully or use icons
-          Image.asset(
-            'assets/images/$image.png',
-            height: 280.h,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => Icon(
-              image.contains('swipe') ? Icons.swipe : Icons.favorite,
-              size: 150.r,
-              color: const Color(0xFFF97316).withOpacity(0.2),
+          if (customVisual != null)
+            customVisual
+          else
+            Image.asset(
+              'assets/images/$image.png',
+              height: 280.h,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => Icon(
+                image?.contains('swipe') == true ? Icons.swipe : Icons.favorite,
+                size: 150.r,
+                color: const Color(0xFFF97316).withOpacity(0.2),
+              ),
             ),
-          ),
           SizedBox(height: 48.h),
           Text(
             title,
@@ -108,7 +121,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(2, (index) {
+            children: List.generate(_totalPages, (index) {
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 margin: EdgeInsets.symmetric(horizontal: 4.w),
@@ -128,7 +141,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                if (_currentPage < 1) {
+                if (_currentPage < _totalPages - 1) {
                   _pageController.nextPage(
                     duration: const Duration(milliseconds: 300),
                     curve: Curves.easeInOut,
@@ -147,7 +160,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
               child: Text(
-                _currentPage < 1 ? 'SUIVANT' : 'COMMENCER',
+                _currentPage < _totalPages - 1 ? 'SUIVANT' : 'COMMENCER',
                 style: TextStyle(
                   fontSize: 16.sp,
                   fontWeight: FontWeight.w900,
