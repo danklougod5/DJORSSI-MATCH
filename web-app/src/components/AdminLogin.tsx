@@ -7,7 +7,7 @@ interface AdminLoginProps {
   onBack: () => void;
 }
 
-const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBack }) => {
+const AdminLogin: React.FC<AdminLoginProps> = ({ onBack }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

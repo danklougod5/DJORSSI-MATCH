@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Download, Smartphone, Globe, MessageSquare, PlayCircle, Briefcase, X, Menu, Heart, Star, Zap, Bell, Quote } from 'lucide-react';
+import { Download, MessageSquare, PlayCircle, X, Menu, Heart, Zap, Quote, Bell } from 'lucide-react';
 import AppSimulator from './AppSimulator';
 
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.djossimatch.djossimatch';
@@ -25,13 +25,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description, col
   </div>
 );
 
-const ComparisonRow: React.FC<{ label: string, free: React.ReactNode, premium: React.ReactNode, isPremium?: boolean }> = ({ label, free, premium, isPremium }) => (
-  <div className="grid grid-cols-3 font-bold text-[10px] sm:text-sm leading-tight">
-    <div className="p-1.5 sm:p-4 border-r-2 border-black flex items-center bg-white">{label}</div>
-    <div className="p-1.5 sm:p-4 border-r-2 border-black text-center flex items-center justify-center bg-white">{free}</div>
-    <div className={`p-1.5 sm:p-4 text-center flex items-center justify-center ${isPremium ? 'bg-primary/10 text-primary' : 'bg-white'}`}>{premium}</div>
-  </div>
-);
+
 
 interface TestimonialProps {
   quote: string;

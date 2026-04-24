@@ -41,7 +41,7 @@ function App() {
 
     checkSession()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
       try {
         if (event === 'SIGNED_IN' && session) {
           // On ne remet PLUS isInitializing à true ici pour éviter de bloquer l'écran
