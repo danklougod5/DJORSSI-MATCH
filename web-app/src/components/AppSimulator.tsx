@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, X, MessageSquare, MapPin, Building2 } from 'lucide-react';
+import { Heart, X, MessageSquare, MapPin, Building2 } from 'lucide-react';
 
 
 interface Job {
@@ -146,7 +146,7 @@ const AppSimulator: React.FC = () => {
           onClick={() => handleSwipe('right')}
           className="w-20 h-20 rounded-full bg-secondary border-[3px] border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center text-white transition-all active:translate-x-1 active:translate-y-1 active:shadow-none shadow-secondary/20"
         >
-          <CheckCircle size={40} strokeWidth={3} />
+          <Heart size={40} strokeWidth={3} fill="currentColor" />
         </button>
       </div>
 
@@ -165,7 +165,7 @@ const AppSimulator: React.FC = () => {
                   <MessageSquare className="text-black" size={32} />
                 </div>
                 <h5 className="text-xl font-black mb-2 uppercase italic">MATCH PARFAIT !</h5>
-                <p className="font-bold text-sm">Ton CV a été envoyé au recruteur. 📩</p>
+                <p className="font-bold text-sm">Ton CV a été envoyé au recruteur.</p>
   
                 <div className="mt-4 pt-4 border-t-2 border-black/10">
                   <span className="text-xs font-black text-secondary tracking-widest">PATIENTE 24H</span>
