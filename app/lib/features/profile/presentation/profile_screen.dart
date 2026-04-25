@@ -155,6 +155,49 @@ class _ProfileScreenState extends State<ProfileScreen>
         }
 
         final file = File(path);
+        
+        // 1. Validation de la taille (max 5 Mo)
+        final size = await file.length();
+        if (size > 5 * 1024 * 1024) {
+          setState(() => _isUploading = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Erreur: Le fichier est trop volumineux (Maximum 5 Mo).')),
+            );
+          }
+          return;
+        }
+
+        // 2. Validation de la signature du fichier (Magic Bytes)
+        bool isValidFormat = false;
+        try {
+          final bytes = await file.openRead(0, 8).first;
+          // Check PDF: %PDF (25 50 44 46)
+          if (bytes.length >= 4 && bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46) {
+             isValidFormat = true;
+          }
+          // Check DOCX: PK\x03\x04 (50 4B 03 04)
+          else if (bytes.length >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
+             isValidFormat = true;
+          }
+          // Check DOC: D0 CF 11 E0 A1 B1 1A E1
+          else if (bytes.length >= 8 && bytes[0] == 0xD0 && bytes[1] == 0xCF && bytes[2] == 0x11 && bytes[3] == 0xE0) {
+             isValidFormat = true;
+          }
+        } catch (e) {
+          debugPrint('Erreur lors de la lecture des magic bytes: $e');
+        }
+
+        if (!isValidFormat) {
+          setState(() => _isUploading = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Fichier corrompu ou falsifié. Veuillez envoyer un vrai document PDF ou Word.')),
+            );
+          }
+          return;
+        }
+
         final fileExt = result.files.single.extension ?? 'pdf';
         final fileName = '${user.id}_cv.$fileExt';
         final filePath = 'cvs/$fileName';
