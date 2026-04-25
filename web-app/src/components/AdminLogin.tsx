@@ -92,43 +92,22 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onBack }) => {
     };
 
     const authAttempt = async () => {
-      console.log(`[AUTH] Tentative de connexion directe (fetch) pour ${email.trim()}...`);
+      console.log(`[AUTH] Tentative de connexion pour ${email.trim()}...`);
       const start = Date.now();
       try {
-        // Bypass SDK — appel direct à l'API auth car le SDK se bloque
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
-        const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-          },
-          body: JSON.stringify({
-            email: email.trim(),
-            password: password.trim(),
-          }),
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password.trim(),
         });
 
         const duration = Date.now() - start;
-        const result = await response.json();
-        console.log(`[AUTH] Réponse reçue en ${duration}ms, status: ${response.status}`);
+        console.log(`[AUTH] Réponse reçue en ${duration}ms`);
 
-        if (!response.ok) {
-          throw new Error(result.error_description || result.msg || result.error || 'Erreur d\'authentification');
+        if (error) {
+          throw new Error(error.message);
         }
 
-        // Injecter la session dans le client Supabase SDK - NE PAS ATTENDRE (A WAIT), cela deadlock le SDK parfois
-        if (result.access_token && result.refresh_token) {
-          console.log(`[AUTH] Token obtenu, injection asynchrone dans le SDK...`);
-          supabase.auth.setSession({
-            access_token: result.access_token,
-            refresh_token: result.refresh_token,
-          }).catch((err: any) => console.warn('[AUTH] setSession background catch:', err.message));
-        }
-
-        return { user: result.user, session: result };
+        return { user: data.user, session: data.session };
       } catch (e: any) {
         const duration = Date.now() - start;
         console.error(`[AUTH fail] Erreur après ${duration}ms:`, e.message);
@@ -223,21 +202,8 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onBack }) => {
           "la vérification du profil"
         );
         
-        // Bypass the SDK hang completely by writing directly to localStorage
-        console.log("[LOGIN] Authentification validée ! Mise à jour du stockage local...");
-        try {
-          localStorage.setItem('djorssi-admin-v2-auth', JSON.stringify(authData.session));
-          // Provide a non-blocking attempt to notify the SDK just in case, but don't await it
-          supabase.auth.setSession({
-            access_token: authData.session.access_token,
-            refresh_token: authData.session.refresh_token,
-          }).catch(console.warn);
-        } catch (storageErr) {
-          console.warn("[LOGIN] Avertissement accès localStorage: ", storageErr);
-        }
-
-        // Use standard window.location to force a full app reload with the new session
-        window.location.href = '/admin';
+        console.log("[LOGIN] Authentification validée !");
+        onLoginSuccess();
       } else {
         throw new Error("Authentification réussie mais données manquantes.");
       }

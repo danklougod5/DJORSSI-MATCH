@@ -372,6 +372,7 @@ const JobsTab: React.FC<JobsTabProps> = ({
                 const isSelected = selectedJobIds.includes(job.id);
                 const deadlineDate = parseDate(job.deadline);
                 const isExpired = deadlineDate && deadlineDate < new Date();
+                const isNew = job.created_at && (new Date().getTime() - new Date(job.created_at).getTime() < 48 * 60 * 60 * 1000);
 
                 return (
                   <tr 
@@ -379,7 +380,9 @@ const JobsTab: React.FC<JobsTabProps> = ({
                     className={`group transition-all border-l-4 ${
                       isSelected 
                         ? 'bg-primary/[0.02] border-primary ml-1' 
-                        : 'hover:bg-slate-50/50 border-transparent'
+                        : isNew 
+                          ? 'bg-green-50/10 border-green-400 hover:bg-green-50/30' 
+                          : 'hover:bg-slate-50/50 border-transparent'
                     } cursor-pointer select-none`}
                     onClick={() => toggleSelectJob(job.id)}
                   >
@@ -399,9 +402,12 @@ const JobsTab: React.FC<JobsTabProps> = ({
                           {job.company_name?.charAt(0) || <Briefcase size={16} />}
                         </div>
                         <div>
-                          <p className="font-black text-slate-900 text-sm leading-tight group-hover:text-primary transition-all truncate max-w-[200px]" title={job.job_title}>
-                            {job.job_title}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-black text-slate-900 text-sm leading-tight group-hover:text-primary transition-all truncate max-w-[150px]" title={job.job_title}>
+                              {job.job_title}
+                            </p>
+                            {isNew && <span className="bg-green-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 animate-pulse">NOUVEAU</span>}
+                          </div>
                           <p className="text-[10px] text-slate-400 mt-1 font-mono uppercase">#{job.id.substring(0, 8)}</p>
                         </div>
                       </div>

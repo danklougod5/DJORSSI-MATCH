@@ -41,17 +41,25 @@ function App() {
 
     checkSession()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any, session: any) => {
       try {
         if (event === 'SIGNED_IN' && session) {
           // On ne remet PLUS isInitializing à true ici pour éviter de bloquer l'écran
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('is_admin')
-            .eq('id', session.user.id)
-            .single()
-          
-          setIsAdmin(!!profile?.is_admin)
+          // On utilise setTimeout pour éviter le deadlock du SDK Supabase lors de signInWithPassword
+          setTimeout(async () => {
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('is_admin')
+                .eq('id', session.user.id)
+                .single()
+              
+              setIsAdmin(!!profile?.is_admin)
+            } catch (err) {
+              console.error("Auth change async error:", err)
+              setIsAdmin(false)
+            }
+          }, 0);
         } else if (event === 'SIGNED_OUT') {
           setIsAdmin(false)
           if (window.location.pathname.startsWith('/admin')) {

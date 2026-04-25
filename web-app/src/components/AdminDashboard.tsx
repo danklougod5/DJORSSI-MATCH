@@ -209,6 +209,8 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       tags: formData.get('tags') ? (formData.get('tags') as string).split(',').map(s => s.trim()) : []
     };
 
+    const rawUrl = item.urls && typeof item.urls === 'string' && item.urls.trim() !== '' ? item.urls.trim() : null;
+
     const jobData = {
       job_title: item.title || "Sans titre",
       company_name: item.company_name || "Non précisé",
@@ -216,13 +218,13 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       deadline: item.deadline || null,
       required_level: item.niveau || null,
       location: item.lieu || "Côte d'Ivoire",
-      source_url: item.urls || `manual_${Date.now()}`,
+      source_url: rawUrl || `manual_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
       is_ai_verified: true,
       tags: item.tags,
       contact_email: item.email || null,
       whatsapp_number: cleanPhone(item.contact as string),
       application_instructions: item.objet || null,
-      application_link: item.urls || null,
+      application_link: rawUrl || null,
       requires_cover_letter: !!item.lettre_motivation && String(item.lettre_motivation).toUpperCase() !== "NON",
       cover_letter_instructions: item.lettre_motivation || null,
       salary_range: item.salary_range || null,
@@ -231,7 +233,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     };
 
     try {
-      const { error } = await supabase.from('jobs').insert([jobData]);
+      const { error } = await supabase.from('jobs').upsert([jobData], { onConflict: 'source_url' });
       if (error) throw error;
       setSuccessMessage('L\'offre d\'emploi a été ajoutée avec succès !');
       (e.target as HTMLFormElement).reset();
@@ -419,28 +421,31 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         });
       }
 
-      const formattedJobs = jobsToAdd.map(item => ({
-        job_title: item.title || item.job_title || "Sans titre",
-        company_name: item.company_name || "Non précisé",
-        location: item.lieu || item.location || "Côte d'Ivoire",
-        description: item.summary || item.description || "",
-        tags: Array.isArray(item.tags) ? item.tags : (typeof item.tags === 'string' ? item.tags.split(',').map((s: any) => s.trim()) : []),
-        deadline: item.deadline || null,
-        whatsapp_number: cleanPhone(item.contact || item.whatsapp_number),
-        contact_email: item.email || item.contact_email || null,
-        application_instructions: item.objet || item.application_instructions || null,
-        required_level: item.niveau || item.required_level || null,
-        salary_range: item.salary_range || null,
-        is_ai_verified: true,
-        source_url: item.urls || `bulk_${Date.now()}`,
-        created_at: new Date().toISOString(),
-        raw_data: item
-      }));
+      const formattedJobs = jobsToAdd.map((item, index) => {
+        const rawUrl = item.urls && typeof item.urls === 'string' && item.urls.trim() !== '' ? item.urls.trim() : null;
+        return {
+          job_title: item.title || item.job_title || "Sans titre",
+          company_name: item.company_name || "Non précisé",
+          location: item.lieu || item.location || "Côte d'Ivoire",
+          description: item.summary || item.description || "",
+          tags: Array.isArray(item.tags) ? item.tags : (typeof item.tags === 'string' ? item.tags.split(',').map((s: any) => s.trim()) : []),
+          deadline: item.deadline || null,
+          whatsapp_number: cleanPhone(item.contact || item.whatsapp_number),
+          contact_email: item.email || item.contact_email || null,
+          application_instructions: item.objet || item.application_instructions || null,
+          required_level: item.niveau || item.required_level || null,
+          salary_range: item.salary_range || null,
+          is_ai_verified: true,
+          source_url: rawUrl || `bulk_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 8)}`,
+          created_at: new Date().toISOString(),
+          raw_data: item
+        };
+      });
 
-      const { error } = await supabase.from('jobs').insert(formattedJobs);
+      const { error } = await supabase.from('jobs').upsert(formattedJobs, { onConflict: 'source_url' });
       if (error) throw error;
 
-      setSuccessMessage(`${formattedJobs.length} offres ajoutées avec succès !`);
+      setSuccessMessage(`${formattedJobs.length} offres importées ou mises à jour avec succès !`);
       (e.target as HTMLFormElement).reset();
       fetchJobs();
     } catch (err: any) {
