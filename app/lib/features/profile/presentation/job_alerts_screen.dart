@@ -17,6 +17,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
   bool _isPremium = false;
   bool _alertsEnabled = true;
   final Set<String> _selectedSectors = {};
+  Map<String, int> _sectorCounts = {};
 
   List<String> _availableSectors = [];
 
@@ -48,7 +49,35 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
             uniqueTags.addAll(List<String>.from(row['tags']));
           }
         }
-        _availableSectors = uniqueTags.toList()..sort();
+        
+        final profilesResponse = await _supabase
+            .from('profiles')
+            .select('skills')
+            .limit(1000);
+
+        final Map<String, int> sectorCounts = {};
+        for (var row in profilesResponse as List) {
+          if (row['skills'] != null) {
+            for (var skill in List<String>.from(row['skills'])) {
+              if (skill.isNotEmpty) {
+                sectorCounts[skill] = (sectorCounts[skill] ?? 0) + 1;
+              }
+            }
+          }
+        }
+
+        final List<String> sortedTags = uniqueTags.toList();
+        sortedTags.sort((a, b) {
+          final countA = sectorCounts[a] ?? 0;
+          final countB = sectorCounts[b] ?? 0;
+          if (countA != countB) {
+            return countB.compareTo(countA); // Descending count
+          }
+          return a.compareTo(b); // Alphabetical
+        });
+
+        _availableSectors = sortedTags;
+        _sectorCounts = sectorCounts;
       } catch (e) {
         debugPrint('Erreur lors du chargement des tags dynamiques: $e');
         // Garder une liste vide ou fallback
@@ -176,7 +205,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 10,
                     offset: const Offset(0, -4),
                   ),
@@ -235,7 +264,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: Colors.white.withOpacity(0.7),
+      color: Colors.white.withValues(alpha: 0.7),
       child: Center(
         child: Container(
           margin: EdgeInsets.all(32.w),
@@ -245,7 +274,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
             borderRadius: BorderRadius.circular(32.r),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 30,
                 offset: const Offset(0, 10),
               ),
@@ -257,7 +286,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
               Container(
                 padding: EdgeInsets.all(20.r),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF97316).withOpacity(0.1),
+                  color: const Color(0xFFF97316).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -334,7 +363,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
         borderRadius: BorderRadius.circular(24.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -345,7 +374,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           Container(
             padding: EdgeInsets.all(12.r),
             decoration: BoxDecoration(
-              color: const Color(0xFFF97316).withOpacity(0.1),
+              color: const Color(0xFFF97316).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -379,7 +408,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           ),
           Switch.adaptive(
             value: _alertsEnabled,
-            activeColor: const Color(0xFFF97316),
+            activeTrackColor: const Color(0xFFF97316),
             onChanged: _isPremium
                 ? (val) => setState(() => _alertsEnabled = val)
                 : null,
@@ -390,46 +419,175 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
   }
 
   Widget _buildSectorsGrid() {
-    return Wrap(
-      spacing: 8.w,
-      runSpacing: 8.h,
-      children: _availableSectors.map((sector) {
-        final isSelected = _selectedSectors.contains(sector);
-        return FilterChip(
-          label: Text(sector),
-          selected: isSelected,
-          onSelected: (_isPremium && _alertsEnabled)
-              ? (val) {
-                  setState(() {
-                    if (val) {
-                      _selectedSectors.add(sector);
-                    } else {
-                      _selectedSectors.remove(sector);
+    final popularTags = _availableSectors
+        .where((tag) => (_sectorCounts[tag] ?? 0) > 0)
+        .take(8)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (popularTags.isNotEmpty) ...[
+          Row(
+            children: [
+              Text('🔥', style: TextStyle(fontSize: 18.sp)),
+              SizedBox(width: 6.w),
+              Text(
+                'Les plus populaires',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFF97316),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          Wrap(
+            spacing: 8.w,
+            runSpacing: 10.h,
+            children: popularTags.map((sector) {
+              return _buildPopularChip(sector);
+            }).toList(),
+          ),
+          SizedBox(height: 20.h),
+          const Divider(),
+          SizedBox(height: 16.h),
+          Text(
+            'Tous les secteurs :',
+            style: TextStyle(fontSize: 13.sp, color: Colors.grey),
+          ),
+          SizedBox(height: 12.h),
+        ],
+        Wrap(
+          spacing: 8.w,
+          runSpacing: 8.h,
+          children: _availableSectors.map((sector) {
+            final isSelected = _selectedSectors.contains(sector);
+            return FilterChip(
+              label: Text(sector),
+              selected: isSelected,
+              onSelected: (_isPremium && _alertsEnabled)
+                  ? (val) {
+                      setState(() {
+                        if (val) {
+                          _selectedSectors.add(sector);
+                        } else {
+                          _selectedSectors.remove(sector);
+                        }
+                      });
                     }
-                  });
+                  : null,
+              selectedColor: const Color(0xFFF97316).withValues(alpha: 0.15),
+              checkmarkColor: const Color(0xFFF97316),
+              labelStyle: TextStyle(
+                color: isSelected
+                    ? const Color(0xFFF97316)
+                    : const Color(0xFF64748B),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13.sp,
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(100.r),
+                side: BorderSide(
+                  color: isSelected
+                      ? const Color(0xFFF97316)
+                      : const Color(0xFFE2E8F0),
+                  width: isSelected ? 1.5 : 1,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPopularChip(String tag) {
+    final count = _sectorCounts[tag] ?? 0;
+    final isSelected = _selectedSectors.contains(tag);
+    return GestureDetector(
+      onTap: (_isPremium && _alertsEnabled)
+          ? () {
+              setState(() {
+                if (isSelected) {
+                  _selectedSectors.remove(tag);
+                } else {
+                  _selectedSectors.add(tag);
                 }
-              : null,
-          selectedColor: const Color(0xFFF97316).withOpacity(0.15),
-          checkmarkColor: const Color(0xFFF97316),
-          labelStyle: TextStyle(
+              });
+            }
+          : null,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [
+                    const Color(0xFFF97316),
+                    const Color(0xFFF97316).withValues(alpha: 0.8),
+                  ],
+                )
+              : const LinearGradient(
+                  colors: [Color(0xFFFFF7ED), Color(0xFFFEF3C7)],
+                ),
+          borderRadius: BorderRadius.circular(100.r),
+          border: Border.all(
             color: isSelected
                 ? const Color(0xFFF97316)
-                : const Color(0xFF64748B),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            fontSize: 13.sp,
+                : const Color(0xFFF97316).withValues(alpha: 0.4),
+            width: 1.5,
           ),
-          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(100.r),
-            side: BorderSide(
-              color: isSelected
-                  ? const Color(0xFFF97316)
-                  : const Color(0xFFE2E8F0),
-              width: isSelected ? 1.5 : 1,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFF97316).withValues(alpha: isSelected ? 0.25 : 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-          ),
-        );
-      }).toList(),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected)
+              Padding(
+                padding: EdgeInsets.only(right: 6.w),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 16.r,
+                ),
+              ),
+            Text(
+              tag,
+              style: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFFEA580C),
+                fontWeight: FontWeight.w700,
+                fontSize: 13.sp,
+              ),
+            ),
+            SizedBox(width: 6.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : const Color(0xFFF97316).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w900,
+                  color: isSelected ? Colors.white : const Color(0xFFF97316),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

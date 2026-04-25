@@ -18,6 +18,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _customSkillController = TextEditingController();
   List<String> _availableTags = [];
+  Map<String, int> _sectorCounts = {};
   String _searchQuery = '';
 
   final Set<String> _selectedTags = {};
@@ -83,6 +84,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       if (mounted) {
         setState(() {
           _availableTags = sortedTags;
+          _sectorCounts = sectorCounts;
           _isLoadingTags = false;
         });
       }
@@ -368,7 +370,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 10,
               offset: const Offset(0, -4),
             ),
@@ -384,7 +386,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               borderRadius: BorderRadius.circular(20.r),
             ),
             elevation: 4,
-            shadowColor: Theme.of(context).primaryColor.withOpacity(0.3),
+            shadowColor: Theme.of(context).primaryColor.withValues(alpha: 0.3),
           ),
           child: _isLoading
               ? const SizedBox(
@@ -576,10 +578,56 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                           SizedBox(height: 16.h),
                         ],
 
-                        // 2. Afficher les suggestions (limitées pour la performance)
+                        // 2. Section "Populaires" — les tags les plus choisis par les utilisateurs
+                        if (_searchQuery.isEmpty) ...[
+                          () {
+                            final popularTags = _availableTags
+                                .where((tag) =>
+                                    !_selectedTags.contains(tag) &&
+                                    (_sectorCounts[tag] ?? 0) > 0)
+                                .take(8)
+                                .toList();
+                            if (popularTags.isEmpty) return const SizedBox.shrink();
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      '🔥',
+                                      style: TextStyle(fontSize: 18.sp),
+                                    ),
+                                    SizedBox(width: 6.w),
+                                    Text(
+                                      'Les plus populaires',
+                                      style: TextStyle(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFFF97316),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 12.h),
+                                Wrap(
+                                  spacing: 8.w,
+                                  runSpacing: 10.h,
+                                  children: popularTags
+                                      .map((tag) => _buildPopularChip(tag))
+                                      .toList(),
+                                ),
+                                SizedBox(height: 20.h),
+                                const Divider(),
+                                SizedBox(height: 16.h),
+                              ],
+                            );
+                          }(),
+                        ],
+
+                        // 3. Afficher les suggestions restantes (limitées pour la performance)
                         Text(
                           _searchQuery.isEmpty
-                              ? 'Suggestions de secteurs :'
+                              ? 'Tous les secteurs :'
                               : 'Résultats de recherche :',
                           style: TextStyle(fontSize: 13.sp, color: Colors.grey),
                         ),
@@ -631,6 +679,86 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       borderSide: BorderSide.none,
     ),
   );
+
+  /// Chip pour les tags populaires — design accentué avec compteur
+  Widget _buildPopularChip(String tag) {
+    final count = _sectorCounts[tag] ?? 0;
+    final isSelected = _selectedTags.contains(tag);
+    return GestureDetector(
+      onTap: () => setState(
+        () => isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag),
+      ),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [
+                    Theme.of(context).primaryColor,
+                    Theme.of(context).primaryColor.withValues(alpha: 0.8),
+                  ],
+                )
+              : const LinearGradient(
+                  colors: [Color(0xFFFFF7ED), Color(0xFFFEF3C7)],
+                ),
+          borderRadius: BorderRadius.circular(100.r),
+          border: Border.all(
+            color: isSelected
+                ? Theme.of(context).primaryColor
+                : const Color(0xFFF97316).withValues(alpha: 0.4),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0xFFF97316).withValues(alpha: isSelected ? 0.25 : 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected)
+              Padding(
+                padding: EdgeInsets.only(right: 6.w),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 16.r,
+                ),
+              ),
+            Text(
+              tag,
+              style: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFFEA580C),
+                fontWeight: FontWeight.w700,
+                fontSize: 13.sp,
+              ),
+            ),
+            SizedBox(width: 6.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : const Color(0xFFF97316).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w900,
+                  color: isSelected ? Colors.white : const Color(0xFFF97316),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildSectorChip(String tag, bool isSelected) {
     final themeColor = Theme.of(context).primaryColor;

@@ -442,7 +442,12 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         };
       });
 
-      const { error } = await supabase.from('jobs').upsert(formattedJobs, { onConflict: 'source_url' });
+      // Dédoublonner par source_url pour éviter l'erreur "cannot affect row a second time"
+      const uniqueJobs = Array.from(
+        formattedJobs.reduce((map, job) => map.set(job.source_url, job), new Map()).values()
+      );
+
+      const { error } = await supabase.from('jobs').upsert(uniqueJobs, { onConflict: 'source_url' });
       if (error) throw error;
 
       setSuccessMessage(`${formattedJobs.length} offres importées ou mises à jour avec succès !`);
