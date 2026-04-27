@@ -39,7 +39,10 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     totalUsers: 0,
     premiumUsers: 0,
     activeJobs: 0,
-    pendingFeedback: 0
+    pendingFeedback: 0,
+    maleUsers: 0,
+    femaleUsers: 0,
+    iosWaitlist: 0
   });
 
   const [recentUsersList, setRecentUsersList] = useState<any[]>([]);
@@ -88,11 +91,19 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       const { count: premiumCount } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_premium', true);
       const { count: jobsCount } = await supabase.from('jobs').select('id', { count: 'exact', head: true });
       
+      const { count: maleCount } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).ilike('sexe', 'Homme');
+      const { count: femaleCount } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).ilike('sexe', 'Femme');
+      
+      const { count: iosWaitlistCount } = await supabase.from('ios_waitlist').select('id', { count: 'exact', head: true });
+
       setStats({
         totalUsers: usersCount || 0,
         premiumUsers: premiumCount || 0,
         activeJobs: jobsCount || 0,
-        pendingFeedback: 0
+        pendingFeedback: 0,
+        maleUsers: maleCount || 0,
+        femaleUsers: femaleCount || 0,
+        iosWaitlist: iosWaitlistCount || 0
       });
 
       const { data: userData } = await supabase

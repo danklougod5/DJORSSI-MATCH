@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, MessageSquare, PlayCircle, X, Menu, Heart, Zap, Quote, Bell } from 'lucide-react';
 import AppSimulator from './AppSimulator';
+import { supabase } from '../lib/supabase';
 
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.djossimatch.djossimatch';
 
@@ -47,13 +48,31 @@ const LandingPage: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [iosEmail, setIosEmail] = useState('');
-  const [iosSubmitted, setIosSubmitted] = useState(false);
+  const [iosSubmitted, setIosSubmitted] = useState<string | null>(null);
+  const [iosLoading, setIosLoading] = useState(false);
 
-  const handleIosNotify = (e: React.FormEvent) => {
+  const handleIosNotify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (iosEmail.trim()) {
-      setIosSubmitted(true);
-      setIosEmail('');
+    if (iosEmail.trim() && !iosLoading) {
+      setIosLoading(true);
+      try {
+        const { error } = await supabase.from('ios_waitlist').insert([{ email: iosEmail.trim() }]);
+        if (error) {
+          if (error.code === '23505' || error.message?.toLowerCase().includes('unique')) {
+            setIosSubmitted("Tu es déjà dans la course ! 🏁\nL'app iOS est prête et en cours de validation finale chez Apple. Encore un tout petit peu de patience, le Djorssi sur iPhone arrive très fort ! 🔥");
+          } else {
+            throw error;
+          }
+        } else {
+          setIosSubmitted("L'app iOS est PRÊTE ! 🔥\nElle est actuellement en cours de validation par Apple. Tu seras le TOUT PREMIER averti dès qu'elle est dispo. Ton futur job n'attend pas ! 🚀");
+        }
+        setIosEmail('');
+      } catch (error: any) {
+        console.error('Error adding to waitlist', error);
+        alert("Oups ! Une erreur s'est produite. Assure-toi d'être bien connecté(e) à internet.");
+      } finally {
+        setIosLoading(false);
+      }
     }
   };
 
@@ -168,6 +187,35 @@ const LandingPage: React.FC = () => {
                    En cours de validation
                 </div>
               </div>
+            </div>
+
+            {/* iOS Waitlist (Hero Section) */}
+            <div className="mt-8 max-w-md w-full border-t-2 border-black/10 pt-6">
+              <p className="text-slate-600 font-bold text-sm mb-3 uppercase tracking-wider">Tu es sur iPhone ? Liste d'attente :</p>
+              {iosSubmitted ? (
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="bg-green-100 border-2 border-green-500 rounded-xl px-4 py-3 shadow-[4px_4px_0px_0px_rgba(34,197,94,1)]"
+                >
+                  <p className="font-black text-green-700 text-sm leading-relaxed whitespace-pre-line">{iosSubmitted}</p>
+                </motion.div>
+              ) : (
+                <form onSubmit={handleIosNotify} className="flex gap-2">
+                  <input
+                    type="email"
+                    placeholder="Ton adresse email..."
+                    value={iosEmail}
+                    onChange={(e) => setIosEmail(e.target.value)}
+                    className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-300 bg-white text-black placeholder-slate-400 font-bold text-sm focus:outline-none focus:border-black focus:ring-2 focus:ring-black/20 transition-all shadow-sm"
+                    required
+                  />
+                  <button type="submit" disabled={iosLoading} className="neo-brutal-btn !py-3 !px-4 !text-sm flex items-center justify-center gap-2 shrink-0 disabled:opacity-50">
+                    <Bell size={16} />
+                    {iosLoading ? '...' : 'S\'INSCRIRE'}
+                  </button>
+                </form>
+              )}
             </div>
 
             <div className="mt-10 md:mt-14 grid grid-cols-3 min-[450px]:flex min-[450px]:flex-wrap items-center gap-y-8 gap-x-4 sm:gap-6 md:gap-8 justify-center lg:justify-start">
@@ -320,9 +368,13 @@ const LandingPage: React.FC = () => {
           <div className="mt-10 max-w-md mx-auto">
             <p className="text-slate-400 font-bold text-sm mb-3">Tu es sur iPhone ? Sois le premier averti :</p>
             {iosSubmitted ? (
-              <div className="bg-secondary/20 border-2 border-secondary rounded-xl px-6 py-4">
-                <p className="font-black text-secondary text-sm">C'est noté ! On te prévient dès que c'est dispo sur iOS.</p>
-              </div>
+              <motion.div 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="bg-secondary/20 border-2 border-secondary rounded-xl px-6 py-4 shadow-[4px_4px_0px_0px_rgba(var(--secondary-rgb),0.5)]"
+              >
+                <p className="font-black text-secondary text-sm leading-relaxed whitespace-pre-line">{iosSubmitted}</p>
+              </motion.div>
             ) : (
               <form onSubmit={handleIosNotify} className="flex gap-2">
                 <input
@@ -333,9 +385,9 @@ const LandingPage: React.FC = () => {
                   className="flex-1 px-4 py-3 rounded-xl border-2 border-white/20 bg-white/10 text-white placeholder-slate-500 font-bold text-sm focus:outline-none focus:border-primary"
                   required
                 />
-                <button type="submit" className="neo-brutal-btn !py-3 !px-6 !text-sm flex items-center gap-2 shrink-0">
+                <button type="submit" disabled={iosLoading} className="neo-brutal-btn !py-3 !px-6 !text-sm flex items-center gap-2 shrink-0 disabled:opacity-50">
                   <Bell size={16} />
-                  M'AVERTIR
+                  {iosLoading ? 'EN COURS...' : 'M\'AVERTIR'}
                 </button>
               </form>
             )}

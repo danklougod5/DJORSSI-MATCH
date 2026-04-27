@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, CreditCard, Briefcase, MessageSquare, ChevronRight } from 'lucide-react';
+import { Users, CreditCard, Briefcase, MessageSquare, ChevronRight, Smartphone } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import StatCard from './StatCard';
 
@@ -28,8 +28,11 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Utilisateurs" value={stats.totalUsers.toLocaleString()} icon={<Users />} color="bg-primary" trend="+12% cette semaine" />
         <StatCard title="Abonnés Premium" value={stats.premiumUsers.toLocaleString()} icon={<CreditCard />} color="bg-secondary" trend="+5% cette semaine" />
-        <StatCard title="Offres Actives" value={stats.activeJobs.toLocaleString()} icon={<Briefcase />} color="bg-secondary" trend="+24 ajoutées" />
+        <StatCard title="Attente iOS" value={stats.iosWaitlist.toLocaleString()} icon={<Smartphone />} color="bg-black" trend="Demandes iPhone" />
         <StatCard title="Messages" value={stats.pendingFeedback.toLocaleString()} icon={<MessageSquare />} color="bg-primary" trend="3 non lus" />
+        <StatCard title="Hommes" value={stats.maleUsers.toLocaleString()} icon={<Users />} color="bg-[#3B82F6]" trend="Sexe masculin" />
+        <StatCard title="Femmes" value={stats.femaleUsers.toLocaleString()} icon={<Users />} color="bg-[#EC4899]" trend="Sexe féminin" />
+        <StatCard title="Offres Actives" value={stats.activeJobs.toLocaleString()} icon={<Briefcase />} color="bg-secondary" trend="+24 ajoutées" />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
