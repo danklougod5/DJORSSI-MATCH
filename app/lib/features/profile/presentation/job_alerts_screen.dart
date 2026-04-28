@@ -83,15 +83,22 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
         // Garder une liste vide ou fallback
       }
 
-      // 2. Check if user is premium
+      // 2. Check if user is premium (with expiration check)
       final profile = await _supabase
           .from('profiles')
-          .select('is_premium, skills')
+          .select('is_premium, premium_until, skills')
           .eq('id', user.id)
           .maybeSingle();
 
       if (profile != null) {
-        _isPremium = profile['is_premium'] ?? false;
+        final isPremium = profile['is_premium'] ?? false;
+        final premiumUntilRaw = profile['premium_until'];
+        if (isPremium && premiumUntilRaw != null) {
+          final premiumUntil = DateTime.parse(premiumUntilRaw);
+          _isPremium = premiumUntil.isAfter(DateTime.now());
+        } else {
+          _isPremium = isPremium;
+        }
       }
 
       // 2. Load alerts

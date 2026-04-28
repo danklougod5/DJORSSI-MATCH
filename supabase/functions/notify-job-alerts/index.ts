@@ -88,8 +88,29 @@ serve(async (req) => {
       return new Response(JSON.stringify({ message: "No matching alerts" }), { status: 200 });
     }
 
-    // 3. For each matching user, get their email and send notification
+    // 3. For each matching user, check premium status and send notification
     const notifications = await Promise.all(alerts.map(async (alert) => {
+      // Check if user is still premium
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('is_premium, premium_until')
+        .eq('id', alert.user_id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error(`Could not find profile for user ${alert.user_id}`);
+        return { user_id: alert.user_id, status: 'skipped', reason: 'No profile' };
+      }
+
+      const isPremium = profile.is_premium ?? false;
+      const premiumUntil = profile.premium_until ? new Date(profile.premium_until) : null;
+      const isStillPremium = isPremium && (!premiumUntil || premiumUntil > new Date());
+
+      if (!isStillPremium) {
+        console.log(`User ${alert.user_id} is no longer premium, skipping notification.`);
+        return { user_id: alert.user_id, status: 'skipped', reason: 'Premium expired' };
+      }
+
       // Get user email from auth.users (requires service role / admin)
       const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.getUserById(alert.user_id);
       

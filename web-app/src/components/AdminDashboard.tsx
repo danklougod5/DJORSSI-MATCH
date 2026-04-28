@@ -244,12 +244,23 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     };
 
     try {
-      const { error } = await supabase.from('jobs').upsert([jobData], { onConflict: 'source_url' });
+      const { data: insertedJobs, error } = await supabase.from('jobs').upsert([jobData], { onConflict: 'source_url' }).select('id, tags');
       if (error) throw error;
       setSuccessMessage('L\'offre d\'emploi a été ajoutée avec succès !');
       (e.target as HTMLFormElement).reset();
       fetchStats();
-      fetchJobs(); 
+      fetchJobs();
+
+      // Notifier les utilisateurs Premium dont les secteurs matchent
+      if (insertedJobs && insertedJobs.length > 0) {
+        for (const job of insertedJobs) {
+          if (job.tags && job.tags.length > 0) {
+            supabase.functions.invoke('notify-job-alerts', { body: { job_id: job.id } })
+              .then((res: unknown) => console.log('[ALERTS] Notification envoyée pour job', job.id, res))
+              .catch((err: unknown) => console.error('[ALERTS] Erreur notification:', err));
+          }
+        }
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Erreur lors de l\'ajout de l\'offre');
     } finally {
@@ -458,12 +469,24 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         formattedJobs.reduce((map, job) => map.set(job.source_url, job), new Map()).values()
       );
 
-      const { error } = await supabase.from('jobs').upsert(uniqueJobs, { onConflict: 'source_url' });
+      const { data: insertedJobs, error } = await supabase.from('jobs').upsert(uniqueJobs, { onConflict: 'source_url' }).select('id, tags');
       if (error) throw error;
 
       setSuccessMessage(`${formattedJobs.length} offres importées ou mises à jour avec succès !`);
       (e.target as HTMLFormElement).reset();
       fetchJobs();
+
+      // Notifier les utilisateurs Premium pour chaque nouveau job avec tags
+      if (insertedJobs && insertedJobs.length > 0) {
+        console.log(`[ALERTS] Envoi des notifications pour ${insertedJobs.length} jobs...`);
+        for (const job of insertedJobs) {
+          if (job.tags && job.tags.length > 0) {
+            supabase.functions.invoke('notify-job-alerts', { body: { job_id: job.id } })
+              .then((res: unknown) => console.log('[ALERTS] Notification envoyée pour job', job.id, res))
+              .catch((err: unknown) => console.error('[ALERTS] Erreur notification:', err));
+          }
+        }
+      }
     } catch (err: any) {
       setErrorMessage("Erreur d'importation: " + err.message);
     } finally {

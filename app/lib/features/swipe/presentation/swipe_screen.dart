@@ -693,6 +693,146 @@ class _SwipeScreenState extends State<SwipeScreen> {
       'pmp',
       'prince2',
     ],
+    'hse': [
+      'hse',
+      'hygiène',
+      'sécurité',
+      'environnement',
+      'qualité',
+      'qhse',
+      'prévention',
+      'risques professionnels',
+      'audit sécurité',
+      'normes',
+      'iso',
+      'epi',
+    ],
+    'immobilier': [
+      'immobilier',
+      'investissement immobilier',
+      'real estate',
+      'foncier',
+      'promotion immobilière',
+      'gestion locative',
+      'transaction',
+      'patrimoine',
+      'aménagement',
+    ],
+    'mines': [
+      'mines',
+      'minier',
+      'extraction',
+      'géologie',
+      'forage',
+      'pétrole',
+      'gaz',
+      'pétrole et gaz',
+      'oil and gas',
+      'exploration',
+      'métallurgie',
+    ],
+    'agro-alimentaire': [
+      'agro-alimentaire',
+      'agroalimentaire',
+      'agro-industrie',
+      'agriculture',
+      'production alimentaire',
+      'conditionnement',
+      'qualité alimentaire',
+      'haccp',
+      'usine',
+      'transformation',
+    ],
+    'humanitaire': [
+      'humanitaire',
+      'ong',
+      'développement',
+      'aide humanitaire',
+      'coopération',
+      'programme',
+      'projet humanitaire',
+      'nations unies',
+      'onu',
+      'unicef',
+      'pam',
+      'solidarité',
+    ],
+    'assurance': [
+      'assurance',
+      'assurance vie',
+      'assurance santé',
+      'sinistre',
+      'souscription',
+      'courtier',
+      'actuariat',
+      'risque',
+      'police',
+      'indemnisation',
+      'réassurance',
+    ],
+    'microfinance': [
+      'microfinance',
+      'microcrédit',
+      'épargne',
+      'crédit',
+      'recouvrement',
+      'chef d\'agence',
+      'agent de crédit',
+      'portefeuille',
+      'mobile money',
+      'fintech',
+    ],
+    'communication': [
+      'communication',
+      'relations publiques',
+      'rp',
+      'presse',
+      'média',
+      'rédaction',
+      'événementiel',
+      'communication digitale',
+      'content',
+      'community manager',
+      'attaché de presse',
+      'communication visuelle',
+    ],
+    'achats': [
+      'achats',
+      'achat',
+      'procurement',
+      'approvisionnement',
+      'fournisseur',
+      'sourcing',
+      'négociation',
+      'capex',
+      'supply',
+      'appel d\'offres',
+    ],
+    'audit': [
+      'audit',
+      'audit interne',
+      'audit externe',
+      'contrôle interne',
+      'conformité',
+      'compliance',
+      'risque',
+      'coso',
+      'iia',
+      'inspection',
+      'vérification',
+    ],
+    'événementiel': [
+      'événementiel',
+      'événement',
+      'event',
+      'organisation',
+      'logistique événementielle',
+      'conférence',
+      'salon',
+      'spectacle',
+      'production',
+      'coordination',
+    ],
   };
 
   /// Vérifie si un tag est générique (non-sectoriel)
@@ -816,7 +956,25 @@ class _SwipeScreenState extends State<SwipeScreen> {
       return -100;
     }
 
-    return maxScore.clamp(0, 300).toInt();
+    // 5. BONUS PREMIUM : Les utilisateurs premium voient les offres récentes en priorité
+    if (_isPremium && hasSectorMatch) {
+      final createdAt = job['created_at'] as String?;
+      if (createdAt != null) {
+        try {
+          final jobDate = DateTime.parse(createdAt);
+          final hoursAgo = DateTime.now().difference(jobDate).inHours;
+          if (hoursAgo <= 24) {
+            // Job de moins de 24h → boost fort (apparaît en premier)
+            maxScore += 50;
+          } else if (hoursAgo <= 72) {
+            // Job de moins de 3 jours → boost léger
+            maxScore += 25;
+          }
+        } catch (_) {}
+      }
+    }
+
+    return maxScore.clamp(0, 400).toInt();
   }
 
   bool _onSwipe(
