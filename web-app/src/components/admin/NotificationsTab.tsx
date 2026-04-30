@@ -23,7 +23,7 @@ const NotificationsTab: React.FC = () => {
 
     try {
       // On appelle la Edge Function Supabase (qu'on va créer plus tard)
-      const { data, error: funcError } = await supabase.functions.invoke('send-broadcast-notification', {
+      const { error: funcError } = await supabase.functions.invoke('send-broadcast-notification', {
         body: { 
           title, 
           message, 

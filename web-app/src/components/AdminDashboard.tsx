@@ -610,7 +610,7 @@ reader.readAsText(file);
             message: "Votre compte est désormais Premium. Profitez de toutes les fonctionnalités Djorssi-Match ! 🚀",
             target: "premium" // Note: Currently sends to all premiums, but good for test
           }
-        }).catch(err => console.error("Error sending welcome notification:", err));
+        }).catch((err: any) => console.error("Error sending welcome notification:", err));
       }
 
       // Force refresh stats after successful update
@@ -949,7 +949,7 @@ reader.readAsText(file);
           />
         )}
 
-        {activeTab === 'job-metrics' && <JobMetricsTab stats={stats} />}
+        {activeTab === 'job-metrics' && <JobMetricsTab />}
         {activeTab === 'notifications' && <NotificationsTab />}
         {activeTab === 'settings' && (
           <SettingsTab 
