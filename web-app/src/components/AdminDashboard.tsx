@@ -709,7 +709,8 @@ reader.readAsText(file);
         .update({ 
           is_premium: true,
           premium_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        });
+        })
+        .eq('is_premium', false); // Ne touche QUE ceux qui n'ont pas déjà le premium !
 
       if (error) throw error;
       
@@ -723,6 +724,29 @@ reader.readAsText(file);
       });
 
       setSuccessMessage("Campagne lancée : Tous les utilisateurs sont Premium et notifiés !");
+      fetchStats();
+    } catch (err: any) {
+      setErrorMessage("Erreur: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRevokeCampaignPremium = async () => {
+    if (!window.confirm("Voulez-vous ANNULER l'offre et repasser en Gratuit les utilisateurs de la campagne (ceux dont le Premium expire dans moins de 25h) ?")) return;
+    try {
+      setIsLoading(true);
+      const tomorrow = new Date(Date.now() + 25 * 60 * 60 * 1000).toISOString();
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          is_premium: false,
+          premium_until: null
+        })
+        .lt('premium_until', tomorrow);
+
+      if (error) throw error;
+      setSuccessMessage("Campagne annulée : le Premium a été retiré avec succès pour ces utilisateurs.");
       fetchStats();
     } catch (err: any) {
       setErrorMessage("Erreur: " + err.message);
@@ -901,6 +925,7 @@ reader.readAsText(file);
             setActiveTab={setActiveTab} 
             onMakeMePremium={handleMakeMePremium}
             onMakeAllPremium={handleMakeAllPremium}
+            onRevokeCampaignPremium={handleRevokeCampaignPremium}
             isCampaignLoading={isLoading}
           />
         )}

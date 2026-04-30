@@ -13,6 +13,7 @@ interface OverviewTabProps {
   setActiveTab: (tab: any) => void;
   onMakeMePremium: () => void;
   onMakeAllPremium: () => void;
+  onRevokeCampaignPremium: () => void;
   isCampaignLoading: boolean;
 }
 
@@ -26,6 +27,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   setActiveTab,
   onMakeMePremium,
   onMakeAllPremium,
+  onRevokeCampaignPremium,
   isCampaignLoading
 }) => {
   return (
@@ -51,6 +53,13 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                   className="bg-white text-orange-600 hover:bg-orange-50 px-6 py-2.5 rounded-xl font-black text-sm shadow-lg shadow-orange-900/10 transition-all active:scale-95 disabled:opacity-50"
                >
                   {isCampaignLoading ? 'Opération en cours...' : 'OFFRIR PREMIUM À TOUS (24h)'}
+               </button>
+               <button 
+                  onClick={onRevokeCampaignPremium}
+                  disabled={isCampaignLoading}
+                  className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-red-500/20 transition-all active:scale-95 disabled:opacity-50"
+               >
+                  {isCampaignLoading ? '...' : 'Annuler l\'offre'}
                </button>
             </div>
          </div>
