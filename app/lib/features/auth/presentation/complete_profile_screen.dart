@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import '../../../core/services/profile_notifier.dart';
 import '../../../core/utils/error_translator.dart';
+import '../../../core/utils/tag_normalizer.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -19,6 +21,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final TextEditingController _customSkillController = TextEditingController();
   List<String> _availableTags = [];
   Map<String, int> _sectorCounts = {};
+  Map<String, int> _jobTagCounts = {};
   String _searchQuery = '';
 
   final Set<String> _selectedTags = {};
@@ -46,30 +49,46 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               'Délai d\'attente dépassé pour le chargement des secteurs.',
             ),
           );
-      final Set<String> uniqueTags = {};
-
+      // Collecter tous les tags bruts puis dédupliquer (case-insensitive)
+      final List<String> rawTags = [];
       for (var row in tagsResponse as List) {
         if (row['tags'] != null) {
-          uniqueTags.addAll(List<String>.from(row['tags']));
+          rawTags.addAll(List<String>.from(row['tags']));
+        }
+      }
+      // Normalisation : "informatique" et "Informatique" → "Informatique"
+      final uniqueTags = TagNormalizer.deduplicateTags(rawTags).toSet();
+
+      // 2. Calculer le volume de jobs par tag (Opportunités)
+      final Map<String, int> jobCounts = {};
+      for (var row in tagsResponse as List) {
+        if (row['tags'] != null) {
+          for (var tag in List<String>.from(row['tags'])) {
+            final normalized = TagNormalizer.normalizeDisplay(tag);
+            jobCounts[normalized] = (jobCounts[normalized] ?? 0) + 1;
+          }
         }
       }
 
-      // Fetch popular sectors across profiles to order tags
+      // 3. Récupérer les secteurs populaires chez les utilisateurs
       final profilesResponse = await Supabase.instance.client
           .from('profiles')
           .select('skills')
           .limit(1000);
 
-      final Map<String, int> sectorCounts = {};
+      final Map<String, int> rawSectorCounts = {};
       for (var row in profilesResponse as List) {
         if (row['skills'] != null) {
           for (var skill in List<String>.from(row['skills'])) {
             if (skill.isNotEmpty) {
-              sectorCounts[skill] = (sectorCounts[skill] ?? 0) + 1;
+              final normalized = TagNormalizer.normalizeDisplay(skill);
+              rawSectorCounts[normalized] =
+                  (rawSectorCounts[normalized] ?? 0) + 1;
             }
           }
         }
       }
+      final sectorCounts = rawSectorCounts;
 
       final List<String> sortedTags = uniqueTags.toList();
       sortedTags.sort((a, b) {
@@ -85,6 +104,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         setState(() {
           _availableTags = sortedTags;
           _sectorCounts = sectorCounts;
+          _jobTagCounts = jobCounts;
           _isLoadingTags = false;
         });
       }
@@ -128,8 +148,18 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           if (profile['skills'] != null) {
             final skills = List<String>.from(profile['skills']);
             for (var skill in skills) {
-              if (_availableTags.contains(skill)) {
-                _selectedTags.add(skill);
+              // Match case-insensitive contre les tags disponibles
+              final normalized = TagNormalizer.normalizeDisplay(skill);
+              final match = _availableTags.cast<String?>().firstWhere(
+                (t) => t != null &&
+                    TagNormalizer.normalizeKey(t) ==
+                        TagNormalizer.normalizeKey(skill),
+                orElse: () => null,
+              );
+              if (match != null) {
+                _selectedTags.add(match);
+              } else if (_availableTags.contains(normalized)) {
+                _selectedTags.add(normalized);
               }
             }
           }
@@ -268,17 +298,37 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
 
-    if (name.isEmpty ||
-        phone.isEmpty ||
-        _selectedGender == null ||
-        (_selectedTags.isEmpty && _customSkillController.text.isEmpty)) {
+    void showError(String message) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Veuillez remplir votre nom, téléphone, choisir votre sexe et un secteur.',
-          ),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.redAccent,
         ),
       );
+    }
+
+    if (name.isEmpty) {
+      showError('Veuillez renseigner votre nom complet.');
+      return;
+    }
+    if (phone.isEmpty) {
+      showError('Veuillez renseigner votre numéro de téléphone.');
+      return;
+    }
+    if (_selectedGender == null) {
+      showError('Veuillez choisir votre genre.');
+      return;
+    }
+    if (_selectedTags.isEmpty && _customSkillController.text.isEmpty) {
+      showError('Veuillez sélectionner au moins un secteur d\'activité.');
+      return;
+    }
+    if (_isUploadingCV) {
+      showError('Veuillez attendre la fin de l\'envoi de votre CV.');
+      return;
+    }
+    if (_cvUrl == null) {
+      showError('Veuillez ajouter votre CV pour postuler aux offres.');
       return;
     }
 
@@ -331,6 +381,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
             );
 
         if (mounted) {
+          // Signaler le changement globalement
+          ProfileNotifier.notifyProfileUpdated();
+
           // Si on peut revenir en arrière (appelé depuis ProfileScreen via push),
           // on pop pour retourner au profil et déclencher le rechargement
           if (Navigator.canPop(context)) {
@@ -449,7 +502,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
               ),
 
               SizedBox(height: 24.h),
-              _buildLabel('Votre Sexe'),
+              _buildLabel('Votre Genre'),
               Row(
                 children: [
                   Expanded(
@@ -616,9 +669,53 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                                       .map((tag) => _buildPopularChip(tag))
                                       .toList(),
                                 ),
-                                SizedBox(height: 20.h),
-                                const Divider(),
-                                SizedBox(height: 16.h),
+                                SizedBox(height: 24.h),
+                                // NOUVELLE SECTION : OPPORTUNITÉS (Jobs disponibles)
+                                () {
+                                  final highDemandTags = _availableTags
+                                      .where((tag) =>
+                                          !_selectedTags.contains(tag) &&
+                                          (_jobTagCounts[tag] ?? 0) > 1)
+                                      .toList();
+                                  highDemandTags.sort((a, b) => (_jobTagCounts[b] ?? 0).compareTo(_jobTagCounts[a] ?? 0));
+                                  final topOpportunities = highDemandTags.take(6).toList();
+                                  
+                                  if (topOpportunities.isEmpty) return const SizedBox.shrink();
+                                  
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            '💼',
+                                            style: TextStyle(fontSize: 18.sp),
+                                          ),
+                                          SizedBox(width: 6.w),
+                                          Text(
+                                            'Top opportunités (Offres)',
+                                            style: TextStyle(
+                                              fontSize: 14.sp,
+                                              fontWeight: FontWeight.w800,
+                                              color: const Color(0xFF0EA5E9),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 12.h),
+                                      Wrap(
+                                        spacing: 8.w,
+                                        runSpacing: 10.h,
+                                        children: topOpportunities
+                                            .map((tag) => _buildOpportunityChip(tag))
+                                            .toList(),
+                                      ),
+                                      SizedBox(height: 12.h),
+                                      const Divider(),
+                                      SizedBox(height: 16.h),
+                                    ],
+                                  );
+                                }(),
                               ],
                             );
                           }(),
@@ -680,6 +777,88 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     ),
   );
 
+  Widget _buildOpportunityChip(String tag) {
+    final count = _jobTagCounts[tag] ?? 0;
+    final isSelected = _selectedTags.contains(tag);
+    return GestureDetector(
+      onTap: () => setState(
+        () => isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag),
+      ),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [
+                    const Color(0xFF0EA5E9),
+                    const Color(0xFF0EA5E9).withValues(alpha: 0.8),
+                  ],
+                )
+              : const LinearGradient(
+                  colors: [Color(0xFFF0F9FF), Color(0xFFE0F2FE)],
+                ),
+          borderRadius: BorderRadius.circular(100.r),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF0EA5E9)
+                : const Color(0xFF0EA5E9).withValues(alpha: 0.4),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0EA5E9).withValues(alpha: isSelected ? 0.25 : 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected)
+              Padding(
+                padding: EdgeInsets.only(right: 6.w),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 16.r,
+                ),
+              ),
+            Flexible(
+              child: Text(
+                tag,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF0369A1),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.sp,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            SizedBox(width: 6.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : const Color(0xFF0EA5E9).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Text(
+                '$count jobs',
+                style: TextStyle(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w900,
+                  color: isSelected ? Colors.white : const Color(0xFF0369A1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Chip pour les tags populaires — design accentué avec compteur
   Widget _buildPopularChip(String tag) {
     final count = _sectorCounts[tag] ?? 0;
@@ -728,12 +907,15 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   size: 16.r,
                 ),
               ),
-            Text(
-              tag,
-              style: TextStyle(
-                color: isSelected ? Colors.white : const Color(0xFFEA580C),
-                fontWeight: FontWeight.w700,
-                fontSize: 13.sp,
+            Flexible(
+              child: Text(
+                tag,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFFEA580C),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.sp,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             SizedBox(width: 6.w),

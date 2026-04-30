@@ -11,6 +11,9 @@ interface OverviewTabProps {
   topSectors: any[];
   COLORS: string[];
   setActiveTab: (tab: any) => void;
+  onMakeMePremium: () => void;
+  onMakeAllPremium: () => void;
+  isCampaignLoading: boolean;
 }
 
 const OverviewTab: React.FC<OverviewTabProps> = ({
@@ -20,10 +23,39 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   recentUsersList,
   topSectors,
   COLORS,
-  setActiveTab
+  setActiveTab,
+  onMakeMePremium,
+  onMakeAllPremium,
+  isCampaignLoading
 }) => {
   return (
     <div className="space-y-8">
+      {/* Campaign Section */}
+      <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 rounded-3xl text-white shadow-xl shadow-orange-200">
+         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="text-center md:text-left">
+               <h3 className="text-xl font-black uppercase tracking-tight">Campagne Fête du Travail 🇨🇮</h3>
+               <p className="text-orange-100 font-medium text-sm mt-1">Offrez le Premium à tous vos utilisateurs pour célébrer l'événement !</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+               <button 
+                  onClick={onMakeMePremium}
+                  disabled={isCampaignLoading}
+                  className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all border border-white/20 disabled:opacity-50"
+               >
+                  {isCampaignLoading ? 'Chargement...' : 'Tester sur moi (24h)'}
+               </button>
+               <button 
+                  onClick={onMakeAllPremium}
+                  disabled={isCampaignLoading}
+                  className="bg-white text-orange-600 hover:bg-orange-50 px-6 py-2.5 rounded-xl font-black text-sm shadow-lg shadow-orange-900/10 transition-all active:scale-95 disabled:opacity-50"
+               >
+                  {isCampaignLoading ? 'Opération en cours...' : 'OFFRIR PREMIUM À TOUS (24h)'}
+               </button>
+            </div>
+         </div>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Utilisateurs" value={stats.totalUsers.toLocaleString()} icon={<Users />} color="bg-primary" trend="+12% cette semaine" />

@@ -14,6 +14,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:djossimatch/core/cache/local_cache.dart';
 import 'package:djossimatch/core/services/match_notifier.dart';
+import 'package:djossimatch/core/services/profile_notifier.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:in_app_review/in_app_review.dart';
+import 'package:djossimatch/core/utils/tag_normalizer.dart';
 
 class SwipeScreen extends StatefulWidget {
   const SwipeScreen({super.key});
@@ -32,12 +36,16 @@ class _SwipeScreenState extends State<SwipeScreen> {
   // Cache des scores de matching pour éviter les recalculs à chaque frame
   final Map<String, int> _matchScoreCache = {};
 
+  // Clé pour forcer la reconstruction du CardSwiper quand les secteurs changent
+  int _swiperKey = 0;
+
   // Nouveaux états pour le Premium
   int _swipeCount = 0;
   bool _isPremium = false;
   String? _cvUrl;
   String? _fullName;
   String? _sexe;
+  bool _hasUnreadNotifications = false;
 
   // File d'attente pour les envois d'email (éviter le rate-limiting)
   final List<Map<String, dynamic>> _emailQueue = [];
@@ -50,6 +58,49 @@ class _SwipeScreenState extends State<SwipeScreen> {
     super.initState();
     _loadData();
     _setupRealtime();
+    _listenToProfileChanges();
+    _checkUnreadNotifications();
+  }
+
+  Future<void> _checkUnreadNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastViewed = prefs.getString('last_notifications_view') ?? DateTime(2000).toIso8601String();
+      
+      final response = await _supabase
+          .from('notifications')
+          .select('created_at')
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response != null && mounted) {
+        final latestNotifDate = DateTime.parse(response['created_at']);
+        final lastViewedDate = DateTime.parse(lastViewed);
+        
+        setState(() {
+          _hasUnreadNotifications = latestNotifDate.isAfter(lastViewedDate);
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur check notifications: $e');
+    }
+  }
+
+  void _listenToProfileChanges() {
+    ProfileNotifier.stream.addListener(() {
+      if (mounted) {
+        debugPrint('*** [NOTIFIER] Changement de profil détecté via ProfileNotifier ! Rechargement... ***');
+        // Vider le cache de matching
+        _matchScoreCache.clear();
+        setState(() {
+          _isLoading = true;
+          _jobs = [];
+          _swiperKey++; // Force la reconstruction du CardSwiper
+        });
+        _loadData();
+      }
+    });
   }
 
   @override
@@ -69,6 +120,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
         .eq('id', userId)
         .listen((data) {
           if (data.isNotEmpty && mounted) {
+            // Détecter un changement de secteurs pour recharger les offres
+            final newSkills = List<String>.from(data.first['skills'] ?? []);
+            final oldSkills = List<String>.from(_userSkills);
+            final skillsChanged = !_listsEqual(oldSkills, newSkills);
+
             setState(() {
               final isPremium = data.first['is_premium'] ?? false;
               final premiumUntilRaw = data.first['premium_until'];
@@ -82,19 +138,51 @@ class _SwipeScreenState extends State<SwipeScreen> {
               _fullName = data.first['full_name'];
               _sexe = data.first['sexe'];
             });
+
+            // Si les secteurs ont changé → recharger complètement les offres
+            if (skillsChanged) {
+              debugPrint(
+                '*** [REALTIME] Changement de secteurs détecté ! Ancien: $oldSkills → Nouveau: $newSkills ***',
+              );
+              // 1. Mettre à jour immédiatement les skills AVANT _loadData
+              _userSkills = newSkills;
+              // 2. Vider le cache de matching (les scores sont obsolètes)
+              _matchScoreCache.clear();
+              // 3. Forcer le rechargement visuel complet
+              setState(() {
+                _isLoading = true;
+                _jobs = [];
+                _swiperKey++; // Force la reconstruction du CardSwiper
+              });
+              // 4. Recharger les offres avec les nouveaux secteurs
+              _loadData();
+            }
           }
         });
   }
 
+  /// Compare deux listes indépendamment de l'ordre
+  bool _listsEqual(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    final sortedA = List<String>.from(a)..sort();
+    final sortedB = List<String>.from(b)..sort();
+    for (int i = 0; i < sortedA.length; i++) {
+      if (sortedA[i] != sortedB[i]) return false;
+    }
+    return true;
+  }
+
   Future<void> _loadData() async {
-    // 0a. Charger d'abord les skills du cache pour pouvoir trier correctement
-    try {
-      final cachedSkills = await LocalCache.load(LocalCache.skillsKey);
-      if (cachedSkills != null && cachedSkills is List) {
-        _userSkills = List<String>.from(cachedSkills);
+    // 0a. Charger les skills du cache SEULEMENT si pas déjà définis (par le realtime)
+    if (_userSkills.isEmpty) {
+      try {
+        final cachedSkills = await LocalCache.load(LocalCache.skillsKey);
+        if (cachedSkills != null && cachedSkills is List) {
+          _userSkills = List<String>.from(cachedSkills);
+        }
+      } catch (e) {
+        debugPrint('Erreur lecture cache skills: $e');
       }
-    } catch (e) {
-      debugPrint('Erreur lecture cache skills: $e');
     }
 
     // 0b. Charger le cache jobs immédiatement pour un affichage instantané (même hors ligne)
@@ -191,7 +279,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       ).where((job) => !swipedJobIds.contains(job['id'].toString())).toList();
 
       // 4. Trier et FILTRER par matching pour tous les utilisateurs
-      if (_sectorSkills.isNotEmpty) {
+      if (_userSkills.isNotEmpty) {
         debugPrint('*** [MATCHING] Tags utilisateur (tous): $_userSkills ***');
         debugPrint(
           '*** [MATCHING] Tags sectoriels (pour le matching): $_sectorSkills ***',
@@ -240,16 +328,14 @@ class _SwipeScreenState extends State<SwipeScreen> {
           );
         }
 
-        // Si aucun job ne matche les secteurs, fallback : afficher tous les jobs
-        // (mieux que d'afficher un écran vide)
-        if (matchedJobs.isEmpty) {
+        // Si l'utilisateur a des skills mais aucun match, on ne montre rien
+        // pour éviter de proposer des offres "hors sujet" (dérive)
+        if (matchedJobs.isEmpty && _userSkills.isNotEmpty) {
           debugPrint(
-            '*** [MATCHING] ⚠️ Aucun job ne correspond aux secteurs sélectionnés. Affichage de tous les jobs. ***',
+            '*** [MATCHING] ⚠️ Aucun job ne correspond. On ne montre rien pour éviter la dérive. ***',
           );
-          allJobs.sort(
-            (a, b) => (b['created_at'] ?? '').compareTo(a['created_at'] ?? ''),
-          );
-        } else {
+          allJobs.clear();
+        } else if (matchedJobs.isNotEmpty) {
           allJobs
             ..clear()
             ..addAll(matchedJobs);
@@ -263,7 +349,18 @@ class _SwipeScreenState extends State<SwipeScreen> {
         setState(() {
           _jobs = allJobs;
           _isLoading = false;
+          _swiperKey++; // Force la reconstruction complète du swiper avec les nouvelles données
         });
+
+        // Afficher un petit message si aucune nouvelle offre n'a été trouvée
+        if (allJobs.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Scan terminé : aucune nouvelle offre correspondante.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Erreur lors du chargement réseau: $e');
@@ -284,560 +381,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
     }
   }
 
-  // Tags génériques qui ne représentent PAS un secteur d'activité
-  // et qui ne doivent PAS être utilisés pour le matching
-  static const Set<String> _genericTags = {
-    'stage',
-    'cdi',
-    'cdd',
-    'freelance',
-    'intérim',
-    'alternance',
-    'junior',
-    'senior',
-    'confirmé',
-    'expérimenté',
-    'débutant',
-    'temps plein',
-    'temps partiel',
-    'mi-temps',
-    'urgent',
-    'nouveau',
-    'premium',
-    'bilingue',
-    'anglais',
-    'français',
-    'allemand',
-    'bac',
-    'bac+2',
-    'bac+3',
-    'bac+4',
-    'bac+5',
-    'bepc',
-    'fodese',
-    'ong',
-    'start-up',
-  };
 
-  static const Map<String, List<String>> _skillKeywords = {
-    'informatique': [
-      'développeur',
-      'developer',
-      'software',
-      'web',
-      'mobile',
-      'fullstack',
-      'frontend',
-      'backend',
-      'devops',
-      'informatique',
-      'programmeur',
-      'data',
-      'cloud',
-      'système',
-      'sysadmin',
-      'it',
-      'tech',
-      'cybersécurité',
-      'base de données',
-      'api',
-      'intelligence artificielle',
-      'ia',
-      'machine learning',
-      'ida',
-    ],
-    'marketing': [
-      'marketing',
-      'community manager',
-      'community management',
-      'communication',
-      'seo',
-      'sem',
-      'publicité',
-      'brand',
-      'marque',
-      'social media',
-      'content',
-      'stratégie',
-      'campagne',
-      'emailing',
-      'crm',
-      'acquisition',
-      'growth',
-      'marketing digital',
-      'réseaux sociaux',
-    ],
-    'marketing digital': [
-      'marketing digital',
-      'marketing',
-      'community manager',
-      'community management',
-      'seo',
-      'sem',
-      'social media',
-      'réseaux sociaux',
-      'digital',
-      'content',
-      'création de contenu',
-    ],
-    'vente': [
-      'vente',
-      'commercial',
-      'vendeur',
-      'business',
-      'négociation',
-      'prospection',
-      'terrain',
-      'retail',
-      'b2b',
-      'b2c',
-      'account',
-      'sales',
-      'chiffre d\'affaires',
-      'objectif',
-      'télévente',
-      'télévendeur',
-      'closing',
-    ],
-    'commerce': [
-      'commerce',
-      'commercial',
-      'vente',
-      'distribution',
-      'magasin',
-      'boutique',
-      'caissier',
-      'merchandising',
-      'achat',
-      'négoce',
-      'grossiste',
-      'prospection',
-      'technico-commercial',
-    ],
-    'ressources humaines': [
-      'rh',
-      'ressources humaines',
-      'recrutement',
-      'paie',
-      'formation',
-      'talent',
-      'gpec',
-      'droit du travail',
-      'personnel',
-      'human resources',
-      'hr',
-      'onboarding',
-      'gestion du personnel',
-    ],
-    'rh': [
-      'rh',
-      'ressources humaines',
-      'recrutement',
-      'paie',
-      'formation',
-      'talent',
-      'gpec',
-      'personnel',
-      'human resources',
-      'hr',
-      'onboarding',
-    ],
-    'finance': [
-      'finance',
-      'comptable',
-      'comptabilité',
-      'audit',
-      'trésorerie',
-      'banque',
-      'investissement',
-      'budget',
-      'contrôle de gestion',
-      'fiscalité',
-      'analyste financier',
-      'risque',
-      'crédit',
-      'syscohada',
-      'ohada',
-    ],
-    'comptabilité': [
-      'comptabilité',
-      'comptable',
-      'audit',
-      'finance',
-      'trésorerie',
-      'budget',
-      'contrôle de gestion',
-      'fiscal',
-      'syscohada',
-      'ohada',
-      'assistanat comptable',
-    ],
-    'logistique': [
-      'logistique',
-      'supply chain',
-      'transport',
-      'approvisionnement',
-      'entrepôt',
-      'stock',
-      'manutention',
-      'livraison',
-      'import',
-      'export',
-      'douane',
-      'transit',
-      'fleet',
-    ],
-    'ingénierie': [
-      'ingénieur',
-      'engineering',
-      'technique',
-      'industriel',
-      'mécanique',
-      'électrique',
-      'civil',
-      'production',
-      'maintenance',
-      'qualité',
-      'process',
-      'automatisme',
-      'bureau d\'études',
-    ],
-    'design': [
-      'design',
-      'graphiste',
-      'graphique',
-      'ux',
-      'ui',
-      'créatif',
-      'directeur artistique',
-      'maquette',
-      'photoshop',
-      'figma',
-      'illustration',
-      'motion',
-      'webdesign',
-      'infographie',
-      'brand identity',
-      'communication visuelle',
-    ],
-    'infographie': [
-      'infographie',
-      'graphisme',
-      'graphiste',
-      'design',
-      'photoshop',
-      'illustrator',
-      'canva',
-      'communication visuelle',
-      'webmaster',
-    ],
-    'administration': [
-      'administratif',
-      'administration',
-      'secrétaire',
-      'assistant',
-      'bureau',
-      'accueil',
-      'office',
-      'coordination',
-      'gestion',
-      'archivage',
-      'courrier',
-      'standard',
-      'assistanat',
-      'secrétariat',
-    ],
-    'télécommunications': [
-      'télécom',
-      'télécommunication',
-      'télécoms',
-      'réseau',
-      'réseaux',
-      'fibre',
-      'fibre optique',
-      'antenne',
-      'opérateur',
-      'infrastructure',
-      'noc',
-      'radio',
-      '4g',
-      '5g',
-      'installation',
-    ],
-    'btp': [
-      'btp',
-      'bâtiment',
-      'construction',
-      'chantier',
-      'génie civil',
-      'architecte',
-      'conducteur de travaux',
-      'maçon',
-      'électricien',
-      'plombier',
-      'topographe',
-      'urbanisme',
-      'ouvrage',
-      'hydraulique',
-      'infrastructures',
-    ],
-    'génie civil': [
-      'génie civil',
-      'btp',
-      'bâtiment',
-      'construction',
-      'chantier',
-      'infrastructures',
-      'ouvrage',
-    ],
-    'santé': [
-      'santé',
-      'médecin',
-      'infirmier',
-      'pharmacie',
-      'hôpital',
-      'clinique',
-      'médical',
-      'soins',
-      'laboratoire',
-      'biologie',
-      'sage-femme',
-      'dentiste',
-      'paramédical',
-      'aide soignant',
-    ],
-    'éducation': [
-      'éducation',
-      'enseignant',
-      'professeur',
-      'formateur',
-      'formation',
-      'école',
-      'université',
-      'pédagogie',
-      'cours',
-      'académique',
-      'tuteur',
-      'éducateur',
-    ],
-    'juridique': [
-      'juridique',
-      'droit',
-      'avocat',
-      'juriste',
-      'contentieux',
-      'contrat',
-      'conformité',
-      'compliance',
-      'réglementation',
-      'notaire',
-      'huissier',
-      'légal',
-    ],
-    'banque & assurance': [
-      'banque',
-      'assurance',
-      'crédit',
-      'épargne',
-      'investissement',
-      'courtier',
-      'souscription',
-      'sinistre',
-      'risque',
-      'microfinance',
-      'fintech',
-      'agent bancaire',
-    ],
-    'transport': [
-      'transport',
-      'chauffeur',
-      'conducteur',
-      'routier',
-      'maritime',
-      'aérien',
-      'flotte',
-      'véhicule',
-      'livraison',
-      'coursier',
-      'dispatch',
-    ],
-    'hôtellerie': [
-      'hôtellerie',
-      'restauration',
-      'hôtel',
-      'restaurant',
-      'cuisine',
-      'chef',
-      'serveur',
-      'réception',
-      'tourisme',
-      'hébergement',
-      'bar',
-      'traiteur',
-      'catering',
-    ],
-    'sécurité': [
-      'sécurité',
-      'surveillance',
-      'gardiennage',
-      'agent de sécurité',
-      'vigile',
-    ],
-    'gestion de projet': [
-      'gestion de projet',
-      'chef de projet',
-      'project manager',
-      'scrum',
-      'agile',
-      'management',
-      'pmp',
-      'prince2',
-    ],
-    'hse': [
-      'hse',
-      'hygiène',
-      'sécurité',
-      'environnement',
-      'qualité',
-      'qhse',
-      'prévention',
-      'risques professionnels',
-      'audit sécurité',
-      'normes',
-      'iso',
-      'epi',
-    ],
-    'immobilier': [
-      'immobilier',
-      'investissement immobilier',
-      'real estate',
-      'foncier',
-      'promotion immobilière',
-      'gestion locative',
-      'transaction',
-      'patrimoine',
-      'aménagement',
-    ],
-    'mines': [
-      'mines',
-      'minier',
-      'extraction',
-      'géologie',
-      'forage',
-      'pétrole',
-      'gaz',
-      'pétrole et gaz',
-      'oil and gas',
-      'exploration',
-      'métallurgie',
-    ],
-    'agro-alimentaire': [
-      'agro-alimentaire',
-      'agroalimentaire',
-      'agro-industrie',
-      'agriculture',
-      'production alimentaire',
-      'conditionnement',
-      'qualité alimentaire',
-      'haccp',
-      'usine',
-      'transformation',
-    ],
-    'humanitaire': [
-      'humanitaire',
-      'ong',
-      'développement',
-      'aide humanitaire',
-      'coopération',
-      'programme',
-      'projet humanitaire',
-      'nations unies',
-      'onu',
-      'unicef',
-      'pam',
-      'solidarité',
-    ],
-    'assurance': [
-      'assurance',
-      'assurance vie',
-      'assurance santé',
-      'sinistre',
-      'souscription',
-      'courtier',
-      'actuariat',
-      'risque',
-      'police',
-      'indemnisation',
-      'réassurance',
-    ],
-    'microfinance': [
-      'microfinance',
-      'microcrédit',
-      'épargne',
-      'crédit',
-      'recouvrement',
-      'chef d\'agence',
-      'agent de crédit',
-      'portefeuille',
-      'mobile money',
-      'fintech',
-    ],
-    'communication': [
-      'communication',
-      'relations publiques',
-      'rp',
-      'presse',
-      'média',
-      'rédaction',
-      'événementiel',
-      'communication digitale',
-      'content',
-      'community manager',
-      'attaché de presse',
-      'communication visuelle',
-    ],
-    'achats': [
-      'achats',
-      'achat',
-      'procurement',
-      'approvisionnement',
-      'fournisseur',
-      'sourcing',
-      'négociation',
-      'capex',
-      'supply',
-      'appel d\'offres',
-    ],
-    'audit': [
-      'audit',
-      'audit interne',
-      'audit externe',
-      'contrôle interne',
-      'conformité',
-      'compliance',
-      'risque',
-      'coso',
-      'iia',
-      'inspection',
-      'vérification',
-    ],
-    'événementiel': [
-      'événementiel',
-      'événement',
-      'event',
-      'organisation',
-      'logistique événementielle',
-      'conférence',
-      'salon',
-      'spectacle',
-      'production',
-      'coordination',
-    ],
-  };
 
-  /// Vérifie si un tag est générique (non-sectoriel)
   bool _isGenericTag(String tag) {
-    return _genericTags.contains(tag.toLowerCase().trim());
+    return TagNormalizer.isGeneric(tag);
   }
 
   /// Retourne les skills de l'utilisateur en filtrant les tags génériques
@@ -846,18 +393,14 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   List<String> _getExpandedKeywords(String userSkill) {
-    final skillKey = userSkill.toLowerCase().trim();
-    return _skillKeywords[skillKey] ?? [skillKey];
+    return TagNormalizer.getExpandedKeywords(userSkill).toList();
   }
 
   int _calculateMatchScore(Map<String, dynamic> job) {
-    // Utiliser uniquement les skills sectoriels pour le matching
-    final effectiveSkills = _sectorSkills;
-    if (effectiveSkills.isEmpty)
-      return 50; // Si aucun secteur, score neutre pour tout montrer
+    if (_userSkills.isEmpty) return 50;
 
-    double maxScore = 0;
-    bool hasSectorMatch = false;
+    double totalScore = 0;
+    int matchesCount = 0;
 
     // Normalisation basique (minuscules)
     final jobTitle = (job['job_title'] as String?)?.toLowerCase().trim() ?? '';
@@ -868,113 +411,124 @@ class _SwipeScreenState extends State<SwipeScreen> {
       job['tags'] ?? [],
     ).map((t) => t.toLowerCase().trim()).toList();
 
-    // Filtrer les tags génériques du job aussi pour un matching plus pertinent
-    final jobSectorTags = allJobTags.where((t) => !_isGenericTag(t)).toList();
-
-    for (final skill in effectiveSkills) {
-      double currentSectorScore = 0;
+    // On matche contre TOUS les skills de l'utilisateur pour être plus précis
+    for (final skill in _userSkills) {
+      double currentSkillScore = 0;
       final skillLower = skill.toLowerCase().trim();
+      final isContractTag = _isContractType(skillLower);
+      
+      bool matchedThisSkill = false;
 
-      // 1. MATCH DIRECT PAR TAG SECTORIEL (PRIORITÉ ABSOLUE)
-      // Compare uniquement avec les tags sectoriels du job
-      for (final jobTag in jobSectorTags) {
-        if (jobTag == skillLower) {
-          // Match exact = score maximal
-          currentSectorScore += 300;
-          hasSectorMatch = true;
+      // 1. MATCH DIRECT PAR TAG (POIDS TRÈS FORT)
+      for (final jobTag in allJobTags) {
+        if (TagNormalizer.normalizeKey(jobTag) == TagNormalizer.normalizeKey(skillLower)) {
+          currentSkillScore += isContractTag ? 400 : 300;
+          matchedThisSkill = true;
           break;
-        } else if (jobTag.contains(skillLower) || skillLower.contains(jobTag)) {
-          // Match partiel (ex: "informatique" contenu dans "informatique de gestion")
-          currentSectorScore += 200;
-          hasSectorMatch = true;
+        }
+        // Match partiel uniquement pour les mots suffisamment longs
+        if (skillLower.length > 3 && (TagNormalizer.normalizeKey(jobTag).contains(TagNormalizer.normalizeKey(skillLower)) || TagNormalizer.normalizeKey(skillLower).contains(TagNormalizer.normalizeKey(jobTag)))) {
+          currentSkillScore += 150;
+          matchedThisSkill = true;
           break;
         }
       }
 
       // 2. MATCH PAR SPÉCIALITÉ (POIDS FORT)
-      if (jobSpecialty.isNotEmpty) {
-        if (jobSpecialty == skillLower) {
-          currentSectorScore += 150;
-          hasSectorMatch = true;
-        } else if (jobSpecialty.contains(skillLower) ||
-            skillLower.contains(jobSpecialty)) {
-          currentSectorScore += 80;
-          hasSectorMatch = true;
+      if (!matchedThisSkill && jobSpecialty.isNotEmpty) {
+        if (TagNormalizer.normalizeKey(jobSpecialty) == TagNormalizer.normalizeKey(skillLower)) {
+          currentSkillScore += 150;
+          matchedThisSkill = true;
+        } else if (skillLower.length > 3 && (TagNormalizer.normalizeKey(jobSpecialty).contains(TagNormalizer.normalizeKey(skillLower)) ||
+            TagNormalizer.normalizeKey(skillLower).contains(TagNormalizer.normalizeKey(jobSpecialty)))) {
+          currentSkillScore += 80;
+          matchedThisSkill = true;
         }
       }
 
-      // 3. RECHERCHE DE MOTS-CLÉS SPÉCIFIQUES AU SECTEUR (dans titre et tags)
-      final keywords = _getExpandedKeywords(skill);
-      int keywordHitsInTitle = 0;
-      int keywordHitsInTags = 0;
-
-      for (final keyword in keywords) {
-        final kw = keyword.toLowerCase();
-
-        // Poids fort si présent dans le titre du job
-        if (jobTitle.contains(kw)) {
-          keywordHitsInTitle++;
-        }
-
-        // Poids moyen si présent dans les tags du job
-        if (jobSectorTags.any((tag) => tag.contains(kw))) {
-          keywordHitsInTags++;
-        }
-      }
-
-      // Les mots-clés dans le titre comptent beaucoup
-      if (keywordHitsInTitle > 0) {
-        currentSectorScore += 60;
-        if (keywordHitsInTitle > 1) currentSectorScore += 20;
-        hasSectorMatch = true;
-      }
-      // Les mots-clés dans les tags comptent aussi
-      if (keywordHitsInTags > 0) {
-        currentSectorScore += 30;
-        hasSectorMatch = true;
-      }
-
-      // 4. Bonus léger si la description confirme le match (seulement si déjà matché)
-      if (hasSectorMatch && currentSectorScore > 0) {
-        int descHits = 0;
-        for (final keyword in keywords) {
-          if (jobDescription.contains(keyword.toLowerCase())) {
-            descHits++;
+      // 3. RECHERCHE DE MOTS-CLÉS (POIDS MOYEN)
+      if (!matchedThisSkill) {
+        final keywords = _getExpandedKeywords(skill);
+        for (final kw in keywords) {
+          final kwLower = kw.toLowerCase().trim();
+          if (_matchWord(jobTitle, kwLower)) {
+            currentSkillScore += 100;
+            matchedThisSkill = true;
+            break;
+          }
+          if (allJobTags.any((tag) => _matchWord(tag, kwLower))) {
+            currentSkillScore += 50;
+            matchedThisSkill = true;
+            break;
           }
         }
-        if (descHits > 0) currentSectorScore += 5;
       }
 
-      if (currentSectorScore > maxScore) {
-        maxScore = currentSectorScore;
+      // 4. Bonus Description
+      if (!matchedThisSkill || isContractTag) {
+        if (_matchWord(jobDescription, skillLower)) {
+          currentSkillScore += matchedThisSkill ? 20 : 40;
+          matchedThisSkill = true;
+        }
+      }
+
+      if (matchedThisSkill) {
+        totalScore += currentSkillScore;
+        matchesCount++;
       }
     }
 
-    // FILTRAGE STRICT : Les jobs sans AUCUN match sectoriel reçoivent
-    // un score de -100 pour être clairement séparés des offres pertinentes
-    if (!hasSectorMatch) {
+    // FILTRAGE STRICT : Si l'utilisateur a des critères mais qu'aucun ne matche ce job
+    if (matchesCount == 0 && _userSkills.isNotEmpty) {
       return -100;
     }
 
+    // BONUS MULTI-MATCH : On récompense les jobs qui cochent plusieurs cases
+    if (matchesCount > 1) {
+      totalScore += (matchesCount * 30);
+    }
+
     // 5. BONUS PREMIUM : Les utilisateurs premium voient les offres récentes en priorité
-    if (_isPremium && hasSectorMatch) {
+    if (_isPremium) {
       final createdAt = job['created_at'] as String?;
       if (createdAt != null) {
         try {
           final jobDate = DateTime.parse(createdAt);
           final hoursAgo = DateTime.now().difference(jobDate).inHours;
           if (hoursAgo <= 24) {
-            // Job de moins de 24h → boost fort (apparaît en premier)
-            maxScore += 50;
+            totalScore += 50;
           } else if (hoursAgo <= 72) {
-            // Job de moins de 3 jours → boost léger
-            maxScore += 25;
+            totalScore += 20;
           }
         } catch (_) {}
       }
     }
 
-    return maxScore.clamp(0, 400).toInt();
+    return totalScore.clamp(0, 1000).toInt();
+  }
+
+  bool _isContractType(String tag) {
+    return const {'cdd', 'cdi', 'stage', 'freelance', 'intérim', 'alternance'}
+        .contains(TagNormalizer.normalizeKey(tag));
+  }
+
+  /// Vérifie si un texte contient un mot ou pattern, avec gestion des frontières de mots
+  /// pour les mots courts afin d'éviter les faux positifs (ex: 'it' dans 'cuisine').
+  bool _matchWord(String text, String word) {
+    final textLower = text.toLowerCase();
+    final wordLower = TagNormalizer.normalizeKey(word);
+
+    if (wordLower.isEmpty) return false;
+
+    if (wordLower.length <= 3) {
+      // Pour les mots courts (it, rh, cdd, btp), on exige des frontières de mots via Regex
+      // \b assure que le mot est entouré d'espaces, ponctuation ou début/fin de ligne.
+      final escaped = RegExp.escape(wordLower);
+      return RegExp('\\b$escaped\\b', caseSensitive: false).hasMatch(textLower);
+    }
+
+    // Pour les mots longs, on accepte le contains standard pour plus de souplesse
+    return textLower.contains(wordLower);
   }
 
   bool _onSwipe(
@@ -1004,6 +558,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   void _handleSwipe(int index, String direction) {
+    if (index < 0 || index >= _jobs.length) return; // Sécurité anti-crash
     final job = _jobs[index];
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
@@ -1012,6 +567,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
     setState(() {
       _swipeCount++;
     });
+    
+    // Vérifier si on doit proposer de noter l'application
+    _checkAndPromptRating();
 
     // TOUTES les opérations DB en arrière-plan (fire-and-forget)
     _performSwipeDbOps(userId, job, direction);
@@ -1716,6 +1274,42 @@ class _SwipeScreenState extends State<SwipeScreen> {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          Stack(
+            children: [
+              IconButton(
+                onPressed: () async {
+                  await context.push('/notifications');
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('last_notifications_view', DateTime.now().toIso8601String());
+                  setState(() => _hasUnreadNotifications = false);
+                },
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: Color(0xFF0F172A),
+                  size: 26,
+                ),
+              ),
+              if (_hasUnreadNotifications)
+                Positioned(
+                  right: 12,
+                  top: 12,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 8,
+                      minHeight: 8,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(width: 8.w),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Container(
@@ -1754,12 +1348,13 @@ class _SwipeScreenState extends State<SwipeScreen> {
                                       maxWidth: 600,
                                     ),
                                     child: CardSwiper(
+                                      key: ValueKey(_swiperKey),
                                       controller: _controller,
                                       cardsCount: _jobs.length,
                                       onSwipe: _onSwipe,
-                                      numberOfCardsDisplayed: _jobs.length >= 3
-                                          ? 3
-                                          : _jobs.length,
+                                      numberOfCardsDisplayed: _jobs.isEmpty 
+                                          ? 1 
+                                          : (_jobs.length >= 3 ? 3 : _jobs.length),
                                       backCardOffset: const Offset(0, 40),
                                       duration: const Duration(
                                         milliseconds: 250,
@@ -1866,20 +1461,87 @@ class _SwipeScreenState extends State<SwipeScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.done_all, size: 80, color: Colors.green),
-          const SizedBox(height: 16),
-          const Text(
-            'Plus d\'offres pour le moment !',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Container(
+            padding: EdgeInsets.all(24.r),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF97316).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.auto_awesome,
+              size: 70.r,
+              color: const Color(0xFFF97316),
+            ),
           ),
-          const Text('Revenez plus tard pour de nouveaux Djorssis.'),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {
-              setState(() => _isLoading = true);
-              _loadData();
-            },
-            child: const Text('Actualiser'),
+          SizedBox(height: 24.h),
+          Text(
+            'Beau travail ! 🚀',
+            style: TextStyle(
+              fontSize: 24.sp,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF1E293B),
+            ),
+          ),
+          SizedBox(height: 12.h),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40.w),
+            child: Text(
+              'Vous avez parcouru toutes les offres correspondant à vos critères actuels. De nouvelles opportunités sont publiées chaque jour !',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15.sp,
+                color: const Color(0xFF475569), // Slate 600
+                height: 1.5,
+              ),
+            ),
+          ),
+          SizedBox(height: 40.h),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40.w),
+            child: Column(
+              children: [
+                Text(
+                  'Envie de découvrir plus ?',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF64748B), // Slate 500
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                ElevatedButton(
+                  onPressed: () => context.go('/?tab=profile'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E293B),
+                    foregroundColor: Colors.white,
+                    minimumSize: Size(double.infinity, 56.h),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16.r),
+                    ),
+                  ),
+                  child: Text(
+                    'Modifier mes secteurs d\'intérêt',
+                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() => _isLoading = true);
+                    _loadData();
+                  },
+                  icon: const Icon(Icons.refresh, size: 20),
+                  label: Text(
+                    'Lancer un nouveau scan',
+                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFF97316),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -2029,5 +1691,70 @@ class _SwipeScreenState extends State<SwipeScreen> {
           ),
       ],
     );
+  }
+
+  Future<void> _checkAndPromptRating() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      int swipeTotal = (prefs.getInt('swipe_total_count') ?? 0) + 1;
+      await prefs.setInt('swipe_total_count', swipeTotal);
+
+      // Proposer tous les 25 swipes (environ 2-3 sessions)
+      if (swipeTotal > 0 && swipeTotal % 25 == 0) {
+        _showRatingDialog();
+      }
+    } catch (e) {
+      debugPrint('Erreur check rating: $e');
+    }
+  }
+
+  void _showRatingDialog() {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+        title: const Row(
+          children: [
+            Icon(Icons.star_rounded, color: Colors.amber, size: 28),
+            SizedBox(width: 10),
+            Text('Aidez-nous !'),
+          ],
+        ),
+        content: const Text(
+          'Vous semblez apprécier Djorssi Match ! Pourriez-vous nous donner 5 étoiles ? Cela aide d\'autres personnes à trouver un emploi.',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Plus tard', style: TextStyle(color: Colors.grey.shade600)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _openStoreForRating();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF97316),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+            ),
+            child: const Text('Noter maintenant', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openStoreForRating() async {
+    final InAppReview inAppReview = InAppReview.instance;
+    try {
+      await inAppReview.openStoreListing(
+        appStoreId: '6740356525',
+      );
+    } catch (e) {
+      debugPrint('Erreur ouverture store: $e');
+    }
   }
 }

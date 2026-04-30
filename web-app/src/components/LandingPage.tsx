@@ -140,7 +140,7 @@ const LandingPage: React.FC = () => {
             <div className="inline-block neo-brutal-tag mb-6 md:mb-8 text-[10px] min-[400px]:text-xs sm:text-sm tracking-tight min-[400px]:tracking-widest leading-relaxed max-w-full whitespace-normal sm:whitespace-nowrap px-4 py-2 uppercase">
               +10 000 MATCHS RÉUSSIS EN CÔTE D'IVOIRE
             </div>
-            <h1 className="text-5xl md:text-7xl lg:text-8xl mb-6 md:mb-8 leading-[0.9] text-black italic">
+            <h1 className="text-4xl min-[400px]:text-5xl md:text-7xl lg:text-8xl mb-6 md:mb-8 leading-[0.9] text-black italic">
               TON PROCHAIN <span className="text-primary not-italic">Djorssi</span> EST À UN SWIPE.
             </h1>
             <p className="text-lg md:text-xl font-bold mb-8 md:mb-12 max-w-xl border-l-4 md:border-l-8 border-primary pl-4 md:pl-6 leading-snug">
@@ -151,23 +151,23 @@ const LandingPage: React.FC = () => {
                 href={PLAY_STORE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="neo-brutal-btn flex items-center justify-center gap-3 group w-full sm:w-auto no-underline"
+                className="neo-brutal-btn flex items-center justify-center gap-3 group w-full sm:w-auto no-underline !text-lg py-4"
               >
                 <Download size={24} />
-                Télécharger l'app
+                TÉLÉCHARGER
               </a>
               <button 
                 onClick={() => setIsVideoModalOpen(true)}
-                className="neo-brutal-btn-secondary flex items-center justify-center gap-3 w-full sm:w-auto"
+                className="neo-brutal-btn-secondary flex items-center justify-center gap-3 w-full sm:w-auto !text-lg py-4"
               >
                 <PlayCircle size={24} />
                 VOIR LA DÉMO
               </button>
             </div>
 
-            <div className="mt-8 flex flex-wrap items-center gap-4">
+            <div className="mt-8 flex flex-col min-[450px]:flex-row items-stretch min-[450px]:items-center gap-4">
               {/* Google Play */}
-              <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 bg-black text-white px-5 py-3 rounded-md border-2 border-black hover:scale-105 transition-transform no-underline shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center min-[450px]:justify-start gap-3 bg-black text-white px-5 py-3 rounded-md border-2 border-black hover:scale-105 transition-transform no-underline shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 0 1-.61-.92V2.734a1 1 0 0 1 .609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.199l2.302 2.302a1 1 0 0 1 0 1.38l-2.302 2.302L15.396 13l2.302-2.492zM5.864 2.658L16.8 8.99l-2.302 2.302L5.864 2.658z"/></svg>
                 <div className="text-left">
                   <div className="text-[10px] font-medium opacity-80 uppercase tracking-wider">Disponible sur</div>
@@ -176,7 +176,7 @@ const LandingPage: React.FC = () => {
               </a>
               
               {/* App Store - Coming Soon Styled */}
-              <div className="flex items-center gap-3 bg-slate-800 text-white px-5 py-3 rounded-md border-2 border-slate-700 opacity-80 animate-scintille shimmer-effect shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] cursor-help relative group">
+              <div className="flex items-center justify-center min-[450px]:justify-start gap-3 bg-slate-800 text-white px-5 py-3 rounded-md border-2 border-slate-700 opacity-80 animate-scintille shimmer-effect shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] cursor-help relative group">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.1 2.48-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.35-1.32-3.19-2.54-1.71-2.47-3.02-6.98-1.25-10.05.88-1.53 2.45-2.49 4.14-2.52 1.29-.02 2.5.87 3.29.87.79 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.31 2.81M15.96 3.54c.7-1 1.3-2.1 1.1-3.3-1 .1-2.3.8-3 1.8-.6.8-1.1 1.9-1 3 1 .1 2.2-.6 2.9-1.5z"/></svg>
                 <div className="text-left">
                   <div className="text-[10px] font-medium opacity-80 uppercase tracking-wider">Bientôt sur</div>
@@ -201,16 +201,16 @@ const LandingPage: React.FC = () => {
                   <p className="font-black text-green-700 text-sm leading-relaxed whitespace-pre-line">{iosSubmitted}</p>
                 </motion.div>
               ) : (
-                <form onSubmit={handleIosNotify} className="flex gap-2">
+                <form onSubmit={handleIosNotify} className="flex flex-col min-[450px]:flex-row gap-3 w-full">
                   <input
                     type="email"
                     placeholder="Ton adresse email..."
                     value={iosEmail}
                     onChange={(e) => setIosEmail(e.target.value)}
-                    className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-300 bg-white text-black placeholder-slate-400 font-bold text-sm focus:outline-none focus:border-black focus:ring-2 focus:ring-black/20 transition-all shadow-sm"
+                    className="w-full min-[450px]:flex-1 px-4 py-3 rounded-xl border-2 border-slate-300 bg-white text-black placeholder-slate-400 font-bold text-sm focus:outline-none focus:border-black focus:ring-2 focus:ring-black/20 transition-all shadow-sm"
                     required
                   />
-                  <button type="submit" disabled={iosLoading} className="neo-brutal-btn !py-3 !px-4 !text-sm flex items-center justify-center gap-2 shrink-0 disabled:opacity-50">
+                  <button type="submit" disabled={iosLoading} className="neo-brutal-btn !py-3 !px-6 !text-sm flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 w-full min-[450px]:w-auto">
                     <Bell size={16} />
                     {iosLoading ? '...' : 'S\'INSCRIRE'}
                   </button>
@@ -218,16 +218,16 @@ const LandingPage: React.FC = () => {
               )}
             </div>
 
-            <div className="mt-10 md:mt-14 grid grid-cols-3 min-[450px]:flex min-[450px]:flex-wrap items-center gap-y-8 gap-x-4 sm:gap-6 md:gap-8 justify-center lg:justify-start">
-              <div className="text-center shrink-0 border-r-2 border-black/10 min-[450px]:border-none pr-4 min-[450px]:p-0">
+            <div className="mt-10 md:mt-14 flex flex-wrap items-center gap-y-8 gap-x-4 sm:gap-6 md:gap-8 justify-center lg:justify-start">
+              <div className="text-center min-w-[80px] sm:min-w-0 border-r-2 border-black/10 sm:border-none pr-4 sm:p-0">
                 <div className="text-2xl min-[400px]:text-3xl md:text-4xl font-black italic">10K+</div>
                 <div className="text-[10px] sm:text-xs md:text-sm font-black uppercase text-slate-500 tracking-tighter">Matchs réussis</div>
               </div>
-              <div className="text-center shrink-0 border-x-2 border-black/10 min-[450px]:border-none px-4 min-[450px]:p-0">
+              <div className="text-center min-w-[80px] sm:min-w-0 border-r-2 border-black/10 sm:border-none px-4 sm:p-0">
                 <div className="text-2xl min-[400px]:text-3xl md:text-4xl font-black italic">24H</div>
                 <div className="text-[10px] sm:text-xs md:text-sm font-black uppercase text-slate-500 tracking-tighter">Réponse moyenne</div>
               </div>
-              <div className="text-center shrink-0 border-l-2 border-black/10 min-[450px]:border-none pl-4 min-[450px]:p-0">
+              <div className="text-center min-w-[80px] sm:min-w-0 pl-4 sm:p-0">
                 <div className="text-2xl min-[400px]:text-3xl md:text-4xl font-black italic">500+</div>
                 <div className="text-[10px] sm:text-xs md:text-sm font-black uppercase text-slate-500 tracking-tighter">Offres actives</div>
               </div>
@@ -376,16 +376,16 @@ const LandingPage: React.FC = () => {
                 <p className="font-black text-secondary text-sm leading-relaxed whitespace-pre-line">{iosSubmitted}</p>
               </motion.div>
             ) : (
-              <form onSubmit={handleIosNotify} className="flex gap-2">
+              <form onSubmit={handleIosNotify} className="flex flex-col min-[450px]:flex-row gap-3 w-full">
                 <input
                   type="email"
                   placeholder="Ton email..."
                   value={iosEmail}
                   onChange={(e) => setIosEmail(e.target.value)}
-                  className="flex-1 px-4 py-3 rounded-xl border-2 border-white/20 bg-white/10 text-white placeholder-slate-500 font-bold text-sm focus:outline-none focus:border-primary"
+                  className="w-full min-[450px]:flex-1 px-4 py-3 rounded-xl border-2 border-white/20 bg-white/10 text-white placeholder-slate-500 font-bold text-sm focus:outline-none focus:border-primary"
                   required
                 />
-                <button type="submit" disabled={iosLoading} className="neo-brutal-btn !py-3 !px-6 !text-sm flex items-center gap-2 shrink-0 disabled:opacity-50">
+                <button type="submit" disabled={iosLoading} className="neo-brutal-btn !py-3 !px-6 !text-sm flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 w-full min-[450px]:w-auto">
                   <Bell size={16} />
                   {iosLoading ? 'EN COURS...' : 'M\'AVERTIR'}
                 </button>

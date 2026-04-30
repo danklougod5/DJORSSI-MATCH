@@ -10,6 +10,7 @@ import 'package:djossimatch/features/auth/presentation/complete_profile_screen.d
 import 'package:djossimatch/features/auth/presentation/reset_password_screen.dart';
 import 'package:djossimatch/features/profile/presentation/job_alerts_screen.dart';
 import 'package:djossimatch/features/matches/presentation/match_details_screen.dart';
+import 'package:djossimatch/features/notifications/presentation/notification_screen.dart';
 import 'package:djossimatch/main.dart'; // To access MainNavigationScreen
 
 class AppRouter {
@@ -92,6 +93,10 @@ class AppRouter {
           final extras = state.extra as Map<String, dynamic>?;
           return MatchDetailsScreen(match: extras?['match'] ?? {});
         },
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationScreen(),
       ),
       GoRoute(
         path: '/',

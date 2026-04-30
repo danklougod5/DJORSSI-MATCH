@@ -10,6 +10,10 @@ import 'package:djossimatch/features/swipe/presentation/swipe_screen.dart';
 import 'package:djossimatch/features/matches/presentation/matches_screen.dart';
 import 'package:djossimatch/features/profile/presentation/profile_screen.dart';
 import 'package:djossimatch/core/routing/app_router.dart';
+import 'package:djossimatch/core/services/version_service.dart';
+import 'package:djossimatch/core/services/notification_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +36,16 @@ Future<void> main() async {
   }
 
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+
+  // Initialisation de Firebase
+  try {
+    await Firebase.initializeApp(
+       options: DefaultFirebaseOptions.currentPlatform,
+    );
+    await NotificationService.initialize();
+  } catch (e) {
+    debugPrint('Firebase initialization failed: $e');
+  }
 
   runApp(const DjorssiMatchApp());
 }
@@ -119,6 +133,22 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       const MatchesScreen(),
       const ProfileScreen(),
     ];
+
+    // Vérifier la version et mettre à jour le token de notification
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      VersionService.checkVersion(context);
+      NotificationService.updateToken();
+    });
+  }
+
+  @override
+  void didUpdateWidget(MainNavigationScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialIndex != widget.initialIndex) {
+      setState(() {
+        _selectedIndex = widget.initialIndex;
+      });
+    }
   }
 
   void _onItemTapped(int index) {

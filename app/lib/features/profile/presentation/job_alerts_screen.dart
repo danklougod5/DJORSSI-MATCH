@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/utils/tag_normalizer.dart';
 
 class JobAlertsScreen extends StatefulWidget {
   const JobAlertsScreen({super.key});
@@ -18,6 +19,10 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
   bool _alertsEnabled = true;
   final Set<String> _selectedSectors = {};
   Map<String, int> _sectorCounts = {};
+  Map<String, int> _jobTagCounts = {};
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
 
   List<String> _availableSectors = [];
 
@@ -25,6 +30,13 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
   void initState() {
     super.initState();
     _loadAlertsAndProfile();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAlertsAndProfile() async {
@@ -43,28 +55,38 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
               onTimeout: () =>
                   throw Exception('Délai d\'attente dépassé (secteurs)'),
             );
-        final Set<String> uniqueTags = {};
+        final List<String> rawTags = [];
+        final Map<String, int> jobCounts = {};
         for (var row in tagsResponse as List) {
           if (row['tags'] != null) {
-            uniqueTags.addAll(List<String>.from(row['tags']));
+            final tags = List<String>.from(row['tags']);
+            rawTags.addAll(tags);
+            for (var tag in tags) {
+              final normalized = TagNormalizer.normalizeDisplay(tag);
+              jobCounts[normalized] = (jobCounts[normalized] ?? 0) + 1;
+            }
           }
         }
+        final uniqueTags = TagNormalizer.deduplicateTags(rawTags).toSet();
+        _jobTagCounts = jobCounts;
         
         final profilesResponse = await _supabase
             .from('profiles')
             .select('skills')
             .limit(1000);
 
-        final Map<String, int> sectorCounts = {};
+        final Map<String, int> rawSectorCounts = {};
         for (var row in profilesResponse as List) {
           if (row['skills'] != null) {
             for (var skill in List<String>.from(row['skills'])) {
               if (skill.isNotEmpty) {
-                sectorCounts[skill] = (sectorCounts[skill] ?? 0) + 1;
+                final normalized = TagNormalizer.normalizeDisplay(skill);
+                rawSectorCounts[normalized] = (rawSectorCounts[normalized] ?? 0) + 1;
               }
             }
           }
         }
+        final sectorCounts = rawSectorCounts;
 
         final List<String> sortedTags = uniqueTags.toList();
         sortedTags.sort((a, b) {
@@ -80,7 +102,6 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
         _sectorCounts = sectorCounts;
       } catch (e) {
         debugPrint('Erreur lors du chargement des tags dynamiques: $e');
-        // Garder une liste vide ou fallback
       }
 
       // 2. Check if user is premium (with expiration check)
@@ -101,7 +122,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
         }
       }
 
-      // 2. Load alerts
+      // 3. Load alerts
       final response = await _supabase
           .from('job_alerts')
           .select()
@@ -112,12 +133,14 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
         setState(() {
           _alertsEnabled = response['is_active'] ?? true;
           final sectors = List<String>.from(response['sectors'] ?? []);
-          // On ne garde que les secteurs qui existent toujours
           for (var s in sectors) {
-            if (_availableSectors.contains(s)) _selectedSectors.add(s);
+            final match = _availableSectors.cast<String?>().firstWhere(
+              (sector) => sector != null && TagNormalizer.normalizeKey(sector) == TagNormalizer.normalizeKey(s),
+              orElse: () => null,
+            );
+            if (match != null) _selectedSectors.add(match);
           }
 
-          // Fallback : si rien n'est sélectionné mais que l'alerte est active, on pourrait pré-remplir
           if (_selectedSectors.isEmpty &&
               profile != null &&
               profile['skills'] != null) {
@@ -127,11 +150,14 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           }
         });
       } else if (profile != null && profile['skills'] != null) {
-        // Default: use sectors from profile
         setState(() {
           final profileSkills = List<String>.from(profile['skills']);
           for (var s in profileSkills) {
-            if (_availableSectors.contains(s)) _selectedSectors.add(s);
+            final match = _availableSectors.cast<String?>().firstWhere(
+              (sector) => sector != null && TagNormalizer.normalizeKey(sector) == TagNormalizer.normalizeKey(s),
+              orElse: () => null,
+            );
+            if (match != null) _selectedSectors.add(match);
           }
         });
       }
@@ -178,6 +204,23 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
     }
   }
 
+  /// Secteurs filtrés par la recherche
+  List<String> get _filteredSectors {
+    if (_searchQuery.isEmpty) return [];
+    final q = _searchQuery.toLowerCase().trim();
+    return _availableSectors
+        .where((s) => s.toLowerCase().contains(q))
+        .toList();
+  }
+
+  /// Top secteurs populaires (count > 0, max 10)
+  List<String> get _popularSectors {
+    return _availableSectors
+        .where((tag) => (_sectorCounts[tag] ?? 0) > 0)
+        .take(10)
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -198,7 +241,6 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      // Bouton fixé en bas, toujours visible
       bottomNavigationBar: (_isLoading || !_isPremium)
           ? null
           : Container(
@@ -226,44 +268,484 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
             )
           : Stack(
               children: [
-                SingleChildScrollView(
-                  padding: EdgeInsets.all(24.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildNotificationToggle(),
-                      SizedBox(height: 32.h),
-                      Text(
-                        'Secteurs d\'intérêt',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF0F172A),
+                GestureDetector(
+                  onTap: () => _searchFocus.unfocus(),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(24.w),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildNotificationToggle(),
+                        SizedBox(height: 32.h),
+
+                        // Mes secteurs sélectionnés
+                        if (_selectedSectors.isNotEmpty) ...[
+                          _buildSelectedSectorsSection(),
+                          SizedBox(height: 24.h),
+                        ],
+
+                        Text(
+                          'Secteurs d\'intérêt',
+                          style: TextStyle(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0F172A),
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 12.h),
-                      Text(
-                        'Choisissez les domaines pour lesquels vous souhaitez recevoir des alertes par email.',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          color: const Color(0xFF64748B),
+                        SizedBox(height: 8.h),
+                        Text(
+                          'Recherchez ou choisissez parmi les plus populaires.',
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            color: const Color(0xFF64748B),
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 24.h),
-                      _availableSectors.isEmpty
-                          ? const Text(
-                              "Aucun secteur disponible pour le moment.",
-                              style: TextStyle(color: Colors.grey),
-                            )
-                          : _buildSectorsGrid(),
-                      // Espace en bas pour que le contenu ne soit pas caché par le bouton
-                      SizedBox(height: 20.h),
-                    ],
+                        SizedBox(height: 16.h),
+
+                        // Barre de recherche
+                        _buildSearchBar(),
+                        SizedBox(height: 20.h),
+
+                        // Résultats de recherche ou populaires
+                        _availableSectors.isEmpty
+                            ? const Text(
+                                "Aucun secteur disponible pour le moment.",
+                                style: TextStyle(color: Colors.grey),
+                              )
+                            : _buildSectorsContent(),
+
+                        SizedBox(height: 20.h),
+                      ],
+                    ),
                   ),
                 ),
                 if (!_isPremium) _buildPremiumLocker(),
               ],
             ),
+    );
+  }
+
+  /// Barre de recherche stylée
+  Widget _buildSearchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(
+          color: _searchQuery.isNotEmpty
+              ? const Color(0xFFF97316)
+              : const Color(0xFFE2E8F0),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        focusNode: _searchFocus,
+        onChanged: (val) => setState(() => _searchQuery = val),
+        style: TextStyle(fontSize: 14.sp, color: const Color(0xFF0F172A)),
+        decoration: InputDecoration(
+          hintText: 'Rechercher un secteur...',
+          hintStyle: TextStyle(
+            color: const Color(0xFF94A3B8),
+            fontSize: 14.sp,
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: _searchQuery.isNotEmpty
+                ? const Color(0xFFF97316)
+                : const Color(0xFF94A3B8),
+            size: 22.r,
+          ),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: Icon(
+                    Icons.clear_rounded,
+                    color: const Color(0xFF94A3B8),
+                    size: 20.r,
+                  ),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                    _searchFocus.unfocus();
+                  },
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: 16.w,
+            vertical: 14.h,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Contenu principal : résultats de recherche ou populaires
+  Widget _buildSectorsContent() {
+    // Mode recherche
+    if (_searchQuery.isNotEmpty) {
+      final results = _filteredSectors;
+      if (results.isEmpty) {
+        return Container(
+          padding: EdgeInsets.all(24.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.search_off_rounded, size: 40.r, color: const Color(0xFF94A3B8)),
+              SizedBox(height: 12.h),
+              Text(
+                'Aucun secteur trouvé pour "$_searchQuery"',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: const Color(0xFF64748B),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${results.length} résultat${results.length > 1 ? 's' : ''}',
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: const Color(0xFF94A3B8),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: 10.h),
+          Wrap(
+            spacing: 8.w,
+            runSpacing: 10.h,
+            children: results.map((sector) {
+              final count = _sectorCounts[sector] ?? 0;
+              return count > 0
+                  ? _buildPopularChip(sector)
+                  : _buildSimpleChip(sector);
+            }).toList(),
+          ),
+        ],
+      );
+    }
+
+    // Mode par défaut : populaires seulement
+    final popular = _popularSectors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (popular.isNotEmpty) ...[
+          Row(
+            children: [
+              Text('🔥', style: TextStyle(fontSize: 18.sp)),
+              SizedBox(width: 6.w),
+              Text(
+                'Les plus choisis',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFF97316),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          Wrap(
+            spacing: 8.w,
+            runSpacing: 10.h,
+            children: popular.map((sector) => _buildPopularChip(sector)).toList(),
+          ),
+          SizedBox(height: 24.h),
+          // NOUVELLE SECTION : OPPORTUNITÉS (Jobs disponibles)
+          () {
+            final highDemandTags = _availableSectors
+                .where((tag) =>
+                    !_selectedSectors.contains(tag) &&
+                    (_jobTagCounts[tag] ?? 0) > 1)
+                .toList();
+            highDemandTags.sort((a, b) => (_jobTagCounts[b] ?? 0).compareTo(_jobTagCounts[a] ?? 0));
+            final topOpportunities = highDemandTags.take(6).toList();
+            
+            if (topOpportunities.isEmpty) return const SizedBox.shrink();
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      '💼',
+                      style: TextStyle(fontSize: 18.sp),
+                    ),
+                    SizedBox(width: 6.w),
+                    Text(
+                      'Top opportunités (Offres)',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0EA5E9),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12.h),
+                Wrap(
+                  spacing: 8.w,
+                  runSpacing: 10.h,
+                  children: topOpportunities
+                      .map((tag) => _buildOpportunityChip(tag))
+                      .toList(),
+                ),
+                SizedBox(height: 12.h),
+              ],
+            );
+          }(),
+          SizedBox(height: 20.h),
+          Container(
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 18.r, color: const Color(0xFF64748B)),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: Text(
+                    'Utilisez la barre de recherche pour trouver d\'autres secteurs.',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (popular.isEmpty)
+          const Text(
+            "Aucun secteur populaire pour le moment.",
+            style: TextStyle(color: Colors.grey),
+          ),
+      ],
+    );
+  }
+
+  /// Section "Mes secteurs sélectionnés" en haut
+  Widget _buildSelectedSectorsSection() {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(
+          color: const Color(0xFFF97316).withValues(alpha: 0.2),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF97316).withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: const Color(0xFF22C55E), size: 20.r),
+              SizedBox(width: 8.w),
+              Text(
+                'Mes alertes (${_selectedSectors.length})',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          Wrap(
+            spacing: 6.w,
+            runSpacing: 6.h,
+            children: _selectedSectors.map((sector) {
+              return Container(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF97316).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(100.r),
+                  border: Border.all(
+                    color: const Color(0xFFF97316).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      sector,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFFEA580C),
+                      ),
+                    ),
+                    if (_isPremium && _alertsEnabled) ...[
+                      SizedBox(width: 4.w),
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedSectors.remove(sector)),
+                        child: Icon(
+                          Icons.close_rounded,
+                          size: 14.r,
+                          color: const Color(0xFFF97316),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimpleChip(String sector) {
+    final isSelected = _selectedSectors.contains(sector);
+    return FilterChip(
+      label: Text(sector),
+      selected: isSelected,
+      onSelected: (_isPremium && _alertsEnabled)
+          ? (val) {
+              setState(() {
+                if (val) {
+                  _selectedSectors.add(sector);
+                } else {
+                  _selectedSectors.remove(sector);
+                }
+              });
+            }
+          : null,
+      selectedColor: const Color(0xFFF97316).withValues(alpha: 0.15),
+      checkmarkColor: const Color(0xFFF97316),
+      labelStyle: TextStyle(
+        color: isSelected
+            ? const Color(0xFFF97316)
+            : const Color(0xFF64748B),
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 13.sp,
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(100.r),
+        side: BorderSide(
+          color: isSelected
+              ? const Color(0xFFF97316)
+              : const Color(0xFFE2E8F0),
+          width: isSelected ? 1.5 : 1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOpportunityChip(String tag) {
+    final count = _jobTagCounts[tag] ?? 0;
+    final isSelected = _selectedSectors.contains(tag);
+    return GestureDetector(
+      onTap: (_isPremium && _alertsEnabled)
+          ? () => setState(
+                () => isSelected ? _selectedSectors.remove(tag) : _selectedSectors.add(tag),
+              )
+          : null,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [
+                    const Color(0xFF0EA5E9),
+                    const Color(0xFF0EA5E9).withValues(alpha: 0.8),
+                  ],
+                )
+              : const LinearGradient(
+                  colors: [Color(0xFFF0F9FF), Color(0xFFE0F2FE)],
+                ),
+          borderRadius: BorderRadius.circular(100.r),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF0EA5E9)
+                : const Color(0xFF0EA5E9).withValues(alpha: 0.4),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0EA5E9).withValues(alpha: isSelected ? 0.25 : 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected)
+              Padding(
+                padding: EdgeInsets.only(right: 6.w),
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: Colors.white,
+                  size: 16.r,
+                ),
+              ),
+            Flexible(
+              child: Text(
+                tag,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF0369A1),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.sp,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            SizedBox(width: 6.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : const Color(0xFF0EA5E9).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Text(
+                '$count jobs',
+                style: TextStyle(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w900,
+                  color: isSelected ? Colors.white : const Color(0xFF0369A1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -425,92 +907,6 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
     );
   }
 
-  Widget _buildSectorsGrid() {
-    final popularTags = _availableSectors
-        .where((tag) => (_sectorCounts[tag] ?? 0) > 0)
-        .take(8)
-        .toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (popularTags.isNotEmpty) ...[
-          Row(
-            children: [
-              Text('🔥', style: TextStyle(fontSize: 18.sp)),
-              SizedBox(width: 6.w),
-              Text(
-                'Les plus populaires',
-                style: TextStyle(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFFF97316),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12.h),
-          Wrap(
-            spacing: 8.w,
-            runSpacing: 10.h,
-            children: popularTags.map((sector) {
-              return _buildPopularChip(sector);
-            }).toList(),
-          ),
-          SizedBox(height: 20.h),
-          const Divider(),
-          SizedBox(height: 16.h),
-          Text(
-            'Tous les secteurs :',
-            style: TextStyle(fontSize: 13.sp, color: Colors.grey),
-          ),
-          SizedBox(height: 12.h),
-        ],
-        Wrap(
-          spacing: 8.w,
-          runSpacing: 8.h,
-          children: _availableSectors.map((sector) {
-            final isSelected = _selectedSectors.contains(sector);
-            return FilterChip(
-              label: Text(sector),
-              selected: isSelected,
-              onSelected: (_isPremium && _alertsEnabled)
-                  ? (val) {
-                      setState(() {
-                        if (val) {
-                          _selectedSectors.add(sector);
-                        } else {
-                          _selectedSectors.remove(sector);
-                        }
-                      });
-                    }
-                  : null,
-              selectedColor: const Color(0xFFF97316).withValues(alpha: 0.15),
-              checkmarkColor: const Color(0xFFF97316),
-              labelStyle: TextStyle(
-                color: isSelected
-                    ? const Color(0xFFF97316)
-                    : const Color(0xFF64748B),
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                fontSize: 13.sp,
-              ),
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(100.r),
-                side: BorderSide(
-                  color: isSelected
-                      ? const Color(0xFFF97316)
-                      : const Color(0xFFE2E8F0),
-                  width: isSelected ? 1.5 : 1,
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
   Widget _buildPopularChip(String tag) {
     final count = _sectorCounts[tag] ?? 0;
     final isSelected = _selectedSectors.contains(tag);
@@ -566,12 +962,15 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                   size: 16.r,
                 ),
               ),
-            Text(
-              tag,
-              style: TextStyle(
-                color: isSelected ? Colors.white : const Color(0xFFEA580C),
-                fontWeight: FontWeight.w700,
-                fontSize: 13.sp,
+            Flexible(
+              child: Text(
+                tag,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFFEA580C),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.sp,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             SizedBox(width: 6.w),

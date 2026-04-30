@@ -4,8 +4,11 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../../core/services/profile_notifier.dart';
 import '../../../core/utils/error_translator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'dart:io';
 
 class ProfileScreen extends StatefulWidget {
@@ -227,6 +230,9 @@ class _ProfileScreenState extends State<ProfileScreen>
           _isUploading = false;
         });
 
+        // Signaler le changement pour recharger le swipe
+        ProfileNotifier.notifyProfileUpdated();
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('CV mis à jour avec succès !')),
@@ -367,6 +373,22 @@ class _ProfileScreenState extends State<ProfileScreen>
           setState(() => _isLoading = false);
         }
       }
+    }
+  }
+
+  Future<void> _shareApp() async {
+    const String text = 'Découvrez Djorssi Match, l\'application qui révolutionne la recherche d\'emploi par le swipe ! 🚀\n\nAndroid: https://play.google.com/store/apps/details?id=com.djorssi.match\nWeb: https://www.djorssi-match.com';
+    await Share.share(text, subject: 'Trouve ton prochain job sur Djorssi Match !');
+  }
+
+  Future<void> _rateApp() async {
+    final InAppReview inAppReview = InAppReview.instance;
+    try {
+      await inAppReview.openStoreListing(
+        appStoreId: '6740356525', // Remplacez par votre App Store ID réel si nécessaire
+      );
+    } catch (e) {
+      debugPrint('Erreur lors de l\'ouverture du store : $e');
     }
   }
 
@@ -704,6 +726,22 @@ class _ProfileScreenState extends State<ProfileScreen>
                       }
                     },
                   ),
+                  const Divider(height: 1, indent: 56, endIndent: 16),
+                  _buildOptionTile(
+                    icon: Icons.share_rounded,
+                    title: 'Partager l\'application',
+                    subtitle: 'Inviter des amis',
+                    color: const Color(0xFFF97316),
+                    onTap: _shareApp,
+                  ),
+                  _buildOptionTile(
+                    icon: Icons.star_outline_rounded,
+                    title: 'Noter l\'application',
+                    subtitle: 'Donnez votre avis sur le store',
+                    color: Colors.amber.shade700,
+                    onTap: _rateApp,
+                  ),
+                  const Divider(height: 1, indent: 56, endIndent: 16),
                   _buildOptionTile(
                     icon: Icons.logout_rounded,
                     title: 'Se déconnecter',
@@ -711,7 +749,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                     showArrow: false,
                     onTap: _signOut,
                   ),
-                  const Divider(height: 1, indent: 56, endIndent: 16),
                   _buildOptionTile(
                     icon: Icons.delete_forever_rounded,
                     title: 'Supprimer mon compte',

@@ -139,20 +139,17 @@ const UsersTab: React.FC<UsersTabProps> = ({
                       <p className="text-xs font-medium text-slate-500">{user.date}</p>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                    <div className="flex justify-end gap-2">
                       <button 
                         onClick={() => handleTogglePremium(user.id, user.premium)}
-                        className={`p-2 rounded-lg transition-colors ${user.premium ? 'text-cta hover:bg-cta/10' : 'text-slate-400 hover:text-cta hover:bg-slate-100'}`}
-                        title={user.premium ? "Rétrograder en Standard" : "Passer en Premium"}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                          user.premium 
+                            ? 'bg-cta text-white shadow-sm' 
+                            : 'bg-slate-100 text-slate-600 hover:bg-cta/10 hover:text-cta'
+                        }`}
                       >
-                        <Star size={18} fill={user.premium ? "currentColor" : "none"} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteProfile(user.id)}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Définitivement Supprimer"
-                      >
-                        <Trash2 size={18} />
+                        <Star size={14} fill={user.premium ? "currentColor" : "none"} />
+                        {user.premium ? "PREMIUM" : "OFFRIR PREMIUM"}
                       </button>
                       <button 
                         onClick={() => setEditingUser({...user})}
@@ -160,6 +157,13 @@ const UsersTab: React.FC<UsersTabProps> = ({
                         title="Modifier le Profil"
                       >
                         <Pencil size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteProfile(user.id)}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Supprimer"
+                      >
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </td>

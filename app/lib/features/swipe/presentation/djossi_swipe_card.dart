@@ -341,6 +341,34 @@ class DjossiSwipeCard extends StatelessWidget {
                             ],
                           ),
 
+                          if (requiresCoverLetter && coverLetterInstructions != null && coverLetterInstructions!.isNotEmpty) ...[
+                            SizedBox(height: 12.h),
+                            Container(
+                              padding: EdgeInsets.all(12.r),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF8B5CF6).withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12.r),
+                                border: Border.all(color: const Color(0xFF8B5CF6).withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline, size: 16.r, color: const Color(0xFFA78BFA)),
+                                  SizedBox(width: 8.w),
+                                  Expanded(
+                                    child: Text(
+                                      "Consigne lettre : $coverLetterInstructions",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12.sp,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+
                           if (description != null &&
                               description!.isNotEmpty) ...[
                             SizedBox(height: 20.h),
@@ -376,7 +404,6 @@ class DjossiSwipeCard extends StatelessWidget {
                                   SizedBox(height: 8.h),
                                   Text(
                                     description!,
-                                    // Removed maxLines and overflow for scrollable content
                                     style: TextStyle(
                                       color: Colors.white.withOpacity(0.9),
                                       fontSize: 13.sp,
@@ -397,7 +424,7 @@ class DjossiSwipeCard extends StatelessWidget {
                               runSpacing: 8.h,
                               children: tags
                                   .map((tag) => _buildSimpleTag(tag))
-                                  .toList(), // Removed .take(4)
+                                  .toList(),
                             ),
                             SizedBox(height: 20.h),
                           ],

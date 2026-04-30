@@ -7,7 +7,9 @@ import {
   TrendingUp,
   MessageSquare,
   AlertCircle,
-  Settings
+  Settings,
+  BarChart3,
+  Bell
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -19,6 +21,8 @@ import FeedbackTab from './admin/FeedbackTab';
 import AddJobTab from './admin/AddJobTab';
 import JobsTab from './admin/JobsTab';
 import SettingsTab from './admin/SettingsTab';
+import JobMetricsTab from './admin/JobMetricsTab';
+import NotificationsTab from './admin/NotificationsTab';
 
 const cleanPhone = (phone: any): string => {
   if (!phone) return "";
@@ -34,7 +38,7 @@ const cleanPhone = (phone: any): string => {
 const COLORS = ['#FF8200', '#009A44', '#F43F5E', '#7C3AED'];
 
 const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'feedback' | 'add-jobs' | 'all-jobs' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'feedback' | 'add-jobs' | 'all-jobs' | 'settings' | 'job-metrics' | 'notifications'>('overview');
   const [stats, setStats] = useState({
     totalUsers: 0,
     premiumUsers: 0,
@@ -42,7 +46,9 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     pendingFeedback: 0,
     maleUsers: 0,
     femaleUsers: 0,
-    iosWaitlist: 0
+    iosWaitlist: 0,
+    jobSectors: [] as any[],
+    contractTypes: [] as any[]
   });
 
   const [recentUsersList, setRecentUsersList] = useState<any[]>([]);
@@ -96,21 +102,22 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       
       const { count: iosWaitlistCount } = await supabase.from('ios_waitlist').select('id', { count: 'exact', head: true });
 
-      setStats({
+      setStats(prev => ({
+        ...prev,
         totalUsers: usersCount || 0,
         premiumUsers: premiumCount || 0,
         activeJobs: jobsCount || 0,
-        pendingFeedback: 0,
         maleUsers: maleCount || 0,
         femaleUsers: femaleCount || 0,
         iosWaitlist: iosWaitlistCount || 0
-      });
+      }));
 
       const { data: userData } = await supabase
         .from('profiles')
         .select('id, full_name, is_premium, created_at, phone_number, skills')
+        .order('is_premium', { ascending: false })
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(500);
 
       if (userData) {
         setRecentUsersList(userData.map((u: any) => ({
@@ -191,6 +198,70 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           .slice(0, 10)
           .map(([name, count]) => ({ name, count }));
         setTopSectors(sorted);
+      }
+
+      // 7. Job Metrics (Sectors & Contract Types)
+      const { data: allJobs } = await supabase.from('jobs').select('tags, job_title, description');
+      if (allJobs) {
+        const sectorCounts: Record<string, number> = {};
+        const contractCounts: Record<string, number> = {
+          'CDI': 0,
+          'CDD': 0,
+          'Stage': 0,
+          'Alternance': 0,
+          'Freelance': 0,
+          'Intérim': 0
+        };
+
+        const contractTerms = ['CDI', 'CDD', 'STAGE', 'ALTERNANCE', 'FREELANCE', 'INTERIM'];
+
+        allJobs.forEach((job: any) => {
+          let foundContractForThisJob = false;
+          
+          // 1. Check tags
+          if (Array.isArray(job.tags)) {
+            job.tags.forEach((tag: string) => {
+              const upperTag = tag.toUpperCase();
+              if (contractTerms.includes(upperTag)) {
+                const key = upperTag === 'STAGE' ? 'Stage' : upperTag;
+                const displayKey = (upperTag === 'CDI' || upperTag === 'CDD') ? upperTag : (key.charAt(0) + key.slice(1).toLowerCase());
+                contractCounts[displayKey] = (contractCounts[displayKey] || 0) + 1;
+                foundContractForThisJob = true;
+              } else if (tag) {
+                sectorCounts[tag] = (sectorCounts[tag] || 0) + 1;
+              }
+            });
+          }
+
+          // 2. Check title if not found in tags
+          if (!foundContractForThisJob) {
+            const titleUpper = (job.job_title || '').toUpperCase();
+            for (const term of contractTerms) {
+              if (titleUpper.includes(term)) {
+                const key = term === 'STAGE' ? 'Stage' : term;
+                const displayKey = (term === 'CDI' || term === 'CDD') ? term : (key.charAt(0) + key.slice(1).toLowerCase());
+                contractCounts[displayKey] = (contractCounts[displayKey] || 0) + 1;
+                break; // Found one, move to next job
+              }
+            }
+          }
+        });
+
+        const sortedJobSectors = Object.entries(sectorCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([name, count]) => ({ name, count }));
+
+        const sortedContracts = Object.entries(contractCounts)
+          .filter(([_, count]) => count > 0)
+          .sort((a, b) => b[1] - a[1])
+          .map(([name, count]) => ({ name, count }));
+
+        setStats(prev => ({
+          ...prev,
+          jobSectors: sortedJobSectors,
+          contractTypes: sortedContracts
+        }));
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -506,18 +577,44 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         textArea.value = content;
       }
     };
-    reader.readAsText(file);
+reader.readAsText(file);
   };
 
   const handleTogglePremium = async (userId: string, currentStatus: boolean) => {
     try {
+      const newStatus = !currentStatus;
+      
+      // Optimistic update
+      setRecentUsersList(prev => prev.map(u => u.id === userId ? { ...u, premium: newStatus } : u));
+
       const { error } = await supabase
         .from('profiles')
-        .update({ is_premium: !currentStatus })
+        .update({ 
+          is_premium: newStatus,
+          premium_until: newStatus ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null
+        })
         .eq('id', userId);
+      
+      if (error) {
+        // Revert on error
+        setRecentUsersList(prev => prev.map(u => u.id === userId ? { ...u, premium: currentStatus } : u));
+        alert("Erreur de mise à jour : " + error.message);
+        throw error;
+      }
+      
+      // Send Welcome Notification to this user (if they become premium)
+      if (newStatus) {
+        supabase.functions.invoke('send-broadcast-notification', {
+          body: {
+            title: "Félicitations ! 🎉",
+            message: "Votre compte est désormais Premium. Profitez de toutes les fonctionnalités Djorssi-Match ! 🚀",
+            target: "premium" // Note: Currently sends to all premiums, but good for test
+          }
+        }).catch(err => console.error("Error sending welcome notification:", err));
+      }
 
-      if (error) throw error;
-      setRecentUsersList(prev => prev.map(u => u.id === userId ? { ...u, premium: !currentStatus } : u));
+      // Force refresh stats after successful update
+      fetchStats();
     } catch (err) {
       console.error("Error toggling premium:", err);
     }
@@ -579,6 +676,61 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     }
   };
 
+  const handleMakeMePremium = async () => {
+    try {
+      setIsLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          is_premium: true,
+          premium_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      setSuccessMessage("Votre profil est maintenant Premium pour 24h !");
+      fetchStats();
+    } catch (err: any) {
+      setErrorMessage("Erreur: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMakeAllPremium = async () => {
+    if (!window.confirm("ACTION CRITIQUE : Passer TOUS les utilisateurs en Premium pour 24h ?")) return;
+    try {
+      setIsLoading(true);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          is_premium: true,
+          premium_until: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        });
+
+      if (error) throw error;
+      
+      // Envoyer la notification de masse
+      await supabase.functions.invoke('send-broadcast-notification', {
+        body: {
+          title: "Cadeau de la Fête du Travail ! 🎁🇨🇮",
+          message: "Bonne fête à tous ! Djorssi-Match vous offre 24h de Premium pour booster votre carrière. Profitez-en bien !",
+          target: "all"
+        }
+      });
+
+      setSuccessMessage("Campagne lancée : Tous les utilisateurs sont Premium et notifiés !");
+      fetchStats();
+    } catch (err: any) {
+      setErrorMessage("Erreur: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleUpdatePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
@@ -611,7 +763,9 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     { id: 'overview', label: 'Vue d\'ensemble', icon: <TrendingUp size={20} /> },
     { id: 'users', label: 'Utilisateurs', icon: <Users size={20} /> },
     { id: 'all-jobs', label: 'Base des Offres', icon: <Briefcase size={20} /> },
+    { id: 'job-metrics', label: 'Métriques Offres', icon: <BarChart3 size={20} /> },
     { id: 'add-jobs', label: 'Ajout d\'Annonces', icon: <Plus size={20} /> },
+    { id: 'notifications', label: 'Notifications', icon: <Bell size={20} /> },
     { id: 'feedback', label: 'Feedback', icon: <MessageSquare size={20} /> },
     { id: 'settings', label: 'Sécurité', icon: <Settings size={20} /> },
   ];
@@ -745,6 +899,9 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             topSectors={topSectors}
             COLORS={COLORS} 
             setActiveTab={setActiveTab} 
+            onMakeMePremium={handleMakeMePremium}
+            onMakeAllPremium={handleMakeAllPremium}
+            isCampaignLoading={isLoading}
           />
         )}
 
@@ -792,6 +949,8 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           />
         )}
 
+        {activeTab === 'job-metrics' && <JobMetricsTab stats={stats} />}
+        {activeTab === 'notifications' && <NotificationsTab />}
         {activeTab === 'settings' && (
           <SettingsTab 
             handleUpdatePassword={handleUpdatePassword}
