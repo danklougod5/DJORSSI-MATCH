@@ -536,9 +536,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
     int? currentIndex,
     CardSwiperDirection direction,
   ) {
-    // BLOCAGE PHYSIQUE STRICT : Si pas premium et limite de 10 atteinte
+    // BLOCAGE PHYSIQUE STRICT : Si pas premium et limite de 50 atteinte
     // On bloque TOUT mouvement (Gauche ou Droite)
-    if (!_isPremium && _swipeCount >= 10) {
+    if (!_isPremium && _swipeCount >= 50) {
       _showPremiumLimitDialog();
       return false; // Bloque physiquement la carte
     }
@@ -696,7 +696,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       if (e.toString().contains('Daily free swipe limit')) {
         _controller.undo(); // Ramène la carte à l'écran
         setState(
-          () => _swipeCount = 10,
+          () => _swipeCount = 50,
         ); // Resynchronise le compteur local de force
         if (mounted) _showPremiumLimitDialog();
       }
@@ -896,7 +896,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Vous avez utilisé vos 10 swipes gratuits pour aujourd\'hui.',
+              'Vous avez utilisé vos 80 swipes gratuits pour aujourd\'hui.',
             ),
             SizedBox(height: 16.h),
             Container(
@@ -1610,7 +1610,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         _buildActionButton(Icons.close_rounded, Colors.red, () {
-          if (!_isPremium && _swipeCount >= 10) {
+          if (!_isPremium && _swipeCount >= 80) {
             _showPremiumLimitDialog();
             return;
           }
@@ -1624,7 +1624,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
           locked: false, // Cadenas retiré à la demande de l'utilisateur
         ),
         _buildActionButton(Icons.favorite_rounded, Colors.green, () {
-          if (!_isPremium && _swipeCount >= 10) {
+          if (!_isPremium && _swipeCount >= 80) {
             _showPremiumLimitDialog();
             return;
           }

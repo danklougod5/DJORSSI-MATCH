@@ -42,6 +42,24 @@ class TagNormalizer {
     'allemand',
   };
 
+  // ─── Types d'emploi (contrats) ──────────────────────────────────────
+  static const Set<String> jobTypes = {
+    'cdi',
+    'cdd',
+    'stage',
+    'freelance',
+    'intérim',
+    'alternance',
+    'temps plein',
+    'temps partiel',
+    'consultant',
+  };
+
+  /// Vérifie si un tag est un type d'emploi (contrat).
+  static bool isJobType(String tag) {
+    return jobTypes.contains(normalizeKey(tag));
+  }
+
   /// Normalise un tag pour l'affichage (Title Case intelligent).
   ///
   /// - "informatique" → "Informatique"

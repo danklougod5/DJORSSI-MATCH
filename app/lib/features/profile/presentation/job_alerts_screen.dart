@@ -312,7 +312,13 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                                 "Aucun secteur disponible pour le moment.",
                                 style: TextStyle(color: Colors.grey),
                               )
-                            : _buildSectorsContent(),
+                            : Column(
+                                children: [
+                                  _buildJobTypesSection(),
+                                  SizedBox(height: 32.h),
+                                  _buildSectorsContent(),
+                                ],
+                              ),
 
                         SizedBox(height: 20.h),
                       ],
@@ -387,7 +393,47 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
     );
   }
 
-  /// Contenu principal : résultats de recherche ou populaires
+  /// Section pour les types d'emploi
+  Widget _buildJobTypesSection() {
+    final types = _availableSectors.where((s) => TagNormalizer.isJobType(s)).toList();
+    if (types.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('📄', style: TextStyle(fontSize: 18.sp)),
+            SizedBox(width: 6.w),
+            Text(
+              'Types d\'emploi',
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 8.h),
+        Text(
+          'Quel type de contrat recherchez-vous ?',
+          style: TextStyle(
+            fontSize: 13.sp,
+            color: const Color(0xFF64748B),
+          ),
+        ),
+        SizedBox(height: 16.h),
+        Wrap(
+          spacing: 8.w,
+          runSpacing: 10.h,
+          children: types.map((t) => _buildSimpleChip(t)).toList(),
+        ),
+      ],
+    );
+  }
+
+  /// Contenu principal : résultats de recherche ou secteurs populaires
   Widget _buildSectorsContent() {
     // Mode recherche
     if (_searchQuery.isNotEmpty) {
@@ -404,7 +450,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
               Icon(Icons.search_off_rounded, size: 40.r, color: const Color(0xFF94A3B8)),
               SizedBox(height: 12.h),
               Text(
-                'Aucun secteur trouvé pour "$_searchQuery"',
+                'Aucun résultat trouvé pour "$_searchQuery"',
                 style: TextStyle(
                   fontSize: 14.sp,
                   color: const Color(0xFF64748B),
@@ -415,132 +461,117 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           ),
         );
       }
+      
+      // Séparer les résultats de recherche
+      final searchTypes = results.where((s) => TagNormalizer.isJobType(s)).toList();
+      final searchSectors = results.where((s) => !TagNormalizer.isJobType(s)).toList();
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${results.length} résultat${results.length > 1 ? 's' : ''}',
-            style: TextStyle(
-              fontSize: 12.sp,
-              color: const Color(0xFF94A3B8),
-              fontWeight: FontWeight.w600,
+          if (searchTypes.isNotEmpty) ...[
+            Text(
+              'Types d\'emploi',
+              style: TextStyle(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF0F172A),
+              ),
             ),
-          ),
-          SizedBox(height: 10.h),
-          Wrap(
-            spacing: 8.w,
-            runSpacing: 10.h,
-            children: results.map((sector) {
-              final count = _sectorCounts[sector] ?? 0;
-              return count > 0
-                  ? _buildPopularChip(sector)
-                  : _buildSimpleChip(sector);
-            }).toList(),
-          ),
+            SizedBox(height: 10.h),
+            Wrap(
+              spacing: 8.w,
+              runSpacing: 10.h,
+              children: searchTypes.map((t) => _buildSimpleChip(t)).toList(),
+            ),
+            SizedBox(height: 20.h),
+          ],
+          if (searchSectors.isNotEmpty) ...[
+            Text(
+              'Secteurs d\'activité',
+              style: TextStyle(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+            SizedBox(height: 10.h),
+            Wrap(
+              spacing: 8.w,
+              runSpacing: 10.h,
+              children: searchSectors.map((sector) {
+                final count = _sectorCounts[sector] ?? 0;
+                return count > 0
+                    ? _buildPopularChip(sector)
+                    : _buildSimpleChip(sector);
+              }).toList(),
+            ),
+          ],
         ],
       );
     }
 
-    // Mode par défaut : populaires seulement
-    final popular = _popularSectors;
+    // Mode par défaut : Tous les secteurs
+    final allSectors = _availableSectors
+        .where((s) => !TagNormalizer.isJobType(s) && !_selectedSectors.contains(s))
+        .take(40)
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (popular.isNotEmpty) ...[
-          Row(
+        Row(
+          children: [
+            Icon(
+              Icons.grid_view_rounded,
+              size: 18.r,
+              color: const Color(0xFFF97316),
+            ),
+            SizedBox(width: 8.w),
+            Text(
+              'Tous les secteurs',
+              style: TextStyle(
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12.h),
+        Wrap(
+          spacing: 8.w,
+          runSpacing: 10.h,
+          children: allSectors.map((sector) {
+            final count = _sectorCounts[sector] ?? 0;
+            return count > 0
+                ? _buildPopularChip(sector)
+                : _buildSimpleChip(sector);
+          }).toList(),
+        ),
+        SizedBox(height: 24.h),
+        Container(
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(12.r),
+          ),
+          child: Row(
             children: [
-              Text('🔥', style: TextStyle(fontSize: 18.sp)),
-              SizedBox(width: 6.w),
-              Text(
-                'Les plus choisis',
-                style: TextStyle(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFFF97316),
+              Icon(Icons.info_outline_rounded, size: 18.r, color: const Color(0xFF64748B)),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Text(
+                  'Utilisez la barre de recherche pour trouver d\'autres secteurs spécifiques.',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: const Color(0xFF64748B),
+                  ),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 12.h),
-          Wrap(
-            spacing: 8.w,
-            runSpacing: 10.h,
-            children: popular.map((sector) => _buildPopularChip(sector)).toList(),
-          ),
-          SizedBox(height: 24.h),
-          // NOUVELLE SECTION : OPPORTUNITÉS (Jobs disponibles)
-          () {
-            final highDemandTags = _availableSectors
-                .where((tag) =>
-                    !_selectedSectors.contains(tag) &&
-                    (_jobTagCounts[tag] ?? 0) > 1)
-                .toList();
-            highDemandTags.sort((a, b) => (_jobTagCounts[b] ?? 0).compareTo(_jobTagCounts[a] ?? 0));
-            final topOpportunities = highDemandTags.take(6).toList();
-            
-            if (topOpportunities.isEmpty) return const SizedBox.shrink();
-            
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      '💼',
-                      style: TextStyle(fontSize: 18.sp),
-                    ),
-                    SizedBox(width: 6.w),
-                    Text(
-                      'Top opportunités (Offres)',
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0EA5E9),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 12.h),
-                Wrap(
-                  spacing: 8.w,
-                  runSpacing: 10.h,
-                  children: topOpportunities
-                      .map((tag) => _buildOpportunityChip(tag))
-                      .toList(),
-                ),
-                SizedBox(height: 12.h),
-              ],
-            );
-          }(),
-          SizedBox(height: 20.h),
-          Container(
-            padding: EdgeInsets.all(16.w),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(12.r),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline_rounded, size: 18.r, color: const Color(0xFF64748B)),
-                SizedBox(width: 10.w),
-                Expanded(
-                  child: Text(
-                    'Utilisez la barre de recherche pour trouver d\'autres secteurs.',
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        if (popular.isEmpty)
-          const Text(
-            "Aucun secteur populaire pour le moment.",
-            style: TextStyle(color: Colors.grey),
-          ),
+        ),
       ],
     );
   }

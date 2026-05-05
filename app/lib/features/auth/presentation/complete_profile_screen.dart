@@ -461,202 +461,227 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(24.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(height: 20.h),
-              Text(
-                'Finalisons votre profil',
-                style: TextStyle(
-                  fontSize: 28.sp,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF0F172A),
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 12.h),
-              Text(
-                'Ces informations sont nécessaires pour postuler aux offres.',
-                style: TextStyle(fontSize: 15.sp, color: Colors.grey.shade600),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 40.h),
-
-              _buildLabel('Nom Complet'),
-              TextField(
-                controller: _nameController,
-                decoration: _inputStyle('Ex: Jean Marc', Icons.person_outline),
-              ),
-
-              SizedBox(height: 24.h),
-              _buildLabel('Numéro de Téléphone (Mobile Money)'),
-              TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: _inputStyle(
-                  'Ex: 0707070707',
-                  Icons.phone_android_outlined,
-                ),
-              ),
-
-              SizedBox(height: 24.h),
-              _buildLabel('Votre Genre'),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildGenderCard(
-                      'Homme',
-                      Icons.male,
-                      const Color(0xFF3B82F6),
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: _buildGenderCard(
-                      'Femme',
-                      Icons.female,
-                      const Color(0xFFEC4899),
-                    ),
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 24.h),
-              _buildLabel('Votre CV (Obligatoire)'),
-              GestureDetector(
-                onTap: _pickAndUploadCV,
-                child: Container(
-                  padding: EdgeInsets.all(20.r),
-                  decoration: BoxDecoration(
-                    color: _cvUrl != null
-                        ? const Color(0xFFF0FDF4)
-                        : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(20.r),
-                    border: Border.all(
-                      color: _cvUrl != null
-                          ? const Color(0xFF22C55E)
-                          : const Color(0xFFE2E8F0),
-                      width: 2,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.cloud_upload_outlined,
-                        color: _cvUrl != null
-                            ? const Color(0xFF22C55E)
-                            : const Color(0xFFF97316),
+        child: CustomScrollView(
+          slivers: [
+            // ── Partie haute : champs du formulaire (scrollable normalement) ──
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(height: 20.h),
+                    Text(
+                      'Finalisons votre profil',
+                      style: TextStyle(
+                        fontSize: 28.sp,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF0F172A),
                       ),
-                      SizedBox(width: 16.w),
-                      Expanded(
-                        child: Text(
-                          _cvUrl != null
-                              ? 'CV déjà ajouté !'
-                              : 'Cliquez pour ajouter votre CV',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: _cvUrl != null
-                                ? const Color(0xFF166534)
-                                : const Color(0xFF0F172A),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 12.h),
+                    Text(
+                      'Ces informations sont nécessaires pour postuler aux offres.',
+                      style: TextStyle(fontSize: 15.sp, color: Colors.grey.shade600),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 40.h),
+
+                    _buildLabel('Nom Complet'),
+                    TextField(
+                      controller: _nameController,
+                      decoration: _inputStyle('Ex: Jean Marc', Icons.person_outline),
+                    ),
+
+                    SizedBox(height: 24.h),
+                    _buildLabel('Numéro de Téléphone (Mobile Money)'),
+                    TextField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: _inputStyle(
+                        'Ex: 0707070707',
+                        Icons.phone_android_outlined,
+                      ),
+                    ),
+
+                    SizedBox(height: 24.h),
+                    _buildLabel('Votre Genre'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildGenderCard(
+                            'Homme',
+                            Icons.male,
+                            const Color(0xFF3B82F6),
                           ),
                         ),
+                        SizedBox(width: 16.w),
+                        Expanded(
+                          child: _buildGenderCard(
+                            'Femme',
+                            Icons.female,
+                            const Color(0xFFEC4899),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    SizedBox(height: 24.h),
+                    _buildLabel('Votre CV (Obligatoire)'),
+                    GestureDetector(
+                      onTap: _pickAndUploadCV,
+                      child: Container(
+                        padding: EdgeInsets.all(20.r),
+                        decoration: BoxDecoration(
+                          color: _cvUrl != null
+                              ? const Color(0xFFF0FDF4)
+                              : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(20.r),
+                          border: Border.all(
+                            color: _cvUrl != null
+                                ? const Color(0xFF22C55E)
+                                : const Color(0xFFE2E8F0),
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.cloud_upload_outlined,
+                              color: _cvUrl != null
+                                  ? const Color(0xFF22C55E)
+                                  : const Color(0xFFF97316),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: Text(
+                                _cvUrl != null
+                                    ? 'CV déjà ajouté !'
+                                    : 'Cliquez pour ajouter votre CV',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: _cvUrl != null
+                                      ? const Color(0xFF166534)
+                                      : const Color(0xFF0F172A),
+                                ),
+                              ),
+                            ),
+                            if (_isUploadingCV)
+                              const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                          ],
+                        ),
                       ),
-                      if (_isUploadingCV)
-                        const SizedBox(
-                          height: 20,
-                          width: 20,
+                    ),
+
+                    SizedBox(height: 24.h),
+                    _buildLabel('Secteurs d\'activité'),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Barre de recherche PINNED (reste fixe en haut au scroll) ──
+            if (!_isLoadingTags && _availableTags.isNotEmpty)
+              SliverPersistentHeader(
+                pinned: true,
+                delegate: _StickySearchBarDelegate(
+                  minHeight: 60.h,
+                  maxHeight: 60.h,
+                  child: Container(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 6.h),
+                    child: TextField(
+                      onChanged: (value) => setState(() => _searchQuery = value),
+                      decoration: InputDecoration(
+                        hintText: 'Rechercher un secteur...',
+                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16.r),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // ── Contenu scrollable : sélections + opportunités + tous les secteurs ──
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                child: _isLoadingTags
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20),
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                    ],
-                  ),
-                ),
-              ),
-
-              SizedBox(height: 24.h),
-              _buildLabel('Secteurs d\'activité'),
-              // Barre de recherche pour les tags
-              if (!_isLoadingTags && _availableTags.isNotEmpty) ...[
-                TextField(
-                  onChanged: (value) => setState(() => _searchQuery = value),
-                  decoration: InputDecoration(
-                    hintText: 'Rechercher un secteur...',
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16.r),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 12.h),
-              ],
-
-              _isLoadingTags
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : _availableTags.isEmpty
-                  ? const Center(
-                      child: Text('Aucun secteur disponible pour le moment.'),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 1. Toujours afficher les secteurs déjà sélectionnés en haut
-                        if (_selectedTags.isNotEmpty) ...[
-                          Text(
-                            'Vos sélections :',
-                            style: TextStyle(
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).primaryColor,
+                      )
+                    : _availableTags.isEmpty
+                    ? const Center(
+                        child: Text('Aucun secteur disponible pour le moment.'),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: 12.h),
+                          // 1. Secteurs déjà sélectionnés
+                          if (_selectedTags.isNotEmpty) ...[
+                            Text(
+                              'Vos sélections :',
+                              style: TextStyle(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).primaryColor,
+                              ),
                             ),
-                          ),
-                          SizedBox(height: 8.h),
-                          Wrap(
-                            spacing: 8.w,
-                            runSpacing: 8.h,
-                            children: _selectedTags
-                                .map((tag) => _buildSectorChip(tag, true))
-                                .toList(),
-                          ),
-                          SizedBox(height: 16.h),
-                          const Divider(),
-                          SizedBox(height: 16.h),
-                        ],
+                            SizedBox(height: 8.h),
+                            Wrap(
+                              spacing: 8.w,
+                              runSpacing: 8.h,
+                              children: _selectedTags
+                                  .map((tag) => _buildSectorChip(tag, true))
+                                  .toList(),
+                            ),
+                            SizedBox(height: 16.h),
+                            const Divider(),
+                            SizedBox(height: 16.h),
+                          ],
 
-                        // 2. Section "Populaires" — les tags les plus choisis par les utilisateurs
-                        if (_searchQuery.isEmpty) ...[
+                          // 2. Top opportunités (Jobs disponibles)
                           () {
-                            final popularTags = _availableTags
+                            final highDemandTags = _availableTags
                                 .where((tag) =>
                                     !_selectedTags.contains(tag) &&
-                                    (_sectorCounts[tag] ?? 0) > 0)
-                                .take(8)
+                                    (_jobTagCounts[tag] ?? 0) > 1)
                                 .toList();
-                            if (popularTags.isEmpty) return const SizedBox.shrink();
+                            highDemandTags.sort((a, b) => (_jobTagCounts[b] ?? 0).compareTo(_jobTagCounts[a] ?? 0));
+                            final topOpportunities = highDemandTags.take(6).toList();
+                            
+                            if (topOpportunities.isEmpty) return const SizedBox.shrink();
+                            
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   children: [
                                     Text(
-                                      '🔥',
+                                      '💼',
                                       style: TextStyle(fontSize: 18.sp),
                                     ),
                                     SizedBox(width: 6.w),
                                     Text(
-                                      'Les plus populaires',
+                                      'Top opportunités (Offres)',
                                       style: TextStyle(
                                         fontSize: 14.sp,
                                         fontWeight: FontWeight.w800,
-                                        color: const Color(0xFFF97316),
+                                        color: const Color(0xFF0EA5E9),
                                       ),
                                     ),
                                   ],
@@ -665,94 +690,68 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                                 Wrap(
                                   spacing: 8.w,
                                   runSpacing: 10.h,
-                                  children: popularTags
-                                      .map((tag) => _buildPopularChip(tag))
+                                  children: topOpportunities
+                                      .map((tag) => _buildOpportunityChip(tag))
                                       .toList(),
                                 ),
-                                SizedBox(height: 24.h),
-                                // NOUVELLE SECTION : OPPORTUNITÉS (Jobs disponibles)
-                                () {
-                                  final highDemandTags = _availableTags
-                                      .where((tag) =>
-                                          !_selectedTags.contains(tag) &&
-                                          (_jobTagCounts[tag] ?? 0) > 1)
-                                      .toList();
-                                  highDemandTags.sort((a, b) => (_jobTagCounts[b] ?? 0).compareTo(_jobTagCounts[a] ?? 0));
-                                  final topOpportunities = highDemandTags.take(6).toList();
-                                  
-                                  if (topOpportunities.isEmpty) return const SizedBox.shrink();
-                                  
-                                  return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            '💼',
-                                            style: TextStyle(fontSize: 18.sp),
-                                          ),
-                                          SizedBox(width: 6.w),
-                                          Text(
-                                            'Top opportunités (Offres)',
-                                            style: TextStyle(
-                                              fontSize: 14.sp,
-                                              fontWeight: FontWeight.w800,
-                                              color: const Color(0xFF0EA5E9),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      SizedBox(height: 12.h),
-                                      Wrap(
-                                        spacing: 8.w,
-                                        runSpacing: 10.h,
-                                        children: topOpportunities
-                                            .map((tag) => _buildOpportunityChip(tag))
-                                            .toList(),
-                                      ),
-                                      SizedBox(height: 12.h),
-                                      const Divider(),
-                                      SizedBox(height: 16.h),
-                                    ],
-                                  );
-                                }(),
+                                SizedBox(height: 12.h),
+                                const Divider(),
+                                SizedBox(height: 16.h),
                               ],
                             );
                           }(),
+
+                          // 3. Tous les secteurs
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.grid_view_rounded,
+                                size: 18.r,
+                                color: const Color(0xFFF97316),
+                              ),
+                              SizedBox(width: 8.w),
+                              Text(
+                                _searchQuery.isEmpty
+                                    ? 'Tous les secteurs'
+                                    : 'Résultats de recherche',
+                                style: TextStyle(
+                                  fontSize: 15.sp,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                          Wrap(
+                            spacing: 8.w,
+                            runSpacing: 8.h,
+                            children: _availableTags
+                                .where(
+                                  (tag) =>
+                                      tag.toLowerCase().contains(
+                                        _searchQuery.toLowerCase(),
+                                      ) &&
+                                      !_selectedTags.contains(
+                                        tag,
+                                      ),
+                                )
+                                .take(30)
+                                .map((tag) {
+                                  final count = _sectorCounts[tag] ?? 0;
+                                  return count > 0
+                                      ? _buildPopularChip(tag)
+                                      : _buildSectorChip(tag, false);
+                                })
+                                .toList(),
+                          ),
+                          // Espace en bas pour éviter que le contenu soit caché par le bouton
+                          SizedBox(height: 20.h),
                         ],
-
-                        // 3. Afficher les suggestions restantes (limitées pour la performance)
-                        Text(
-                          _searchQuery.isEmpty
-                              ? 'Tous les secteurs :'
-                              : 'Résultats de recherche :',
-                          style: TextStyle(fontSize: 13.sp, color: Colors.grey),
-                        ),
-                        SizedBox(height: 12.h),
-                        Wrap(
-                          spacing: 8.w,
-                          runSpacing: 8.h,
-                          children: _availableTags
-                              .where(
-                                (tag) =>
-                                    tag.toLowerCase().contains(
-                                      _searchQuery.toLowerCase(),
-                                    ) &&
-                                    !_selectedTags.contains(
-                                      tag,
-                                    ), // On ne répète pas ceux déjà en haut
-                              )
-                              .take(30) // ON LIMITE À 30 POUR LA PERFORMANCE ⚡️
-                              .map((tag) => _buildSectorChip(tag, false))
-                              .toList(),
-                        ),
-                      ],
-                    ),
-
-              // Espace en bas pour éviter que le contenu soit caché par le bouton
-              SizedBox(height: 20.h),
-            ],
-          ),
+                      ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1003,5 +1002,36 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Delegate pour la barre de recherche sticky (pinned) dans le CustomScrollView
+class _StickySearchBarDelegate extends SliverPersistentHeaderDelegate {
+  final double minHeight;
+  final double maxHeight;
+  final Widget child;
+
+  _StickySearchBarDelegate({
+    required this.minHeight,
+    required this.maxHeight,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => minHeight;
+
+  @override
+  double get maxExtent => maxHeight;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  bool shouldRebuild(_StickySearchBarDelegate oldDelegate) {
+    return maxHeight != oldDelegate.maxHeight ||
+        minHeight != oldDelegate.minHeight ||
+        child != oldDelegate.child;
   }
 }

@@ -13,6 +13,7 @@ import 'package:djossimatch/core/routing/app_router.dart';
 import 'package:djossimatch/core/services/version_service.dart';
 import 'package:djossimatch/core/services/notification_service.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:upgrader/upgrader.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -93,8 +94,6 @@ class _DjorssiMatchAppState extends State<DjorssiMatchApp> {
           routerConfig: AppRouter.router,
           builder: (context, routerChild) {
             final mediaQuery = MediaQuery.of(context);
-            // On limite l'échelle de texte pour éviter que les très grandes polices
-            // du système (accessibilité) ne cassent le design.
             final scale = mediaQuery.textScaler.clamp(
               minScaleFactor: 1.0,
               maxScaleFactor: 1.15,
@@ -163,7 +162,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       builder: (context, constraints) {
         final isWide = constraints.maxWidth > 800;
 
-        return Scaffold(
+        return UpgradeAlert(
+          dialogStyle: UpgradeDialogStyle.cupertino,
+          showIgnore: false,
+          showLater: true,
+          barrierDismissible: true,
+          upgrader: Upgrader(
+            debugDisplayAlways: false,
+            debugLogging: false,
+            durationUntilAlertAgain: const Duration(days: 1),
+            messages: UpgraderMessages(code: 'fr'),
+          ),
+          child: Scaffold(
           body: Row(
             children: [
               if (isWide)
@@ -217,7 +227,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   ],
                 )
               : null,
-        );
+        ),
+      );
       },
     );
   }

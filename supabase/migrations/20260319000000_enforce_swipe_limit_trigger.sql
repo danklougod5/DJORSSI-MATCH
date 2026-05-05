@@ -20,8 +20,8 @@ BEGIN
     AND created_at >= CURRENT_DATE;
 
   -- If limit reached, raise exception to prevent insert
-  IF v_swipe_count >= 10 THEN
-    RAISE EXCEPTION 'Daily free swipe limit reached (10)';
+  IF v_swipe_count >= 80 THEN
+    RAISE EXCEPTION 'Daily free swipe limit reached (80)';
   END IF;
 
   RETURN NEW;
