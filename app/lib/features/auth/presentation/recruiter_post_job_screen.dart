@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:djossimatch/core/utils/tag_normalizer.dart';
 
 class RecruiterPostJobScreen extends StatefulWidget {
   const RecruiterPostJobScreen({super.key});
@@ -22,13 +23,15 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
   final _emailController = TextEditingController();
   final _whatsappController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _tagsController = TextEditingController();
   final _coverLetterController = TextEditingController();
   final _deadlineController = TextEditingController();
 
   String _contractType = 'CDI';
   bool _requiresCoverLetter = false;
   bool _isLoading = false;
+  bool _isLoadingTags = true;
+  List<String> _availableTags = [];
+  final Set<String> _selectedTags = {};
   bool _isSuccess = false;
 
   final List<String> _contractTypes = [
@@ -41,6 +44,43 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadAvailableTags();
+  }
+
+  Future<void> _loadAvailableTags() async {
+    try {
+      final tagsResponse = await _supabase
+          .from('jobs')
+          .select('tags')
+          .eq('is_approved', true)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () => throw Exception('Timeout'),
+          );
+      final List<String> rawTags = [];
+      for (var row in tagsResponse as List) {
+        if (row['tags'] != null) {
+          rawTags.addAll(List<String>.from(row['tags']));
+        }
+      }
+      final uniqueTags = TagNormalizer.deduplicateTags(rawTags)
+          .where((t) => !TagNormalizer.isGeneric(t))
+          .toList();
+      if (mounted) {
+        setState(() {
+          _availableTags = uniqueTags;
+          _isLoadingTags = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur chargement tags: $e');
+      if (mounted) setState(() => _isLoadingTags = false);
+    }
+  }
+
+  @override
   void dispose() {
     _companyController.dispose();
     _titleController.dispose();
@@ -50,7 +90,6 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
     _emailController.dispose();
     _whatsappController.dispose();
     _descriptionController.dispose();
-    _tagsController.dispose();
     _coverLetterController.dispose();
     _deadlineController.dispose();
     super.dispose();
@@ -69,16 +108,22 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
   Future<void> _submitJob() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_selectedTags.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Veuillez sélectionner au moins un tag'),
+          backgroundColor: Colors.red.shade400,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     final randomSuffix = Random().nextInt(1000000).toString().padLeft(6, '0');
     final uniqueSourceUrl = 'recruiter_post_${DateTime.now().millisecondsSinceEpoch}_$randomSuffix';
 
-    final tags = _tagsController.text
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
+    final tags = _selectedTags.toList();
 
     // Add contract type to tags for filtering if it's not already there
     if (!tags.contains(_contractType)) {
@@ -111,7 +156,6 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
       'whatsapp_number': _cleanPhone(rawData['whatsapp_number'] as String),
       'description': rawData['description'],
       'tags': tags,
-      'contract_type': _contractType,
       'requires_cover_letter': _requiresCoverLetter,
       'cover_letter_instructions': rawData['cover_letter_instructions'],
       'deadline': rawData['deadline'],
@@ -403,12 +447,93 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
             ),
             SizedBox(height: 16.h),
 
-            _buildTextField(
-              controller: _tagsController,
-              label: 'Compétences clés / Tags (séparés par virgules)',
-              hint: 'Ex: Comptabilité, Excel, Vente, Accueil',
-              icon: Icons.label_outline,
-              validator: (v) => v!.isEmpty ? 'Veuillez entrer au moins un tag de compétence' : null,
+            // Tags selector from database
+            Container(
+              padding: EdgeInsets.all(16.r),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16.r),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.label_outline, color: const Color(0xFF94A3B8), size: 20.r),
+                      SizedBox(width: 8.w),
+                      Text(
+                        'Secteurs / Compétences *',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    'Sélectionnez les tags qui correspondent à l\'offre',
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+                  if (_selectedTags.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 6.w,
+                      runSpacing: 6.h,
+                      children: _selectedTags.map((tag) {
+                        return Chip(
+                          label: Text(tag, style: TextStyle(fontSize: 12.sp, color: Colors.white, fontWeight: FontWeight.bold)),
+                          backgroundColor: const Color(0xFFF97316),
+                          deleteIcon: Icon(Icons.close, size: 16.r, color: Colors.white),
+                          onDeleted: () => setState(() => _selectedTags.remove(tag)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+                          padding: EdgeInsets.symmetric(horizontal: 4.w),
+                        );
+                      }).toList(),
+                    ),
+                    SizedBox(height: 12.h),
+                    const Divider(),
+                    SizedBox(height: 8.h),
+                  ],
+                  if (_isLoadingTags)
+                    const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                  else if (_availableTags.isEmpty)
+                    Text('Aucun tag disponible', style: TextStyle(fontSize: 12.sp, color: const Color(0xFF94A3B8)))
+                  else
+                    SizedBox(
+                      height: 200.h,
+                      child: SingleChildScrollView(
+                        child: Wrap(
+                          spacing: 6.w,
+                          runSpacing: 6.h,
+                          children: _availableTags.map((tag) {
+                            final isSelected = _selectedTags.contains(tag);
+                            return FilterChip(
+                              label: Text(tag, style: TextStyle(fontSize: 12.sp)),
+                              selected: isSelected,
+                              onSelected: (_) => setState(() {
+                                isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag);
+                              }),
+                              selectedColor: const Color(0xFFF97316).withValues(alpha: 0.15),
+                              checkmarkColor: const Color(0xFFF97316),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20.r),
+                                side: BorderSide(
+                                  color: isSelected ? const Color(0xFFF97316) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
             SizedBox(height: 24.h),
 
