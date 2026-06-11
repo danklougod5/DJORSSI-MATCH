@@ -59,7 +59,7 @@ serve(async (req) => {
         // Find the payment record
         const { data: payment, error: pError } = await supabase
             .from("payments")
-            .select("user_id, status")
+            .select("user_id, status, amount, metadata")
             .eq("pay_token", reference)
             .single();
 
@@ -78,24 +78,60 @@ serve(async (req) => {
             .update({ status: "SUCCESS" })
             .eq("pay_token", reference);
 
-        // Activate Premium for 30 days
-        const premiumUntil = new Date();
-        premiumUntil.setDate(premiumUntil.getDate() + 30);
+        const payType = payment.metadata?.type;
+        const amount = payment.amount;
 
-        const { error: uError } = await supabase
-            .from("profiles")
-            .update({
-                is_premium: true,
-                premium_until: premiumUntil.toISOString(),
-            })
-            .eq("id", payment.user_id);
+        if (payType === "premium" || (amount >= 2000 && payType !== "extra_cv" && payType !== "modification")) {
+            // Activate Premium for 30 days
+            const premiumUntil = new Date();
+            premiumUntil.setDate(premiumUntil.getDate() + 30);
 
-        if (uError) {
-            console.error("Error updating profile:", uError);
-            return new Response("Error updating profile", { status: 500 });
+            const { error: uError } = await supabase
+                .from("profiles")
+                .update({
+                    is_premium: true,
+                    premium_until: premiumUntil.toISOString(),
+                })
+                .eq("id", payment.user_id);
+
+            if (uError) {
+                console.error("Error updating profile for premium:", uError);
+                return new Response("Error updating profile", { status: 500 });
+            }
+
+            console.log(`Successfully activated premium for user: ${payment.user_id}`);
+        } else if (payType === "extra_cv" || (amount === 500 && payType !== "modification")) {
+            // Increment extra_cvs_purchased by 1
+            // Fetch current extra_cvs_purchased first
+            const { data: profile, error: profError } = await supabase
+                .from("profiles")
+                .select("extra_cvs_purchased")
+                .eq("id", payment.user_id)
+                .single();
+            
+            if (profError) {
+                console.error("Error fetching profile:", profError);
+                return new Response("Error fetching profile", { status: 500 });
+            }
+
+            const currentPurchased = profile?.extra_cvs_purchased || 0;
+
+            const { error: uError } = await supabase
+                .from("profiles")
+                .update({
+                    extra_cvs_purchased: currentPurchased + 1,
+                })
+                .eq("id", payment.user_id);
+
+            if (uError) {
+                console.error("Error updating profile for extra_cvs:", uError);
+                return new Response("Error updating profile", { status: 500 });
+            }
+            console.log(`Successfully recorded extra CV slot purchase for user: ${payment.user_id}`);
+        } else if (payType === "modification") {
+            // Client checks payment table status
+            console.log(`Successfully processed modification payment for user: ${payment.user_id}`);
         }
-
-        console.log(`Successfully activated premium for user: ${payment.user_id}`);
     } else if (event === "payment.failed" || status === "failed" || event === "payment.cancelled") {
         await supabase
             .from("payments")

@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
-import 'package:file_picker/file_picker.dart';
-import '../../../core/services/profile_notifier.dart';
-import '../../../core/utils/error_translator.dart';
+import '../../../core/services/version_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:in_app_review/in_app_review.dart';
-import 'dart:io';
+import '../../../core/cache/local_cache.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -22,14 +20,12 @@ class _ProfileScreenState extends State<ProfileScreen>
     with WidgetsBindingObserver {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
-  bool _isUploading = false;
   Map<String, dynamic>? _profileData;
   List<String> _skills = [];
   String? _fullName;
-  String? _cvUrl;
+  int _unreadSupportReplies = 0;
 
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
-  bool _hasLoadedOnce = false;
 
   @override
   void initState() {
@@ -41,20 +37,15 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Recharger quand l'app revient au premier plan
-    if (state == AppLifecycleState.resumed) {
-      _loadProfile();
-    }
+    // Le Realtime gère déjà les mises à jour du profil.
+    // Pas besoin de recharger ici (économie d'Egress).
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Recharger à chaque fois qu'on revient sur cet écran (navigation)
-    if (_hasLoadedOnce) {
-      _loadProfile();
-    }
-    _hasLoadedOnce = true;
+    // Le Realtime gère déjà les mises à jour du profil.
+    // Pas besoin de recharger à chaque retour de navigation (économie d'Egress).
   }
 
   /// Abonnement realtime pour que le profil se mette à jour automatiquement
@@ -68,11 +59,12 @@ class _ProfileScreenState extends State<ProfileScreen>
         .eq('id', userId)
         .listen((data) {
           if (data.isNotEmpty && mounted) {
+            // Sauvegarder dans le cache local
+            LocalCache.save(LocalCache.profileKey, data.first);
             setState(() {
               _profileData = data.first;
               _skills = List<String>.from(data.first['skills'] ?? []);
               _fullName = data.first['full_name'];
-              _cvUrl = data.first['cv_url'];
             });
           }
         });
@@ -85,8 +77,35 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.dispose();
   }
 
-  Future<void> _loadProfile() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadProfile({bool forceRefresh = false}) async {
+    // 1. Lire le cache immédiatement pour l'affichage instantané
+    try {
+      final cachedProfile = await LocalCache.load(LocalCache.profileKey);
+      if (cachedProfile != null && cachedProfile is Map<String, dynamic> && mounted) {
+        setState(() {
+          _profileData = cachedProfile;
+          _skills = List<String>.from(cachedProfile['skills'] ?? []);
+          _fullName = cachedProfile['full_name'];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lecture cache profil: $e');
+    }
+
+    // 2. Si le cache est frais et qu'on ne force pas, s'arrêter là (économie d'Egress)
+    try {
+      final isFresh = await LocalCache.isFresh(LocalCache.profileKey, LocalCache.profileTTL);
+      if (isFresh && !forceRefresh) {
+        debugPrint('*** [CACHE] Profil chargé depuis le cache frais (TTL) - Pas d\'appel réseau ***');
+        return;
+      }
+    } catch (e) {
+      debugPrint('Erreur vérification cache profil: $e');
+    }
+
+    // Sinon, charger depuis Supabase
+    setState(() => _isLoading = _profileData == null);
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) {
@@ -96,22 +115,41 @@ class _ProfileScreenState extends State<ProfileScreen>
 
       final response = await _supabase
           .from('profiles')
-          .select()
+          .select('id, full_name, skills, cv_url, is_premium, premium_until, sexe')
           .eq('id', user.id)
           .maybeSingle();
 
       if (response != null) {
-        setState(() {
-          _profileData = response;
-          _skills = List<String>.from(response['skills'] ?? []);
-          _fullName = response['full_name'];
-          _cvUrl = response['cv_url'];
-        });
+        // Mettre en cache
+        await LocalCache.save(LocalCache.profileKey, response);
+        
+        if (mounted) {
+          setState(() {
+            _profileData = response;
+            _skills = List<String>.from(response['skills'] ?? []);
+            _fullName = response['full_name'];
+          });
+        }
+      }
+
+      if (user != null) {
+        final unreadRes = await _supabase
+            .from('support_messages')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('is_read', false);
+        if (mounted) {
+          setState(() {
+            _unreadSupportReplies = (unreadRes as List).length;
+          });
+        }
       }
     } catch (e) {
       debugPrint('Erreur lors du chargement du profil: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -120,133 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final result = await context.push('/complete-profile');
     // Si le profil a été modifié, recharger les données
     if (result == true && mounted) {
-      _loadProfile();
-    }
-  }
-
-  Future<void> _pickAndUploadCV() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'doc', 'docx'],
-      );
-
-      if (result != null) {
-        setState(() => _isUploading = true);
-
-        final path = result.files.single.path;
-        if (path == null) {
-          debugPrint('Erreur: Le chemin du fichier est null');
-          setState(() => _isUploading = false);
-          return;
-        }
-
-        final user = _supabase.auth.currentUser;
-        if (user == null) {
-          debugPrint('Erreur: Utilisateur non connecté');
-          setState(() => _isUploading = false);
-          return;
-        }
-
-        // Security Fix: Basic path traversal check
-        if (path.contains('..')) {
-          debugPrint(
-            'Erreur: Chemin de fichier invalide (tentative de traversée)',
-          );
-          setState(() => _isUploading = false);
-          return;
-        }
-
-        final file = File(path);
-        
-        // 1. Validation de la taille (max 5 Mo)
-        final size = await file.length();
-        if (size > 5 * 1024 * 1024) {
-          setState(() => _isUploading = false);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Erreur: Le fichier est trop volumineux (Maximum 5 Mo).')),
-            );
-          }
-          return;
-        }
-
-        // 2. Validation de la signature du fichier (Magic Bytes)
-        bool isValidFormat = false;
-        try {
-          final bytes = await file.openRead(0, 8).first;
-          // Check PDF: %PDF (25 50 44 46)
-          if (bytes.length >= 4 && bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46) {
-             isValidFormat = true;
-          }
-          // Check DOCX: PK\x03\x04 (50 4B 03 04)
-          else if (bytes.length >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
-             isValidFormat = true;
-          }
-          // Check DOC: D0 CF 11 E0 A1 B1 1A E1
-          else if (bytes.length >= 8 && bytes[0] == 0xD0 && bytes[1] == 0xCF && bytes[2] == 0x11 && bytes[3] == 0xE0) {
-             isValidFormat = true;
-          }
-        } catch (e) {
-          debugPrint('Erreur lors de la lecture des magic bytes: $e');
-        }
-
-        if (!isValidFormat) {
-          setState(() => _isUploading = false);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Fichier corrompu ou falsifié. Veuillez envoyer un vrai document PDF ou Word.')),
-            );
-          }
-          return;
-        }
-
-        final fileExt = result.files.single.extension ?? 'pdf';
-        final fileName = '${user.id}_cv.$fileExt';
-        final filePath = 'cvs/$fileName';
-
-        // Upload to Supabase Storage (bucket: cv_files)
-        await _supabase.storage
-            .from('cv_files')
-            .upload(
-              filePath,
-              file,
-              fileOptions: const FileOptions(upsert: true),
-            );
-
-        // Get public URL
-        final String publicUrl = _supabase.storage
-            .from('cv_files')
-            .getPublicUrl(filePath);
-
-        // Update profile in DB
-        await _supabase
-            .from('profiles')
-            .update({'cv_url': publicUrl})
-            .eq('id', user.id);
-
-        setState(() {
-          _cvUrl = publicUrl;
-          _isUploading = false;
-        });
-
-        // Signaler le changement pour recharger le swipe
-        ProfileNotifier.notifyProfileUpdated();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('CV mis à jour avec succès !')),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Erreur upload CV: $e');
-      setState(() => _isUploading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ErrorTranslator.translate(e))),
-        );
-      }
+      _loadProfile(forceRefresh: true);
     }
   }
 
@@ -273,6 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
 
     if (confirmed == true) {
+      await LocalCache.clearAll();
       await _supabase.auth.signOut();
       if (mounted) {
         context.go('/auth');
@@ -320,13 +233,10 @@ class _ProfileScreenState extends State<ProfileScreen>
         // 1. Appeler l'Edge Function pour supprimer le compte définitivement (Auth + Profil)
         await _supabase.functions.invoke(
           'delete-account',
-          headers: {
-            'Authorization':
-                'Bearer ${_supabase.auth.currentSession?.accessToken}',
-          },
         );
 
-        // 2. Déconnexion locale pour forcer le nettoyage de la session
+        // 2. Déconnexion locale pour forcer le nettoyage de la session et du cache
+        await LocalCache.clearAll();
         await _supabase.auth.signOut();
 
         if (mounted) {
@@ -377,7 +287,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _shareApp() async {
-    const String text = 'Découvrez Djorssi Match, l\'application qui révolutionne la recherche d\'emploi par le swipe ! 🚀\n\nAndroid: https://play.google.com/store/apps/details?id=com.djorssi.match\nWeb: https://www.djorssi-match.com';
+    const String text = 'Découvrez Djorssi Match, l\'application qui révolutionne la recherche d\'emploi par le swipe ! 🚀\n\nAndroid: https://play.google.com/store/apps/details?id=com.djossimatch.djossimatch\niPhone: https://apps.apple.com/us/app/djorssi-match/id6767549287\nWeb: https://www.djorssi-match.com';
     await Share.share(text, subject: 'Trouve ton prochain job sur Djorssi Match !');
   }
 
@@ -385,7 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     final InAppReview inAppReview = InAppReview.instance;
     try {
       await inAppReview.openStoreListing(
-        appStoreId: '6740356525', // Remplacez par votre App Store ID réel si nécessaire
+        appStoreId: '6767549287',
       );
     } catch (e) {
       debugPrint('Erreur lors de l\'ouverture du store : $e');
@@ -627,55 +537,6 @@ class _ProfileScreenState extends State<ProfileScreen>
 
             SizedBox(height: 16.h),
 
-            // Section CV
-            _buildCardSection(
-              title: 'Mon CV',
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: EdgeInsets.all(10.r),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF97316).withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.description,
-                    color: const Color(0xFFF97316),
-                    size: 24.r,
-                  ),
-                ),
-                title: Text(
-                  _cvUrl != null ? 'CV déjà téléchargé' : 'Aucun CV ajouté',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15.sp,
-                  ),
-                ),
-                subtitle: Text(
-                  _cvUrl != null
-                      ? 'Cliquez pour remplacer'
-                      : 'Ajoutez votre CV pour postuler',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                trailing: _isUploading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        Icons.upload_file,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                onTap: _isUploading ? null : _pickAndUploadCV,
-              ),
-            ),
-
-            SizedBox(height: 16.h),
-
             // Autres Options
             Container(
               padding: EdgeInsets.all(8.w),
@@ -689,9 +550,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     icon: Icons.notifications_none_rounded,
                     title: 'Alertes Emplois',
                     subtitle: 'Gérer mes notifications',
-                    trailing: (_profileData?['is_premium'] ?? false)
-                        ? null
-                        : Container(
+                    trailing: (VersionService.showPremium && !(_profileData?['is_premium'] ?? false))
+                        ? Container(
                             padding: EdgeInsets.symmetric(
                               horizontal: 8.w,
                               vertical: 4.h,
@@ -708,8 +568,38 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 color: const Color(0xFFF97316),
                               ),
                             ),
-                          ),
+                          )
+                        : null,
                     onTap: () => context.push('/job-alerts'),
+                  ),
+                  _buildOptionTile(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    title: 'Suggestions & Questions',
+                    subtitle: 'Partager vos idées ou poser des questions',
+                    color: Colors.teal,
+                    trailing: _unreadSupportReplies > 0
+                        ? Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8.w,
+                              vertical: 4.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(10.r),
+                            ),
+                            child: Text(
+                              '$_unreadSupportReplies',
+                              style: TextStyle(
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          )
+                        : null,
+                    onTap: () => context.push('/support').then((_) {
+                      if (mounted) _loadProfile();
+                    }),
                   ),
                   _buildOptionTile(
                     icon: Icons.info_outline_rounded,
@@ -767,6 +657,12 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildPremiumBanner() {
     final isPremium = _profileData?['is_premium'] ?? false;
+    
+    // Si le mode Premium est désactivé à distance (pour la validation Apple)
+    // et que l'utilisateur n'est pas déjà premium, on cache la bannière.
+    if (!VersionService.showPremium && !isPremium) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       clipBehavior: Clip.antiAlias, // Pour que les cercles ne dépassent pas

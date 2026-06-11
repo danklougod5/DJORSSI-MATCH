@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { 
   Briefcase, 
   CheckCircle2, 
-  Star, 
   Search, 
   Pencil, 
   Trash2, 
@@ -24,6 +23,8 @@ interface JobsTabProps {
   handleBulkDeleteJobs: (jobIds: string[]) => Promise<boolean>;
   fetchJobs: () => Promise<void>;
   handleCleanupExpiredJobs: () => Promise<void>;
+  handleApproveJob: (jobId: string) => Promise<void>;
+  handleBulkApproveJobs: (jobIds: string[]) => Promise<boolean>;
 }
 
 const JobsTab: React.FC<JobsTabProps> = ({
@@ -34,7 +35,9 @@ const JobsTab: React.FC<JobsTabProps> = ({
   handleDeleteJob,
   handleBulkDeleteJobs,
   fetchJobs,
-  handleCleanupExpiredJobs
+  handleCleanupExpiredJobs,
+  handleApproveJob,
+  handleBulkApproveJobs
 }) => {
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
@@ -44,6 +47,7 @@ const JobsTab: React.FC<JobsTabProps> = ({
   const [filterAiVerified, setFilterAiVerified] = useState<string>('all');
   const [filterDateLimit, setFilterDateLimit] = useState<string>('all'); // all, active, expired
   const [filterLevel, setFilterLevel] = useState<string>('all');
+  const [filterApproved, setFilterApproved] = useState<string>('all'); // all, approved, pending
 
   // Derive unique locations and levels for filters
   const locations = useMemo(() => {
@@ -114,9 +118,13 @@ const JobsTab: React.FC<JobsTabProps> = ({
         }
       }
 
+      // Approved filter
+      if (filterApproved === 'approved' && job.is_approved === false) return false;
+      if (filterApproved === 'pending' && job.is_approved !== false) return false;
+
       return true;
     });
-  }, [jobsList, jobsSearch, filterLocation, filterAiVerified, filterDateLimit, filterLevel]);
+  }, [jobsList, jobsSearch, filterLocation, filterAiVerified, filterDateLimit, filterLevel, filterApproved]);
 
   const toggleSelectAll = () => {
     if (selectedJobIds.length === filteredJobs.length) {
@@ -141,11 +149,20 @@ const JobsTab: React.FC<JobsTabProps> = ({
     }
   };
 
+  const onBulkApprove = async () => {
+    if (selectedJobIds.length === 0) return;
+    const confirmed = await handleBulkApproveJobs(selectedJobIds);
+    if (confirmed) {
+      setSelectedJobIds([]);
+    }
+  };
+
   const resetFilters = () => {
     setFilterLocation('all');
     setFilterAiVerified('all');
     setFilterDateLimit('all');
     setFilterLevel('all');
+    setFilterApproved('all');
     setJobsSearch('');
   };
 
@@ -153,7 +170,8 @@ const JobsTab: React.FC<JobsTabProps> = ({
     filterLocation !== 'all',
     filterAiVerified !== 'all',
     filterDateLimit !== 'all',
-    filterLevel !== 'all'
+    filterLevel !== 'all',
+    filterApproved !== 'all'
   ].filter(Boolean).length;
 
   return (
@@ -178,15 +196,15 @@ const JobsTab: React.FC<JobsTabProps> = ({
               <CheckCircle2 size={24} />
             </div>
          </div>
-         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center group hover:border-cta/30 transition-all">
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Localisations</p>
-              <h4 className="text-2xl font-black text-cta">{new Set(jobsList.map(j => j.location)).size}</h4>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-cta/10 text-cta flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Star size={24} />
-            </div>
-         </div>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center group hover:border-amber-500/30 transition-all">
+             <div>
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">En attente d'approbation</p>
+               <h4 className="text-2xl font-black text-amber-500">{jobsList.filter(j => j.is_approved === false).length}</h4>
+             </div>
+             <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center group-hover:scale-110 transition-transform">
+               <Briefcase size={24} />
+             </div>
+          </div>
       </div>
 
       {/* Action & Filter Bar */}
@@ -228,6 +246,13 @@ const JobsTab: React.FC<JobsTabProps> = ({
                   {selectedJobIds.length} sélectionnés
                 </span>
                 <button 
+                  onClick={onBulkApprove}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-green-500 text-white rounded-2xl font-bold text-sm shadow-lg shadow-green-200 hover:bg-green-600 transition-all active:scale-95 cursor-pointer"
+                >
+                  <CheckCircle2 size={18} />
+                  <span>Approuver</span>
+                </button>
+                <button 
                   onClick={onBulkDelete}
                   className="flex items-center gap-2 px-4 py-2.5 bg-red-500 text-white rounded-2xl font-bold text-sm shadow-lg shadow-red-200 hover:bg-red-600 transition-all active:scale-95"
                 >
@@ -264,7 +289,7 @@ const JobsTab: React.FC<JobsTabProps> = ({
 
         {/* Expandable Advanced Filters */}
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 animate-in slide-in-from-top-4 duration-300">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 p-4 bg-slate-50/50 rounded-2xl border border-slate-100 animate-in slide-in-from-top-4 duration-300">
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
                 <MapPin size={12} /> Localisation
@@ -293,6 +318,21 @@ const JobsTab: React.FC<JobsTabProps> = ({
                 <option value="all">Tous les statuts</option>
                 <option value="verified">Vérifiés par AI</option>
                 <option value="unverified">Non vérifiés</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                <CheckCircle2 size={12} /> Approbation
+              </label>
+              <select 
+                value={filterApproved}
+                onChange={(e) => setFilterApproved(e.target.value)}
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all appearance-none cursor-pointer"
+              >
+                <option value="all">Toutes les offres</option>
+                <option value="approved">Approuvées</option>
+                <option value="pending">En attente</option>
               </select>
             </div>
 
@@ -364,6 +404,7 @@ const JobsTab: React.FC<JobsTabProps> = ({
                 <th className="px-6 py-5">Tags (Mots-clés)</th>
                 <th className="px-6 py-5">E-mail de contact</th>
                 <th className="px-6 py-5">Statut AI</th>
+                <th className="px-6 py-5">Approbation</th>
                 <th className="px-6 py-5 text-right">Actions</th>
               </tr>
             </thead>
@@ -466,8 +507,29 @@ const JobsTab: React.FC<JobsTabProps> = ({
                         </span>
                       )}
                     </td>
+                    <td className="px-6 py-5">
+                      {job.is_approved !== false ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-50 text-green-700 text-[9px] font-black rounded-lg uppercase tracking-wider border border-green-200">
+                          <CheckCircle2 size={10} /> Approuvé
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 text-[9px] font-black rounded-lg uppercase tracking-wider border border-amber-200 animate-pulse">
+                          En attente
+                        </span>
+                      )}
+                    </td>
                     <td className="px-6 py-5 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                        {job.is_approved === false && (
+                          <button 
+                            onClick={() => handleApproveJob(job.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-xl font-black text-[10px] uppercase tracking-wider shadow-md shadow-green-150 hover:bg-green-600 transition-all active:scale-95 cursor-pointer shrink-0"
+                            title="Approuver l'offre"
+                          >
+                            <CheckCircle2 size={12} />
+                            <span>Approuver</span>
+                          </button>
+                        )}
                         <button 
                           onClick={() => setEditingJob({...job})}
                           className="p-2 text-slate-400 hover:text-primary hover:bg-slate-100 rounded-lg transition-colors"
@@ -490,7 +552,7 @@ const JobsTab: React.FC<JobsTabProps> = ({
               
               {filteredJobs.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-6 py-20 text-center">
+                  <td colSpan={12} className="px-6 py-20 text-center">
                      <LayoutGrid size={48} className="mx-auto text-slate-100 mb-4" />
                      <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Aucun résultat correspondant</p>
                      <button 

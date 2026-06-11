@@ -37,6 +37,17 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Cette application a besoin d'utiliser l'appareil photo pour vous permettre de prendre une photo de votre CV.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Cette application a besoin d'utiliser le micro pour la dictée vocale de votre CV.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Cette application utilise la reconnaissance vocale pour vous permettre de dicter le contenu de votre CV.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Cette application a besoin d'accéder à votre galerie pour vous permettre de choisir une photo de votre CV.</string>
+
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -60,6 +71,8 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -77,15 +90,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Cette application a besoin d'accéder à votre galerie pour vous permettre de choisir une photo de votre CV.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Cette application a besoin d'utiliser l'appareil photo pour vous permettre de prendre une photo de votre CV.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Cette application a besoin d'utiliser le micro (pour la capture vidéo si nécessaire).</string>
-	<key>UIFileSharingEnabled</key>
-	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

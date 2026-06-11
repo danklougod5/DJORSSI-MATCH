@@ -9,7 +9,11 @@ import {
   AlertCircle,
   Settings,
   BarChart3,
-  Bell
+  Bell,
+  ShieldAlert,
+  Hand,
+  FileText,
+  CheckSquare
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -17,12 +21,16 @@ import UserEditModal from './admin/UserEditModal';
 import JobEditModal from './admin/JobEditModal';
 import OverviewTab from './admin/OverviewTab';
 import UsersTab from './admin/UsersTab';
-import FeedbackTab from './admin/FeedbackTab';
+import JobApprovalTab from './admin/JobApprovalTab';
 import AddJobTab from './admin/AddJobTab';
 import JobsTab from './admin/JobsTab';
 import SettingsTab from './admin/SettingsTab';
 import JobMetricsTab from './admin/JobMetricsTab';
 import NotificationsTab from './admin/NotificationsTab';
+import ReportsTab from './admin/ReportsTab';
+import SwipesTab from './admin/SwipesTab';
+import CvTrialTab from './admin/CvTrialTab';
+import SupportTab from './admin/SupportTab';
 
 const cleanPhone = (phone: any): string => {
   if (!phone) return "";
@@ -38,12 +46,12 @@ const cleanPhone = (phone: any): string => {
 const COLORS = ['#FF8200', '#009A44', '#F43F5E', '#7C3AED'];
 
 const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'feedback' | 'add-jobs' | 'all-jobs' | 'settings' | 'job-metrics' | 'notifications'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'job-approval' | 'add-jobs' | 'all-jobs' | 'settings' | 'job-metrics' | 'notifications' | 'reports' | 'swipes' | 'cv-trial' | 'support'>('overview');
   const [stats, setStats] = useState({
     totalUsers: 0,
     premiumUsers: 0,
     activeJobs: 0,
-    pendingFeedback: 0,
+    pendingApprovals: 0,
     maleUsers: 0,
     femaleUsers: 0,
     iosWaitlist: 0,
@@ -58,8 +66,6 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [feedbacks, setFeedbacks] = useState<any[]>([]);
-  const [unsubscriptions, setUnsubscriptions] = useState<any[]>([]);
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,6 +79,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
   const [dailyActivity, setDailyActivity] = useState<any[]>([]);
   const [topSectors, setTopSectors] = useState<any[]>([]);
+  const [reportsList, setReportsList] = useState<any[]>([]);
 
   const userTypeData = [
     { name: 'Freemium', value: stats.totalUsers - stats.premiumUsers },
@@ -82,6 +89,9 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   useEffect(() => {
     fetchStats();
     fetchJobs();
+    if (activeTab === 'reports') {
+      fetchReports();
+    }
     
     // Auto-refresh logs and status every 5 seconds
     const interval = setInterval(() => {
@@ -102,6 +112,12 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       
       const { count: iosWaitlistCount } = await supabase.from('ios_waitlist').select('id', { count: 'exact', head: true });
 
+      // Get pending jobs count (is_approved = false)
+      const { count: pendingJobsCount } = await supabase
+        .from('jobs')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_approved', false);
+
       setStats(prev => ({
         ...prev,
         totalUsers: usersCount || 0,
@@ -109,12 +125,13 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         activeJobs: jobsCount || 0,
         maleUsers: maleCount || 0,
         femaleUsers: femaleCount || 0,
-        iosWaitlist: iosWaitlistCount || 0
+        iosWaitlist: iosWaitlistCount || 0,
+        pendingApprovals: pendingJobsCount || 0
       }));
 
       const { data: userData } = await supabase
         .from('profiles')
-        .select('id, full_name, is_premium, created_at, phone_number, skills')
+        .select('id, full_name, is_premium, created_at, phone_number, skills, extra_cvs_purchased')
         .order('is_premium', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(500);
@@ -126,55 +143,29 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           premium: u.is_premium,
           date: new Date(u.created_at).toLocaleDateString(),
           phone: u.phone_number || '-',
-          sector: Array.isArray(u.skills) ? u.skills.join(', ') : (u.skills || '-')
+          sector: Array.isArray(u.skills) ? u.skills.join(', ') : (u.skills || '-'),
+          extraCvsPurchased: u.extra_cvs_purchased || 0
         })));
       }
 
-      const { data: feedbackData, error: fbErr } = await supabase
-        .from('feedbacks')
-        .select('id, content, rating, created_at, user_id')
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
-      if (!fbErr && feedbackData) {
-        setStats(prev => ({ ...prev, pendingFeedback: feedbackData.length }));
-        setFeedbacks(feedbackData.map((f: any) => ({
-          user: 'Utilisateur',
-          content: f.content,
-          rating: f.rating,
-          date: new Date(f.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }),
-          type: 'feedback'
-        })));
-      }
-
-      const { data: unsubData, error: unsubErr } = await supabase
-        .from('unsubscriptions')
-        .select('id, feedback, reason, created_at, user_id')
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      if (!unsubErr && unsubData) {
-        setUnsubscriptions(unsubData.map((u: any) => ({
-          user: 'Utilisateur',
-          content: u.feedback || 'Aucun commentaire',
-          reason: u.reason || 'Non précisée',
-          date: new Date(u.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }),
-          type: 'unsub'
-        })));
-      }
+      const { data: recentJobs } = await supabase
+        .from('jobs')
+        .select('created_at, source_url')
+        .gte('created_at', sevenDaysAgo.toISOString());
 
       const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
       const activity = Array.from({ length: 7 }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - (6 - i));
         const dayLabel = days[d.getDay()];
-        const fbCount = (feedbackData || []).filter((f: any) => 
-          new Date(f.created_at).toDateString() === d.toDateString()
+        const count = (recentJobs || []).filter((j: any) => 
+          j.source_url && j.source_url.startsWith('recruiter_post_') &&
+          new Date(j.created_at).toDateString() === d.toDateString()
         ).length;
-        const unsubCount = (unsubData || []).filter((u: any) => 
-          new Date(u.created_at).toDateString() === d.toDateString()
-        ).length;
-        return { name: dayLabel, count: fbCount + unsubCount };
+        return { name: dayLabel, count };
       });
       setDailyActivity(activity);
 
@@ -302,6 +293,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       location: item.lieu || "Côte d'Ivoire",
       source_url: rawUrl || `manual_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
       is_ai_verified: true,
+      is_approved: true,
       tags: item.tags,
       contact_email: item.email || null,
       whatsapp_number: cleanPhone(item.contact as string),
@@ -361,8 +353,77 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       if (error) throw error;
       setSuccessMessage("Offre d'emploi supprimée !");
       setJobsList(prev => prev.filter(j => j.id !== jobId));
+      setReportsList(prev => prev.filter(r => r.jobs?.id !== jobId));
     } catch (err: any) {
       setErrorMessage(err.message || "Erreur de suppression");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchReports = async () => {
+    setIsLoading(true);
+    try {
+      const { data: reportsData, error: reportsError } = await supabase
+        .from('job_reports')
+        .select(`
+          id,
+          reason,
+          details,
+          created_at,
+          user_id,
+          jobs:job_id(id, job_title, company_name, location)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (reportsError) throw reportsError;
+
+      if (!reportsData || reportsData.length === 0) {
+        setReportsList([]);
+        return;
+      }
+
+      const userIds = Array.from(new Set(reportsData.map((r: any) => r.user_id).filter(Boolean)));
+      const profilesMap: Record<string, string> = {};
+
+      if (userIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+
+        if (!profilesError && profilesData) {
+          profilesData.forEach((p: any) => {
+            if (p.full_name) {
+              profilesMap[p.id] = p.full_name;
+            }
+          });
+        }
+      }
+
+      const combined = reportsData.map((r: any) => ({
+        ...r,
+        profiles: r.user_id && profilesMap[r.user_id] ? { full_name: profilesMap[r.user_id] } : null
+      }));
+
+      setReportsList(combined);
+    } catch (err: any) {
+      console.error("Error fetching reports:", err);
+      setErrorMessage("Impossible de charger les signalements : " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDismissReport = async (reportId: string) => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.from('job_reports').delete().eq('id', reportId);
+      if (error) throw error;
+      setSuccessMessage("Signalement classé sans suite !");
+      setReportsList(prev => prev.filter(r => r.id !== reportId));
+    } catch (err: any) {
+      setErrorMessage(err.message || "Erreur lors du classement du signalement");
     } finally {
       setIsLoading(false);
     }
@@ -478,7 +539,9 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           contact_email: editingJob.contact_email,
           whatsapp_number: cleanPhone(editingJob.whatsapp_number),
           application_instructions: editingJob.application_instructions,
-          required_level: editingJob.required_level
+          required_level: editingJob.required_level,
+          is_ai_verified: editingJob.is_ai_verified,
+          is_approved: editingJob.is_approved !== false
         })
         .eq('id', editingJob.id);
 
@@ -487,6 +550,60 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       fetchJobs();
     } catch (err: any) {
       setErrorMessage(err.message || "Erreur lors de la mise à jour");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleApproveJob = async (jobId: string) => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ is_approved: true })
+        .eq('id', jobId);
+        
+      if (error) throw error;
+      setSuccessMessage("Offre approuvée avec succès !");
+      fetchJobs();
+
+      // Trigger alerts notification for the approved job
+      supabase.functions.invoke('notify-job-alerts', { body: { job_id: jobId } })
+        .then((res: any) => console.log('[ALERTS] Notification envoyée pour job approuvé', jobId, res))
+        .catch((err: any) => console.error('[ALERTS] Erreur notification job approuvé:', err));
+    } catch (err: any) {
+      setErrorMessage(err.message || "Erreur lors de l'approbation de l'offre");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBulkApproveJobs = async (jobIds: string[]): Promise<boolean> => {
+    if (!window.confirm(`Voulez-vous vraiment approuver ces ${jobIds.length} offres d'emploi ?`)) {
+      return false;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ is_approved: true })
+        .in('id', jobIds);
+        
+      if (error) throw error;
+      setSuccessMessage(`${jobIds.length} offres approuvées avec succès !`);
+      fetchJobs();
+
+      // Trigger alerts notification for each approved job
+      for (const jobId of jobIds) {
+        supabase.functions.invoke('notify-job-alerts', { body: { job_id: jobId } })
+          .then((res: any) => console.log('[ALERTS] Notification envoyée pour job approuvé', jobId, res))
+          .catch((err: any) => console.error('[ALERTS] Erreur notification job approuvé:', err));
+      }
+
+      return true;
+    } catch (err: any) {
+      setErrorMessage(err.message || "Erreur d'approbation groupée");
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -528,7 +645,12 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           application_instructions: item.objet || item.application_instructions || null,
           required_level: item.niveau || item.required_level || null,
           salary_range: item.salary_range || null,
+          requires_cover_letter: item.requires_cover_letter !== undefined 
+            ? !!item.requires_cover_letter 
+            : (!!item.lettre_motivation && String(item.lettre_motivation).toUpperCase() !== "NON"),
+          cover_letter_instructions: item.cover_letter_instructions || item.lettre_motivation || null,
           is_ai_verified: true,
+          is_approved: true,
           source_url: rawUrl || `bulk_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 8)}`,
           created_at: new Date().toISOString(),
           raw_data: item
@@ -635,7 +757,8 @@ reader.readAsText(file);
           full_name: editingUser.name,
           phone_number: editingUser.phone,
           is_premium: editingUser.premium,
-          skills: skillsArray
+          skills: skillsArray,
+          extra_cvs_purchased: editingUser.extraCvsPurchased || 0
         })
         .eq('id', editingUser.id);
 
@@ -789,8 +912,12 @@ reader.readAsText(file);
     { id: 'all-jobs', label: 'Base des Offres', icon: <Briefcase size={20} /> },
     { id: 'job-metrics', label: 'Métriques Offres', icon: <BarChart3 size={20} /> },
     { id: 'add-jobs', label: 'Ajout d\'Annonces', icon: <Plus size={20} /> },
+    { id: 'reports', label: 'Signalements', icon: <ShieldAlert size={20} /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell size={20} /> },
-    { id: 'feedback', label: 'Feedback', icon: <MessageSquare size={20} /> },
+    { id: 'swipes', label: 'Swipes', icon: <Hand size={20} /> },
+    { id: 'cv-trial', label: 'CV Essai', icon: <FileText size={20} /> },
+    { id: 'support', label: 'Suggestions & Q&A', icon: <MessageSquare size={20} /> },
+    { id: 'job-approval', label: 'Approbations', icon: <CheckSquare size={20} /> },
     { id: 'settings', label: 'Sécurité', icon: <Settings size={20} /> },
   ];
 
@@ -944,8 +1071,14 @@ reader.readAsText(file);
           />
         )}
 
-        {activeTab === 'feedback' && (
-          <FeedbackTab feedbacks={feedbacks} unsubscriptions={unsubscriptions} />
+        {activeTab === 'job-approval' && (
+          <JobApprovalTab 
+            jobsList={jobsList} 
+            handleApproveJob={handleApproveJob}
+            handleDeleteJob={handleDeleteJob}
+            setEditingJob={setEditingJob}
+            fetchJobs={fetchJobs}
+          />
         )}
 
         {activeTab === 'add-jobs' && (
@@ -971,11 +1104,25 @@ reader.readAsText(file);
             handleBulkDeleteJobs={handleBulkDeleteJobs}
             fetchJobs={fetchJobs}
             handleCleanupExpiredJobs={handleCleanupExpiredJobs}
+            handleApproveJob={handleApproveJob}
+            handleBulkApproveJobs={handleBulkApproveJobs}
           />
         )}
 
         {activeTab === 'job-metrics' && <JobMetricsTab />}
+        {activeTab === 'reports' && (
+          <ReportsTab 
+            reportsList={reportsList}
+            isLoading={isLoading}
+            handleDeleteJob={handleDeleteJob}
+            handleDismissReport={handleDismissReport}
+            fetchReports={fetchReports}
+          />
+        )}
         {activeTab === 'notifications' && <NotificationsTab />}
+        {activeTab === 'swipes' && <SwipesTab />}
+        {activeTab === 'cv-trial' && <CvTrialTab />}
+        {activeTab === 'support' && <SupportTab />}
         {activeTab === 'settings' && (
           <SettingsTab 
             handleUpdatePassword={handleUpdatePassword}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, CreditCard, Briefcase, MessageSquare, ChevronRight, Smartphone } from 'lucide-react';
+import { Users, CreditCard, Briefcase, ChevronRight, Smartphone, CheckSquare } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import StatCard from './StatCard';
 
@@ -70,7 +70,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         <StatCard title="Utilisateurs" value={stats.totalUsers.toLocaleString()} icon={<Users />} color="bg-primary" trend="+12% cette semaine" />
         <StatCard title="Abonnés Premium" value={stats.premiumUsers.toLocaleString()} icon={<CreditCard />} color="bg-secondary" trend="+5% cette semaine" />
         <StatCard title="Attente iOS" value={stats.iosWaitlist.toLocaleString()} icon={<Smartphone />} color="bg-black" trend="Demandes iPhone" />
-        <StatCard title="Messages" value={stats.pendingFeedback.toLocaleString()} icon={<MessageSquare />} color="bg-primary" trend="3 non lus" />
+        <StatCard title="Approbations" value={stats.pendingApprovals.toLocaleString()} icon={<CheckSquare />} color="bg-primary" trend="Offres en attente" />
         <StatCard title="Hommes" value={stats.maleUsers.toLocaleString()} icon={<Users />} color="bg-[#3B82F6]" trend="Sexe masculin" />
         <StatCard title="Femmes" value={stats.femaleUsers.toLocaleString()} icon={<Users />} color="bg-[#EC4899]" trend="Sexe féminin" />
         <StatCard title="Offres Actives" value={stats.activeJobs.toLocaleString()} icon={<Briefcase />} color="bg-secondary" trend="+24 ajoutées" />
@@ -131,7 +131,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
 
         {/* Bar Chart */}
         <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm min-w-0">
-           <h3 className="text-lg mb-6">Activité Feedback (7j)</h3>
+           <h3 className="text-lg mb-6">Offres Recruteurs (7j)</h3>
            <div className="h-64 text-xs w-full">
               <ResponsiveContainer width="99%" height="100%" minWidth={0}>
                 <BarChart data={dailyActivity}>

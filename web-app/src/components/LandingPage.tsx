@@ -1,11 +1,26 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, MessageSquare, PlayCircle, X, Menu, Heart, Zap, Quote, Bell } from 'lucide-react';
+import { Download, MessageSquare, PlayCircle, X, Menu, Heart, Zap, Quote } from 'lucide-react';
 import AppSimulator from './AppSimulator';
-import { supabase } from '../lib/supabase';
 
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.djossimatch.djossimatch';
+const APP_STORE_URL = 'https://apps.apple.com/us/app/djorssi-match/id6767549287';
+
+/** Détecte la plateforme de l'utilisateur et retourne l'URL du store correspondant */
+const getSmartDownloadUrl = (): string => {
+  const ua = navigator.userAgent || '';
+  // iOS : iPhone, iPad, iPod (inclut iPadOS qui se présente parfois comme Mac)
+  if (/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    return APP_STORE_URL;
+  }
+  // Android
+  if (/Android/i.test(ua)) {
+    return PLAY_STORE_URL;
+  }
+  // Desktop/autre : Play Store par défaut
+  return PLAY_STORE_URL;
+};
 
 interface FeatureCardProps {
   icon: React.ReactNode;
@@ -47,34 +62,8 @@ const TestimonialCard: React.FC<TestimonialProps> = ({ quote, name, role }) => (
 const LandingPage: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
-  const [iosEmail, setIosEmail] = useState('');
-  const [iosSubmitted, setIosSubmitted] = useState<string | null>(null);
-  const [iosLoading, setIosLoading] = useState(false);
 
-  const handleIosNotify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (iosEmail.trim() && !iosLoading) {
-      setIosLoading(true);
-      try {
-        const { error } = await supabase.from('ios_waitlist').insert([{ email: iosEmail.trim() }]);
-        if (error) {
-          if (error.code === '23505' || error.message?.toLowerCase().includes('unique')) {
-            setIosSubmitted("Tu es déjà dans la course ! 🏁\nL'app iOS est prête et en cours de validation finale chez Apple. Encore un tout petit peu de patience, le Djorssi sur iPhone arrive très fort ! 🔥");
-          } else {
-            throw error;
-          }
-        } else {
-          setIosSubmitted("L'app iOS est PRÊTE ! 🔥\nElle est actuellement en cours de validation par Apple. Tu seras le TOUT PREMIER averti dès qu'elle est dispo. Ton futur job n'attend pas ! 🚀");
-        }
-        setIosEmail('');
-      } catch (error: any) {
-        console.error('Error adding to waitlist', error);
-        alert("Oups ! Une erreur s'est produite. Assure-toi d'être bien connecté(e) à internet.");
-      } finally {
-        setIosLoading(false);
-      }
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-background selection:bg-accent selection:text-black">
@@ -94,7 +83,7 @@ const LandingPage: React.FC = () => {
             <a href="#features" className="hover:text-primary transition-colors cursor-pointer">Comment ça marche</a>
             <a href="#temoignages" className="hover:text-primary transition-colors cursor-pointer">Témoignages</a>
             <a
-              href={PLAY_STORE_URL}
+              href={getSmartDownloadUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="neo-brutal-btn py-2 px-6 text-sm flex items-center gap-2"
@@ -119,7 +108,7 @@ const LandingPage: React.FC = () => {
             <a href="#temoignages" onClick={() => setIsMobileMenuOpen(false)} className="p-4 hover:bg-slate-100 transition-colors">Témoignages</a>
             <div className="p-4 bg-slate-50">
                <a
-                 href={PLAY_STORE_URL}
+                 href={getSmartDownloadUrl()}
                  target="_blank"
                  rel="noopener noreferrer"
                  className="neo-brutal-btn w-full py-3 text-sm flex items-center justify-center gap-2"
@@ -148,7 +137,7 @@ const LandingPage: React.FC = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 md:gap-6">
               <a
-                href={PLAY_STORE_URL}
+                href={getSmartDownloadUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="neo-brutal-btn flex items-center justify-center gap-3 group w-full sm:w-auto no-underline !text-lg py-4"
@@ -175,47 +164,14 @@ const LandingPage: React.FC = () => {
                 </div>
               </a>
               
-              {/* App Store - Coming Soon Styled */}
-              <div className="flex items-center justify-center min-[450px]:justify-start gap-3 bg-slate-800 text-white px-5 py-3 rounded-md border-2 border-slate-700 opacity-80 animate-scintille shimmer-effect shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] cursor-help relative group">
+              {/* App Store */}
+              <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center min-[450px]:justify-start gap-3 bg-black text-white px-5 py-3 rounded-md border-2 border-black hover:scale-105 transition-transform no-underline shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                 <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.1 2.48-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.35-1.32-3.19-2.54-1.71-2.47-3.02-6.98-1.25-10.05.88-1.53 2.45-2.49 4.14-2.52 1.29-.02 2.5.87 3.29.87.79 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.31 2.81M15.96 3.54c.7-1 1.3-2.1 1.1-3.3-1 .1-2.3.8-3 1.8-.6.8-1.1 1.9-1 3 1 .1 2.2-.6 2.9-1.5z"/></svg>
                 <div className="text-left">
-                  <div className="text-[10px] font-medium opacity-80 uppercase tracking-wider">Bientôt sur</div>
+                  <div className="text-[10px] font-medium opacity-80 uppercase tracking-wider">Disponible sur</div>
                   <div className="text-sm font-black leading-tight">App Store</div>
                 </div>
-                {/* Tooltip */}
-                <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] py-1 px-3 rounded border border-white/20 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity font-bold uppercase tracking-widest z-50">
-                   En cours de validation
-                </div>
-              </div>
-            </div>
-
-            {/* iOS Waitlist (Hero Section) */}
-            <div className="mt-8 max-w-md w-full border-t-2 border-black/10 pt-6">
-              <p className="text-slate-600 font-bold text-sm mb-3 uppercase tracking-wider">Tu es sur iPhone ? Liste d'attente :</p>
-              {iosSubmitted ? (
-                <motion.div 
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="bg-green-100 border-2 border-green-500 rounded-xl px-4 py-3 shadow-[4px_4px_0px_0px_rgba(34,197,94,1)]"
-                >
-                  <p className="font-black text-green-700 text-sm leading-relaxed whitespace-pre-line">{iosSubmitted}</p>
-                </motion.div>
-              ) : (
-                <form onSubmit={handleIosNotify} className="flex flex-col min-[450px]:flex-row gap-3 w-full">
-                  <input
-                    type="email"
-                    placeholder="Ton adresse email..."
-                    value={iosEmail}
-                    onChange={(e) => setIosEmail(e.target.value)}
-                    className="w-full min-[450px]:flex-1 px-4 py-3 rounded-xl border-2 border-slate-300 bg-white text-black placeholder-slate-400 font-bold text-sm focus:outline-none focus:border-black focus:ring-2 focus:ring-black/20 transition-all shadow-sm"
-                    required
-                  />
-                  <button type="submit" disabled={iosLoading} className="neo-brutal-btn !py-3 !px-6 !text-sm flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 w-full min-[450px]:w-auto">
-                    <Bell size={16} />
-                    {iosLoading ? '...' : 'S\'INSCRIRE'}
-                  </button>
-                </form>
-              )}
+              </a>
             </div>
 
             <div className="mt-10 md:mt-14 flex flex-wrap items-center gap-y-8 gap-x-4 sm:gap-6 md:gap-8 justify-center lg:justify-start">
@@ -283,7 +239,7 @@ const LandingPage: React.FC = () => {
           {/* Mid-page CTA */}
           <div className="mt-16 text-center">
             <a
-              href={PLAY_STORE_URL}
+              href={getSmartDownloadUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="neo-brutal-btn inline-flex items-center gap-3 text-lg no-underline"
@@ -342,7 +298,7 @@ const LandingPage: React.FC = () => {
           
           <div className="flex flex-col sm:flex-row gap-4 md:gap-6 justify-center items-center">
             <a
-              href={PLAY_STORE_URL}
+              href={getSmartDownloadUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="neo-brutal-btn !bg-primary !border-white text-2xl px-10 md:px-16 py-6 md:py-8 w-full sm:w-auto flex items-center justify-center gap-4 no-underline group"
@@ -358,39 +314,10 @@ const LandingPage: React.FC = () => {
               <span className="font-black text-sm">Google Play</span>
             </a>
             
-            <div className="flex items-center gap-3 bg-white/5 backdrop-blur text-white/50 px-5 py-3 rounded-md border border-white/10 animate-scintille shimmer-effect shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]">
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 bg-white/10 backdrop-blur text-white px-5 py-3 rounded-md border border-white/30 hover:bg-white/20 transition-all no-underline shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)]">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.1 2.48-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.35-1.32-3.19-2.54-1.71-2.47-3.02-6.98-1.25-10.05.88-1.53 2.45-2.49 4.14-2.52 1.29-.02 2.5.87 3.29.87.79 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.31 2.81M15.96 3.54c.7-1 1.3-2.1 1.1-3.3-1 .1-2.3.8-3 1.8-.6.8-1.1 1.9-1 3 1 .1 2.2-.6 2.9-1.5z"/></svg>
-              <span className="font-black text-sm uppercase tracking-widest text-[10px]">App Store (Bientôt)</span>
-            </div>
-          </div>
-
-          {/* iOS Waitlist */}
-          <div className="mt-10 max-w-md mx-auto">
-            <p className="text-slate-400 font-bold text-sm mb-3">Tu es sur iPhone ? Sois le premier averti :</p>
-            {iosSubmitted ? (
-              <motion.div 
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                className="bg-secondary/20 border-2 border-secondary rounded-xl px-6 py-4 shadow-[4px_4px_0px_0px_rgba(var(--secondary-rgb),0.5)]"
-              >
-                <p className="font-black text-secondary text-sm leading-relaxed whitespace-pre-line">{iosSubmitted}</p>
-              </motion.div>
-            ) : (
-              <form onSubmit={handleIosNotify} className="flex flex-col min-[450px]:flex-row gap-3 w-full">
-                <input
-                  type="email"
-                  placeholder="Ton email..."
-                  value={iosEmail}
-                  onChange={(e) => setIosEmail(e.target.value)}
-                  className="w-full min-[450px]:flex-1 px-4 py-3 rounded-xl border-2 border-white/20 bg-white/10 text-white placeholder-slate-500 font-bold text-sm focus:outline-none focus:border-primary"
-                  required
-                />
-                <button type="submit" disabled={iosLoading} className="neo-brutal-btn !py-3 !px-6 !text-sm flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 w-full min-[450px]:w-auto">
-                  <Bell size={16} />
-                  {iosLoading ? 'EN COURS...' : 'M\'AVERTIR'}
-                </button>
-              </form>
-            )}
+              <span className="font-black text-sm">App Store</span>
+            </a>
           </div>
         </div>
       </section>
@@ -408,15 +335,26 @@ const LandingPage: React.FC = () => {
             <p className="font-medium text-slate-400 max-w-sm mb-8">
               La plateforme n°1 de mise en relation directe pour l'emploi en Côte d'Ivoire. Swipe, matche, bosse.
             </p>
-            <a
-              href={PLAY_STORE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-lg font-black text-sm border-2 border-white/20 hover:scale-105 transition-transform no-underline"
-            >
-              <Download size={16} />
-              Télécharger l'app
-            </a>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href={PLAY_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-primary text-white px-5 py-3 rounded-lg font-black text-sm border-2 border-white/20 hover:scale-105 transition-transform no-underline"
+              >
+                <Download size={16} />
+                Google Play
+              </a>
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-white text-black px-5 py-3 rounded-lg font-black text-sm border-2 border-white/20 hover:scale-105 transition-transform no-underline"
+              >
+                <Download size={16} />
+                App Store
+              </a>
+            </div>
           </div>
           <div>
             <h4 className="text-lg mb-6 uppercase">Legal</h4>

@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/cache/local_cache.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -17,11 +18,53 @@ class _NotificationScreenState extends State<NotificationScreen> {
   bool _isLoading = true;
   List<dynamic> _notifications = [];
   Set<String> _deletedIds = {};
+  String? _userFirstName;
 
   @override
   void initState() {
     super.initState();
+    _loadUserFirstName();
     _loadDeletedIds().then((_) => _fetchNotifications());
+  }
+
+  Future<void> _loadUserFirstName() async {
+    try {
+      final cachedProfile = await LocalCache.load(LocalCache.profileKey);
+      if (cachedProfile != null && cachedProfile is Map) {
+        final fullName = cachedProfile['full_name'] as String?;
+        if (fullName != null && fullName.isNotEmpty) {
+          if (mounted) {
+            setState(() {
+              _userFirstName = _extractFirstName(fullName);
+            });
+          }
+          return;
+        }
+      }
+      
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        final response = await _supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', user.id)
+            .maybeSingle();
+        if (response != null && response['full_name'] != null && mounted) {
+          setState(() {
+            _userFirstName = _extractFirstName(response['full_name'] as String);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du chargement du prénom utilisateur: $e');
+    }
+  }
+
+  String _extractFirstName(String fullName) {
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts[0].isEmpty) return '';
+    final rawName = parts[0];
+    return rawName[0].toUpperCase() + rawName.substring(1).toLowerCase();
   }
 
   Future<void> _loadDeletedIds() async {
@@ -37,22 +80,54 @@ class _NotificationScreenState extends State<NotificationScreen> {
     await prefs.setStringList('deleted_notifications', _deletedIds.toList());
   }
 
-  Future<void> _fetchNotifications() async {
+  Future<void> _fetchNotifications({bool forceRefresh = false}) async {
+    // 1. Lire le cache immédiatement (affichage rapide)
     try {
+      final cached = await LocalCache.load(LocalCache.notificationsKey);
+      if (cached != null && cached is List && mounted) {
+        setState(() {
+          _notifications = cached.where((n) => !_deletedIds.contains(n['id'].toString())).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Erreur lecture cache notifications: $e');
+    }
+
+    // 2. Si le cache est frais (TTL) et qu'on ne force pas le rafraîchissement, s'arrêter là
+    try {
+      final isFresh = await LocalCache.isFresh(LocalCache.notificationsKey, LocalCache.notificationsTTL);
+      if (isFresh && !forceRefresh) {
+        debugPrint('*** [CACHE] Notifications chargées depuis le cache frais (TTL) - Pas d\'appel réseau ***');
+        return;
+      }
+    } catch (e) {
+      debugPrint('Erreur vérification fraîcheur cache notifications: $e');
+    }
+
+    // Sinon, charger depuis Supabase
+    setState(() => _isLoading = _notifications.isEmpty);
+    try {
+      final userId = _supabase.auth.currentUser?.id;
       final response = await _supabase
           .from('notifications')
           .select()
+          .or('target.eq.all${userId != null ? ',target.eq.$userId' : ''}')
           .order('created_at', ascending: false)
           .limit(50);
 
-      setState(() {
-        // Filtrer les notifications supprimées localement
-        _notifications = response.where((n) => !_deletedIds.contains(n['id'].toString())).toList();
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
+      // Sauvegarder dans le cache local
+      await LocalCache.save(LocalCache.notificationsKey, response);
+
       if (mounted) {
+        setState(() {
+          _notifications = response.where((n) => !_deletedIds.contains(n['id'].toString())).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Erreur lors du chargement des notifications')),
         );
@@ -77,7 +152,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           IconButton(
-            onPressed: _fetchNotifications,
+            onPressed: () => _fetchNotifications(forceRefresh: true),
             icon: const Icon(Icons.refresh),
           ),
         ],
@@ -154,6 +229,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final DateTime date = DateTime.parse(notif['created_at']);
     final String formattedDate = DateFormat('dd MMM, HH:mm', 'fr_FR').format(date);
 
+    String body = notif['body'] ?? '';
+    if (body.contains('{name}')) {
+      if (_userFirstName != null && _userFirstName!.isNotEmpty) {
+        body = body.replaceAll('{name}', _userFirstName!);
+      } else {
+        body = body.replaceAll('{name}, ', '').replaceAll('{name}', '');
+        if (body.isNotEmpty) {
+          body = body[0].toUpperCase() + body.substring(1);
+        }
+      }
+    }
+
     return Container(
       margin: EdgeInsets.only(bottom: 16.h),
       padding: EdgeInsets.all(16.w),
@@ -208,7 +295,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 ),
                 SizedBox(height: 4.h),
                 Text(
-                  notif['body'] ?? '',
+                  body,
                   style: GoogleFonts.outfit(
                     fontSize: 13.sp,
                     color: Colors.grey[700],

@@ -37,7 +37,8 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const token = authHeader.replace("Bearer ", "").trim();
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
       console.error("Auth Error:", authError);
@@ -51,7 +52,7 @@ serve(async (req) => {
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Parse request body
-    const { amount, customer } = await req.json();
+    const { amount, customer, description, metadata } = await req.json();
     
     // Call Genius Pay API
     const response = await fetch("https://pay.genius.ci/api/v1/merchant/payments", {
@@ -63,7 +64,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         amount: amount,
-        description: "Abonnement Djorssi Premium",
+        description: description || "Abonnement Djorssi Premium",
         customer: {
           name: customer.name,
           email: customer.email,
@@ -72,7 +73,8 @@ serve(async (req) => {
         success_url: "https://djorssi-match.com/payment/success",
         error_url: "https://djorssi-match.com/payment/error",
         metadata: {
-          user_id: user.id
+          user_id: user.id,
+          ...(metadata || {})
         }
       }),
     });
@@ -95,6 +97,8 @@ serve(async (req) => {
         amount: amount,
         gateway: "GENIUS_PAY",
         status: "PENDING",
+        description: description || "Abonnement Djorssi Premium",
+        metadata: metadata || {}
       });
 
     if (dbError) {

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,9 +8,8 @@ import 'package:djossimatch/features/swipe/presentation/djossi_swipe_card.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/services/version_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:djossimatch/core/cache/local_cache.dart';
 import 'package:djossimatch/core/services/match_notifier.dart';
 import 'package:djossimatch/core/services/profile_notifier.dart';
@@ -20,7 +18,8 @@ import 'package:in_app_review/in_app_review.dart';
 import 'package:djossimatch/core/utils/tag_normalizer.dart';
 
 class SwipeScreen extends StatefulWidget {
-  const SwipeScreen({super.key});
+  final String? jobId;
+  const SwipeScreen({super.key, this.jobId});
 
   @override
   State<SwipeScreen> createState() => _SwipeScreenState();
@@ -51,6 +50,13 @@ class _SwipeScreenState extends State<SwipeScreen> {
   final List<Map<String, dynamic>> _emailQueue = [];
   bool _isProcessingQueue = false;
 
+  // Debounce pour éviter les rechargements multiples (Realtime + ProfileNotifier)
+  DateTime _lastFullReload = DateTime(2000);
+  static const int _reloadDebounceSeconds = 5;
+
+  // Cache local des IDs déjà swipés (évite de re-télécharger 11K+ lignes)
+  Set<String> _cachedSwipedIds = {};
+
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
 
   @override
@@ -67,9 +73,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final lastViewed = prefs.getString('last_notifications_view') ?? DateTime(2000).toIso8601String();
       
+      final userId = _supabase.auth.currentUser?.id;
       final response = await _supabase
           .from('notifications')
           .select('created_at')
+          .or('target.eq.all${userId != null ? ',target.eq.$userId' : ''}')
           .order('created_at', ascending: false)
           .limit(1)
           .maybeSingle();
@@ -90,6 +98,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
   void _listenToProfileChanges() {
     ProfileNotifier.stream.addListener(() {
       if (mounted) {
+        // Debounce : ignorer si un rechargement a eu lieu récemment (ex: via Realtime)
+        final now = DateTime.now();
+        if (now.difference(_lastFullReload).inSeconds < _reloadDebounceSeconds) {
+          debugPrint('*** [NOTIFIER] Rechargement ignoré (debounce, dernier il y a ${now.difference(_lastFullReload).inSeconds}s) ***');
+          return;
+        }
         debugPrint('*** [NOTIFIER] Changement de profil détecté via ProfileNotifier ! Rechargement... ***');
         // Vider le cache de matching
         _matchScoreCache.clear();
@@ -141,6 +155,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
             // Si les secteurs ont changé → recharger complètement les offres
             if (skillsChanged) {
+              // Debounce : ignorer si un rechargement a eu lieu récemment
+              final now = DateTime.now();
+              if (now.difference(_lastFullReload).inSeconds < _reloadDebounceSeconds) {
+                debugPrint('*** [REALTIME] Rechargement ignoré (debounce) ***');
+                return;
+              }
               debugPrint(
                 '*** [REALTIME] Changement de secteurs détecté ! Ancien: $oldSkills → Nouveau: $newSkills ***',
               );
@@ -172,7 +192,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
     return true;
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     // 0a. Charger les skills du cache SEULEMENT si pas déjà définis (par le realtime)
     if (_userSkills.isEmpty) {
       try {
@@ -185,14 +205,41 @@ class _SwipeScreenState extends State<SwipeScreen> {
       }
     }
 
-    // 0b. Charger le cache jobs immédiatement pour un affichage instantané (même hors ligne)
+    // 0b. Utiliser le cache frais si disponible et qu'on ne force pas le rafraîchissement
+    try {
+      final isFresh = await LocalCache.isFresh(LocalCache.jobsKey, LocalCache.jobsTTL);
+      if (isFresh && !forceRefresh) {
+        final cachedJobs = await LocalCache.load(LocalCache.jobsKey);
+        if (cachedJobs != null && cachedJobs is List && mounted) {
+          var cachedList = List<Map<String, dynamic>>.from(cachedJobs);
+          if (_sectorSkills.isNotEmpty) {
+            cachedList = cachedList.where((job) {
+              return _calculateMatchScore(job) > 0;
+            }).toList();
+            cachedList.sort((a, b) {
+              final scoreA = _calculateMatchScore(a);
+              final scoreB = _calculateMatchScore(b);
+              return scoreB.compareTo(scoreA);
+            });
+          }
+          setState(() {
+            _jobs = cachedList;
+            _isLoading = false;
+          });
+          debugPrint('*** [CACHE] Emplois chargés depuis le cache frais (TTL) - Pas d\'appel réseau ***');
+          return; // Évite les appels réseau Supabase !
+        }
+      }
+    } catch (e) {
+      debugPrint('Erreur lecture cache jobs frais: $e');
+    }
+
+    // Charger le cache en arrière-plan ou immédiatement si vide
     try {
       final cachedJobs = await LocalCache.load(LocalCache.jobsKey);
-      if (cachedJobs != null && cachedJobs is List && mounted) {
+      if (cachedJobs != null && cachedJobs is List && mounted && _jobs.isEmpty) {
         var cachedList = List<Map<String, dynamic>>.from(cachedJobs);
-        // Re-trier et filtrer le cache avec l'algorithme de matching actuel
         if (_sectorSkills.isNotEmpty) {
-          // Filtrer les jobs non pertinents du cache aussi
           cachedList = cachedList.where((job) {
             return _calculateMatchScore(job) > 0;
           }).toList();
@@ -218,7 +265,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       // 1. Récupérer les infos du profil (is_premium et skills)
       final profileResponse = await _supabase
           .from('profiles')
-          .select('skills, is_premium, full_name, cv_url, sexe')
+          .select('skills, is_premium, premium_until, full_name, cv_url, sexe')
           .eq('id', userId)
           .maybeSingle();
 
@@ -242,41 +289,92 @@ class _SwipeScreenState extends State<SwipeScreen> {
         await LocalCache.save(LocalCache.skillsKey, _userSkills);
       }
 
-      // 2. Récupérer les IDs des jobs déjà swipés (GAUCHE ou DROITE)
-      final swipedResponse = await _supabase
-          .from('swipes_log')
-          .select('job_id')
-          .eq('user_id', userId);
+      // 2. Récupérer les IDs des jobs déjà swipés — DEPUIS LE CACHE si possible
+      Set<String> swipedJobIds;
+      final cachedSwipedIds = await LocalCache.loadIfFresh(LocalCache.swipedIdsKey, LocalCache.swipedIdsTTL);
+      if (cachedSwipedIds != null && cachedSwipedIds is List && !forceRefresh) {
+        swipedJobIds = Set<String>.from(cachedSwipedIds);
+        debugPrint('*** [CACHE] Swiped IDs chargés depuis le cache (${swipedJobIds.length} IDs) ***');
+      } else {
+        // Cache expiré ou forceRefresh → charger depuis Supabase
+        final swipedResponse = await _supabase
+            .from('swipes_log')
+            .select('job_id')
+            .eq('user_id', userId);
 
-      final swipedJobIds = (swipedResponse as List)
-          .where((s) => s['job_id'] != null)
-          .map((s) => s['job_id'].toString())
-          .toSet();
+        swipedJobIds = (swipedResponse as List)
+            .where((s) => s['job_id'] != null)
+            .map((s) => s['job_id'].toString())
+            .toSet();
 
-      // 2.5 Compter swipes du jour (GAUCHE + DROITE) pour la limite
+        // Sauvegarder dans le cache
+        await LocalCache.save(LocalCache.swipedIdsKey, swipedJobIds.toList());
+        debugPrint('*** [NETWORK] Swiped IDs chargés depuis Supabase (${swipedJobIds.length} IDs) et mis en cache ***');
+      }
+      _cachedSwipedIds = swipedJobIds;
+
+      // 2.5 Compteur de swipes quotidien — LOCAL (plus de requête réseau)
       final today = DateTime.now().toIso8601String().substring(0, 10);
       try {
-        final countResp = await _supabase
-            .from('swipes_log')
-            .select('id')
-            .eq('user_id', userId)
-            .gte('created_at', '${today}T00:00:00Z');
-
-        _swipeCount = countResp != null ? (countResp as List).length : 0;
+        final cachedDate = await LocalCache.load(LocalCache.swipeCountDateKey);
+        final cachedCount = await LocalCache.load(LocalCache.swipeCountKey);
+        if (cachedDate == today && cachedCount != null) {
+          _swipeCount = cachedCount as int;
+          debugPrint('*** [CACHE] Compteur swipes du jour: $_swipeCount ***');
+        } else {
+          // Nouveau jour → réinitialiser le compteur
+          _swipeCount = 0;
+          await LocalCache.save(LocalCache.swipeCountDateKey, today);
+          await LocalCache.save(LocalCache.swipeCountKey, 0);
+          debugPrint('*** [CACHE] Nouveau jour détecté, compteur remis à 0 ***');
+        }
       } catch (e) {
         debugPrint('Erreur lors du comptage des swipes: $e');
         _swipeCount = 0;
       }
 
-      // 3. Récupérer toutes les offres non swipées
-      final jobsResponse = await _supabase
+      // 3. Récupérer les offres non swipées — PAGINÉ (50 max) avec filtrage serveur
+      final swipedIdsList = swipedJobIds.toList();
+      var jobsQuery = _supabase
           .from('jobs')
-          .select()
-          .order('created_at', ascending: false);
+          .select('id, job_title, company_name, salary_range, location, required_level, experience, contact_email, whatsapp_number, description, is_ai_verified, tags, deadline, application_link, requires_cover_letter, cover_letter_instructions, created_at')
+          .eq('is_approved', true);
 
-      final allJobs = List<Map<String, dynamic>>.from(
-        jobsResponse,
-      ).where((job) => !swipedJobIds.contains(job['id'].toString())).toList();
+      // Filtrage serveur : exclure les jobs déjà swipés (si pas trop d'IDs)
+      if (swipedIdsList.isNotEmpty && swipedIdsList.length <= 500) {
+        jobsQuery = jobsQuery.not('id', 'in', '(${swipedIdsList.join(",")})');
+      }
+
+      final jobsResponse = await jobsQuery
+          .order('created_at', ascending: false)
+          .limit(50);
+
+      var allJobs = List<Map<String, dynamic>>.from(jobsResponse);
+      // Fallback client-side filter si trop d'IDs pour le filtre serveur
+      if (swipedIdsList.length > 500) {
+        allJobs = allJobs.where((job) => !swipedJobIds.contains(job['id'].toString())).toList();
+      }
+
+      // Récupérer le job spécifique ciblé par la notification si spécifié
+      if (widget.jobId != null) {
+        try {
+          final targetJobResponse = await _supabase
+              .from('jobs')
+              .select('id, job_title, company_name, salary_range, location, required_level, experience, contact_email, whatsapp_number, description, is_ai_verified, tags, deadline, application_link, requires_cover_letter, cover_letter_instructions, created_at')
+              .eq('id', widget.jobId!)
+              .maybeSingle();
+
+          if (targetJobResponse != null) {
+            // Retirer le job de la liste s'il s'y trouve déjà (pour éviter les doublons)
+            allJobs.removeWhere((job) => job['id'].toString() == widget.jobId);
+            // L'insérer au tout début de la liste (index 0)
+            allJobs.insert(0, targetJobResponse);
+            debugPrint('*** [NOTIF] Job cible ${widget.jobId} ajouté en haut de la pile ***');
+          }
+        } catch (e) {
+          debugPrint('Erreur lors du chargement du job ciblé par notif: $e');
+        }
+      }
 
       // 4. Trier et FILTRER par matching pour tous les utilisateurs
       if (_userSkills.isNotEmpty) {
@@ -345,6 +443,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
       // 5. Sauvegarder dans le cache pour la prochaine fois
       await LocalCache.save(LocalCache.jobsKey, allJobs);
 
+      // Marquer le timestamp du dernier rechargement complet (debounce)
+      _lastFullReload = DateTime.now();
+
       if (mounted) {
         setState(() {
           _jobs = allJobs;
@@ -383,6 +484,70 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
 
 
+  /// Charge le prochain batch de 50 jobs (pagination) sans recharger tout
+  bool _isLoadingNextBatch = false;
+  Future<void> _loadNextBatch() async {
+    if (_isLoadingNextBatch) return;
+    _isLoadingNextBatch = true;
+
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      var jobsQuery = _supabase
+          .from('jobs')
+          .select('id, job_title, company_name, salary_range, location, required_level, experience, contact_email, whatsapp_number, description, is_ai_verified, tags, deadline, application_link, requires_cover_letter, cover_letter_instructions, created_at')
+          .eq('is_approved', true);
+
+      // Filtrage serveur : exclure les jobs déjà swipés + déjà affichés
+      final excludeIds = <String>{..._cachedSwipedIds};
+      for (final job in _jobs) {
+        final id = job['id']?.toString();
+        if (id != null) excludeIds.add(id);
+      }
+      final excludeList = excludeIds.toList();
+
+      if (excludeList.isNotEmpty && excludeList.length <= 500) {
+        jobsQuery = jobsQuery.not('id', 'in', '(${excludeList.join(",")})');
+      }
+
+      final response = await jobsQuery
+          .order('created_at', ascending: false)
+          .limit(50);
+
+      var newJobs = List<Map<String, dynamic>>.from(response);
+
+      // Fallback client-side filter si trop d'IDs
+      if (excludeList.length > 500) {
+        newJobs = newJobs.where((job) => !excludeIds.contains(job['id'].toString())).toList();
+      }
+
+      // Filtrer par matching
+      if (_sectorSkills.isNotEmpty) {
+        newJobs = newJobs.where((job) => _calculateMatchScore(job) > 0).toList();
+        newJobs.sort((a, b) {
+          final scoreA = _calculateMatchScore(a);
+          final scoreB = _calculateMatchScore(b);
+          return scoreB.compareTo(scoreA);
+        });
+      }
+
+      if (newJobs.isNotEmpty && mounted) {
+        setState(() {
+          _jobs.addAll(newJobs);
+        });
+        debugPrint('*** [PAGINATION] ${newJobs.length} nouveaux jobs ajoutés (total: ${_jobs.length}) ***');
+      } else {
+        debugPrint('*** [PAGINATION] Aucun nouveau job disponible ***');
+      }
+    } catch (e) {
+      debugPrint('Erreur chargement batch suivant: $e');
+    } finally {
+      _isLoadingNextBatch = false;
+    }
+  }
+
+
   bool _isGenericTag(String tag) {
     return TagNormalizer.isGeneric(tag);
   }
@@ -397,6 +562,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   int _calculateMatchScore(Map<String, dynamic> job) {
+    if (widget.jobId != null && job['id']?.toString() == widget.jobId) {
+      return 1000; // Score maximum pour l'offre ciblée par notification
+    }
     if (_userSkills.isEmpty) return 50;
 
     double totalScore = 0;
@@ -536,9 +704,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
     int? currentIndex,
     CardSwiperDirection direction,
   ) {
-    // BLOCAGE PHYSIQUE STRICT : Si pas premium et limite de 50 atteinte
+    // BLOCAGE PHYSIQUE STRICT : Si pas premium et limite dynamique atteinte
     // On bloque TOUT mouvement (Gauche ou Droite)
-    if (!_isPremium && _swipeCount >= 50) {
+    if (!_isPremium && _swipeCount >= VersionService.swipeLimit) {
       _showPremiumLimitDialog();
       return false; // Bloque physiquement la carte
     }
@@ -567,6 +735,21 @@ class _SwipeScreenState extends State<SwipeScreen> {
     setState(() {
       _swipeCount++;
     });
+
+    // Mettre à jour le cache local des swiped IDs et du compteur (pas de requête réseau)
+    final jobId = job['id']?.toString();
+    if (jobId != null) {
+      _cachedSwipedIds.add(jobId);
+      // Sauvegarder en arrière-plan (fire-and-forget)
+      unawaited(LocalCache.save(LocalCache.swipedIdsKey, _cachedSwipedIds.toList()));
+      unawaited(LocalCache.save(LocalCache.swipeCountKey, _swipeCount));
+    }
+
+    // Charger le batch suivant si on est bas en stock
+    if (_jobs.length - (index + 1) <= 5) {
+      debugPrint('*** [PAGINATION] Stock bas (${_jobs.length - (index + 1)} restants), chargement du batch suivant... ***');
+      _loadNextBatch();
+    }
     
     // Vérifier si on doit proposer de noter l'application
     _checkAndPromptRating();
@@ -624,11 +807,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
         final whatsapp = job['whatsapp_number'];
         final email = job['contact_email'];
-        final appLink =
-            job['application_link'] ??
-            (job['raw_data'] != null
-                ? job['raw_data']['application_link']
-                : null);
+        final appLink = job['application_link'];
 
         final hasEmail = email != null && email.toString().trim().isNotEmpty;
         final hasWhatsapp =
@@ -696,7 +875,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       if (e.toString().contains('Daily free swipe limit')) {
         _controller.undo(); // Ramène la carte à l'écran
         setState(
-          () => _swipeCount = 50,
+          () => _swipeCount = VersionService.swipeLimit,
         ); // Resynchronise le compteur local de force
         if (mounted) _showPremiumLimitDialog();
       }
@@ -826,11 +1005,13 @@ class _SwipeScreenState extends State<SwipeScreen> {
           children: [
             const Icon(Icons.star, color: Color(0xFFF97316)),
             SizedBox(width: 10.w),
-            const Text('Fonction Premium'),
+            Text(VersionService.showPremium ? 'Fonction Premium' : 'Bientôt disponible'),
           ],
         ),
         content: Text(
-          'La fonctionnalité "$feature" est réservée aux membres Premium.\n\nPassez au forfait illimité pour en profiter !',
+          VersionService.showPremium 
+              ? 'La fonctionnalité "$feature" est réservée aux membres Premium.\n\nPassez au forfait illimité pour en profiter !'
+              : 'La fonctionnalité "$feature" sera bientôt disponible pour tous !',
           style: const TextStyle(height: 1.5),
         ),
         actions: [
@@ -841,8 +1022,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
               style: TextStyle(color: Colors.grey),
             ),
           ),
-          ElevatedButton(
-            onPressed: () {
+          if (VersionService.showPremium)
+            ElevatedButton(
+              onPressed: () {
               Navigator.pop(context);
               context.push('/premium').then((_) {
                 if (mounted) {
@@ -888,15 +1070,15 @@ class _SwipeScreenState extends State<SwipeScreen> {
           children: [
             const Icon(Icons.lock_clock, color: Color(0xFFF97316)),
             SizedBox(width: 10.w),
-            const Text('Limite atteinte !'),
+            Text(VersionService.swipeLimitTitle),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Vous avez utilisé vos 80 swipes gratuits pour aujourd\'hui.',
+            Text(
+              VersionService.formattedSwipeMessage(),
             ),
             SizedBox(height: 16.h),
             Container(
@@ -928,10 +1110,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
               ),
             ),
             SizedBox(height: 16.h),
-            const Text(
-              'Ou passez au illimité maintenant pour ne rater aucun Djorssi !',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            if (VersionService.showPremium) ...[
+              const Text(
+                'Ou passez au illimité maintenant pour ne rater aucun Djorssi !',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -942,12 +1126,13 @@ class _SwipeScreenState extends State<SwipeScreen> {
               style: TextStyle(color: Colors.grey),
             ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.push('/premium').then((_) {
-                if (mounted) {
-                  setState(() => _isLoading = true);
+          if (VersionService.showPremium)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.push('/premium').then((_) {
+                  if (mounted) {
+                    setState(() => _isLoading = true);
                   _loadData();
                 }
               });
@@ -1321,7 +1506,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       body: RefreshIndicator(
         onRefresh: () async {
           setState(() => _isLoading = true);
-          await _loadData();
+          await _loadData(forceRefresh: true);
         },
         color: const Color(0xFFF97316),
         child: LayoutBuilder(
@@ -1416,10 +1601,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
                                                   ),
                                                   deadline: job['deadline'],
                                                   applicationLink:
-                                                      job['application_link'] ??
-                                                      (job['raw_data'] != null
-                                                          ? job['raw_data']['application_link']
-                                                          : null),
+                                                      job['application_link'],
                                                   requiresCoverLetter:
                                                       job['requires_cover_letter'] ??
                                                       false,
@@ -1583,7 +1765,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   Future<void> _handleUndo() async {
-    if (!_isPremium) {
+    if (!_isPremium && VersionService.showPremium) {
       _showPremiumFeatureDialog('Retour en arrière');
       return;
     }
@@ -1606,31 +1788,36 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   Widget _buildActionButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildActionButton(Icons.close_rounded, Colors.red, () {
-          if (!_isPremium && _swipeCount >= 80) {
-            _showPremiumLimitDialog();
-            return;
-          }
-          _controller.swipe(CardSwiperDirection.left);
-        }),
-        _buildActionButton(
-          Icons.replay_rounded,
-          _isPremium ? const Color(0xFFF59E0B) : Colors.grey,
-          _handleUndo,
-          isMini: true,
-          locked: false, // Cadenas retiré à la demande de l'utilisateur
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildActionButton(Icons.close_rounded, Colors.red, () {
+              if (!_isPremium && _swipeCount >= VersionService.swipeLimit) {
+                _showPremiumLimitDialog();
+                return;
+              }
+              _controller.swipe(CardSwiperDirection.left);
+            }),
+            _buildActionButton(
+              Icons.replay_rounded,
+              _isPremium ? const Color(0xFFF59E0B) : Colors.grey,
+              _handleUndo,
+              isMini: true,
+              locked: false, // Cadenas retiré à la demande de l'utilisateur
+            ),
+            _buildActionButton(Icons.favorite_rounded, Colors.green, () {
+              if (!_isPremium && _swipeCount >= VersionService.swipeLimit) {
+                _showPremiumLimitDialog();
+                return;
+              }
+              _controller.swipe(CardSwiperDirection.right);
+            }),
+          ],
         ),
-        _buildActionButton(Icons.favorite_rounded, Colors.green, () {
-          if (!_isPremium && _swipeCount >= 80) {
-            _showPremiumLimitDialog();
-            return;
-          }
-          _controller.swipe(CardSwiperDirection.right);
-        }),
-      ],
+      ),
     );
   }
 
@@ -1751,7 +1938,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
     final InAppReview inAppReview = InAppReview.instance;
     try {
       await inAppReview.openStoreListing(
-        appStoreId: '6740356525',
+        appStoreId: '6767549287',
       );
     } catch (e) {
       debugPrint('Erreur ouverture store: $e');

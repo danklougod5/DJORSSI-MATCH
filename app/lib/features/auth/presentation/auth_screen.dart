@@ -288,264 +288,331 @@ class _AuthScreenState extends State<AuthScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 40.h),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(height: 40.h),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(height: 16.h),
 
-              // App Logo
-              Center(
-                child: Container(
-                  height: 120.w,
-                  width: 120.w,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(12.r),
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-              ),
-
-              SizedBox(height: 32.h),
-
-              Text(
-                'Djorssi-Match',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 28.sp,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-
-              SizedBox(height: 8.h),
-
-              Text(
-                _isSignUp
-                    ? 'Créez votre compte en quelques secondes'
-                    : 'Trouvez votre prochaine opportunité\nen toute simplicité.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15.sp,
-                  color: const Color(0xFF64748B),
-                  height: 1.5,
-                ),
-              ),
-
-              SizedBox(height: 48.h),
-
-              Container(
-                padding: EdgeInsets.all(24.w),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24.r),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    if (_isSignUp) ...[
-                      TextField(
-                        controller: _fullNameController,
-                        textInputAction: TextInputAction.next,
-                        decoration: InputDecoration(
-                          labelText: 'Nom et Prénom',
-                          labelStyle: TextStyle(color: const Color(0xFF94A3B8)),
-                          prefixIcon: const Icon(
-                            Icons.person_outline,
-                            color: Color(0xFF94A3B8),
+                  // App Logo
+                  Center(
+                    child: Container(
+                      height: 90.w,
+                      width: 90.w,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
                           ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16.r),
-                            borderSide: BorderSide(
-                              color: const Color(0xFFE2E8F0),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(12.r),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 20.h),
+
+                  Text(
+                    'Djorssi-Match',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 26.sp,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+
+                  SizedBox(height: 6.h),
+
+                  Text(
+                    _isSignUp
+                        ? 'Créez votre compte en quelques secondes'
+                        : 'Trouvez votre prochaine opportunité\nen toute simplicité.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      color: const Color(0xFF64748B),
+                      height: 1.4,
+                    ),
+                  ),
+
+                  SizedBox(height: 28.h),
+
+                  Container(
+                    padding: EdgeInsets.all(24.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24.r),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        if (_isSignUp) ...[
+                          TextField(
+                            controller: _fullNameController,
+                            textInputAction: TextInputAction.next,
+                            decoration: InputDecoration(
+                              labelText: 'Nom et Prénom',
+                              labelStyle: TextStyle(color: const Color(0xFF94A3B8)),
+                              prefixIcon: const Icon(
+                                Icons.person_outline,
+                                color: Color(0xFF94A3B8),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16.r),
+                                borderSide: BorderSide(
+                                  color: const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16.r),
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).primaryColor,
+                                  width: 2,
+                                ),
+                              ),
                             ),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16.r),
-                            borderSide: BorderSide(
-                              color: Theme.of(context).primaryColor,
-                              width: 2,
+                          SizedBox(height: 16.h),
+                        ],
+                        TextField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(
+                            labelText: 'Adresse e-mail',
+                            labelStyle: TextStyle(color: const Color(0xFF94A3B8)),
+                            prefixIcon: const Icon(
+                              Icons.email_outlined,
+                              color: Color(0xFF94A3B8),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16.r),
+                              borderSide: BorderSide(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16.r),
+                              borderSide: BorderSide(
+                                color: Theme.of(context).primaryColor,
+                                width: 2,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      SizedBox(height: 16.h),
-                    ],
-                    TextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      decoration: InputDecoration(
-                        labelText: 'Adresse e-mail',
-                        labelStyle: TextStyle(color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(
-                          Icons.email_outlined,
-                          color: Color(0xFF94A3B8),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide(
-                            color: const Color(0xFFE2E8F0),
+                        SizedBox(height: 16.h),
+                        TextField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _handleAuth(),
+                          decoration: InputDecoration(
+                            labelText: 'Mot de passe',
+                            labelStyle: TextStyle(color: const Color(0xFF94A3B8)),
+                            prefixIcon: const Icon(
+                              Icons.lock_outline_rounded,
+                              color: Color(0xFF94A3B8),
+                            ),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                color: const Color(0xFF94A3B8),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16.r),
+                              borderSide: BorderSide(
+                                color: const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16.r),
+                              borderSide: BorderSide(
+                                color: Theme.of(context).primaryColor,
+                                width: 2,
+                              ),
+                            ),
                           ),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).primaryColor,
-                            width: 2,
+                        if (!_isSignUp)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _isLoading ? null : _resetPassword,
+                              child: Text(
+                                'Mot de passe oublié ?',
+                                style: TextStyle(
+                                  color: Theme.of(context).primaryColor,
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          SizedBox(height: 32.h),
+
+                        // Auth button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _handleAuth,
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 16.h),
+                              backgroundColor: Theme.of(context).primaryColor,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16.r),
+                              ),
+                            ),
+                            child: _isLoading
+                                ? SizedBox(
+                                    height: 20.h,
+                                    width: 20.h,
+                                    child: const CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    _isSignUp ? 'S\'inscrire' : 'Se connecter',
+                                    style: TextStyle(
+                                      fontSize: 16.sp,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                    SizedBox(height: 16.h),
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _handleAuth(),
-                      decoration: InputDecoration(
-                        labelText: 'Mot de passe',
-                        labelStyle: TextStyle(color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(
-                          Icons.lock_outline_rounded,
-                          color: Color(0xFF94A3B8),
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: const Color(0xFF94A3B8),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide(
-                            color: const Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).primaryColor,
-                            width: 2,
-                          ),
-                        ),
-                      ),
+                  ),
+
+                  SizedBox(height: 16.h),
+
+                  // Switch Mode
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _isSignUp = !_isSignUp);
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF64748B),
                     ),
-                    if (!_isSignUp)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _isLoading ? null : _resetPassword,
-                          child: Text(
-                            'Mot de passe oublié ?',
+                    child: RichText(
+                      text: TextSpan(
+                        text: _isSignUp
+                            ? 'Vous avez déjà un compte ? '
+                            : 'Nouveau sur Djorssi-Match ? ',
+                        style: TextStyle(
+                          color: const Color(0xFF64748B),
+                          fontSize: 14.sp,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: _isSignUp ? 'Connectez-vous' : 'S\'inscrire',
                             style: TextStyle(
                               color: Theme.of(context).primaryColor,
-                              fontSize: 13.sp,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
-                      )
-                    else
-                      SizedBox(height: 32.h),
-
-                    // Auth button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleAuth,
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: 16.h),
-                          backgroundColor: Theme.of(context).primaryColor,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16.r),
-                          ),
-                        ),
-                        child: _isLoading
-                            ? SizedBox(
-                                height: 20.h,
-                                width: 20.h,
-                                child: const CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                _isSignUp ? 'S\'inscrire' : 'Se connecter',
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-
-              SizedBox(height: 24.h),
-
-              // Switch Mode
-              TextButton(
-                onPressed: () {
-                  setState(() => _isSignUp = !_isSignUp);
-                },
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF64748B),
-                ),
-                child: RichText(
-                  text: TextSpan(
-                    text: _isSignUp
-                        ? 'Vous avez déjà un compte ? '
-                        : 'Nouveau sur Djorssi-Match ? ',
-                    style: TextStyle(
-                      color: const Color(0xFF64748B),
-                      fontSize: 14.sp,
-                    ),
-                    children: [
-                      TextSpan(
-                        text: _isSignUp ? 'Connectez-vous' : 'S\'inscrire',
-                        style: TextStyle(
-                          color: Theme.of(context).primaryColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
                   ),
-                ),
+
+                  SizedBox(height: 16.h),
+                  const Divider(color: Color(0xFFE2E8F0), thickness: 1),
+                  SizedBox(height: 12.h),
+
+                  // Vous êtes recruteur ? Card
+                  GestureDetector(
+                    onTap: () {
+                      context.push('/recruiter-post');
+                    },
+                    child: Container(
+                      padding: EdgeInsets.all(16.r),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+                        borderRadius: BorderRadius.circular(16.r),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(10.r),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF97316).withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.business_center,
+                              color: Color(0xFFF97316),
+                            ),
+                          ),
+                          SizedBox(width: 14.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Vous êtes recruteur ?',
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                SizedBox(height: 4.h),
+                                Text(
+                                  'Publiez vos offres et trouvez des talents gratuitement.',
+                                  style: TextStyle(
+                                    fontSize: 11.sp,
+                                    color: const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/genius_pay_service.dart';
+import '../../../core/services/version_service.dart';
 
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
@@ -18,11 +20,38 @@ class _PremiumScreenState extends State<PremiumScreen> {
   String? _userName;
   String? _phoneNumber;
   String? _email;
+  late StreamSubscription<List<Map<String, dynamic>>> _configSubscription;
 
   @override
   void initState() {
     super.initState();
     _checkPremiumStatus();
+    _listenToRemoteConfig();
+  }
+
+  void _listenToRemoteConfig() {
+    debugPrint('Initialisation du flux Realtime pour app_config...');
+    _configSubscription = _supabase
+        .from('app_config')
+        .stream(primaryKey: ['id'])
+        .eq('id', 1)
+        .listen((data) {
+      debugPrint('Données Realtime reçues: $data');
+      if (data.isNotEmpty && mounted) {
+        setState(() {
+          VersionService.showPremium = data.first['show_premium'] ?? false;
+          debugPrint('showPremium est maintenant: ${VersionService.showPremium}');
+        });
+      }
+    }, onError: (error) {
+      debugPrint('ERREUR Realtime: $error');
+    });
+  }
+
+  @override
+  void dispose() {
+    _configSubscription.cancel();
+    super.dispose();
   }
 
   Future<void> _checkPremiumStatus({bool manual = false}) async {
@@ -97,15 +126,17 @@ class _PremiumScreenState extends State<PremiumScreen> {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      final checkoutUrl = await GeniusPayService.initiatePayment(
+      final initResult = await GeniusPayService.initiatePayment(
         amount: 2000,
         phone: _phoneNumber!,
         email: _email ?? '',
         name: _userName ?? 'Client Djorssi',
+        description: 'Abonnement Djorssi Premium',
+        metadata: const {'type': 'premium'},
       );
 
       if (mounted) {
-        await GeniusPayService.launchCheckout(checkoutUrl);
+        await GeniusPayService.launchCheckout(initResult.checkoutUrl);
         
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -189,10 +220,19 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   description: 'Soyez le premier informé ! Recevez un email dès qu\'un job correspondant est publié.',
                   color: const Color(0xFFF97316),
                 ),
+                const SizedBox(height: 16),
+                _buildFeatureCard(
+                  icon: Icons.description_rounded,
+                  title: '3 CV PROFESSIONNELS INCLUS',
+                  description: 'Créez jusqu\'à 3 CV gratuitement contre 1 seul pour les comptes gratuits. CV supplémentaires à 500 F CFA.',
+                  color: const Color(0xFFF59E0B),
+                ),
                 const SizedBox(height: 40),
-                _buildPriceCard(),
-                const SizedBox(height: 40),
-                _buildBottomAction(),
+                if (VersionService.showPremium) ...[
+                  _buildPriceCard(),
+                  const SizedBox(height: 40),
+                  _buildBottomAction(),
+                ],
                 const SizedBox(height: 40),
               ],
             ),
@@ -441,6 +481,41 @@ class _PremiumScreenState extends State<PremiumScreen> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildComingSoonMessage() {
+    return Container(
+      padding: EdgeInsets.all(24.r),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24.r),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.hourglass_empty_rounded, color: const Color(0xFFF97316), size: 32.r),
+          SizedBox(height: 16.h),
+          Text(
+            'PROGRAMME PREMIUM',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16.sp,
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            'Nos services Premium seront bientôt disponibles pour améliorer votre expérience. Restez à l\'écoute !',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: 14.sp,
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );

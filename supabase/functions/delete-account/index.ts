@@ -23,7 +23,7 @@ serve(async (req) => {
     }
 
     // 2. Extract Token from Authorization header
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.replace('Bearer ', '').trim();
 
     // 3. Setup standard client for verification (least privilege)
     const supabaseClient = createClient(
@@ -36,7 +36,7 @@ serve(async (req) => {
     const {
       data: { user },
       error: authError,
-    } = await supabaseClient.auth.getUser();
+    } = await supabaseClient.auth.getUser(token);
 
     // 5. Setup client with the Admin/Service Role key to allow deleting users
     const supabaseAdmin = createClient(

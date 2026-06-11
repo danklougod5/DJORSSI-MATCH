@@ -17,8 +17,8 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { title, message, target } = body;
-    console.log(`[DEBUG] Payload: title="${title}", target="${target}"`);
+    const { title, message, target, is_personal } = body;
+    console.log(`[DEBUG] Payload: title="${title}", target="${target}", is_personal=${is_personal}`);
 
     // 1. Initialiser le client Supabase Admin
     const supabaseAdmin = createClient(
@@ -26,22 +26,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 2. Récupérer les tokens FCM
+    // 2. Récupérer les tokens FCM et les profils
     console.log(`[DEBUG] Récupération des tokens...`);
-    let query = supabaseAdmin.from('profiles').select('fcm_token').not('fcm_token', 'is', null)
+    let query = supabaseAdmin.from('profiles').select('fcm_token, full_name').not('fcm_token', 'is', null)
     
     if (target === 'premium') {
       query = query.eq('is_premium', true)
+    } else if (target && target !== 'all') {
+      query = query.eq('id', target)
     }
 
     const { data: profiles, error: dbError } = await query
     
     if (dbError) throw new Error(`Erreur DB: ${dbError.message}`);
 
-    const tokens = profiles?.map(p => p.fcm_token).filter(t => t !== null) as string[];
-    console.log(`[DEBUG] ${tokens.length} tokens trouvés.`);
+    const validProfiles = profiles?.filter(p => p.fcm_token !== null) || [];
+    console.log(`[DEBUG] ${validProfiles.length} profils avec tokens trouvés.`);
     
-    if (!tokens || tokens.length === 0) {
+    if (validProfiles.length === 0) {
       return new Response(JSON.stringify({ success: true, message: 'Aucun token trouvé.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -49,9 +51,21 @@ serve(async (req) => {
 
     // 2.5 Enregistrer la notification en base pour l'historique des utilisateurs
     console.log(`[DEBUG] Enregistrement de la notification en base...`);
+    let dbBody = message;
+    if (is_personal) {
+      let formattedMsg = message;
+      if (formattedMsg.length > 0) {
+        const firstChar = formattedMsg.charAt(0);
+        if (/[a-zA-ZÀ-ÿ]/.test(firstChar)) {
+          formattedMsg = firstChar.toLowerCase() + formattedMsg.slice(1);
+        }
+      }
+      dbBody = `{name}, ${formattedMsg}`;
+    }
+
     const { error: insertError } = await supabaseAdmin
       .from('notifications')
-      .insert([{ title, body: message, target }]);
+      .insert([{ title, body: dbBody, target }]);
     
     if (insertError) {
       console.error(`Erreur enregistrement base: ${insertError.message}`);
@@ -86,8 +100,33 @@ serve(async (req) => {
     let successCount = 0;
     let failureCount = 0;
 
-    console.log(`[DEBUG] Envoi de ${tokens.length} notifications...`);
-    for (const token of tokens) {
+    console.log(`[DEBUG] Envoi de ${validProfiles.length} notifications...`);
+    for (const profile of validProfiles) {
+      const token = profile.fcm_token;
+      let recipientBody = message;
+
+      if (is_personal) {
+        let firstName = '';
+        if (profile.full_name) {
+          const parts = profile.full_name.trim().split(/\s+/);
+          if (parts.length > 0) {
+            const rawName = parts[0];
+            firstName = rawName.charAt(0).toUpperCase() + rawName.slice(1).toLowerCase();
+          }
+        }
+
+        if (firstName) {
+          let formattedMsg = message;
+          if (formattedMsg.length > 0) {
+            const firstChar = formattedMsg.charAt(0);
+            if (/[a-zA-ZÀ-ÿ]/.test(firstChar)) {
+              formattedMsg = firstChar.toLowerCase() + formattedMsg.slice(1);
+            }
+          }
+          recipientBody = `${firstName}, ${formattedMsg}`;
+        }
+      }
+
       try {
         const response = await fetch(
           `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
@@ -100,7 +139,7 @@ serve(async (req) => {
             body: JSON.stringify({
               message: {
                 token: token,
-                notification: { title, body: message },
+                notification: { title, body: recipientBody },
                 data: { click_action: "FLUTTER_NOTIFICATION_CLICK" }
               },
             }),

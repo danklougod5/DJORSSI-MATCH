@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Star, Lock } from 'lucide-react';
+import { X, Star, Lock, FileText, Minus, Plus } from 'lucide-react';
 
 interface UserEditModalProps {
   editingUser: any;
@@ -88,6 +88,44 @@ const UserEditModal: React.FC<UserEditModalProps> = ({
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editingUser.premium ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
           </div>
+
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                <FileText size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">Quota CV Supplémentaires</p>
+                <p className="text-[10px] text-slate-500 font-medium">CV additionnels achetés ou offerts</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                type="button"
+                onClick={() => setEditingUser({
+                  ...editingUser, 
+                  extraCvsPurchased: Math.max(0, (editingUser.extraCvsPurchased || 0) - 1)
+                })}
+                className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors text-slate-600 border border-slate-200 bg-white cursor-pointer"
+              >
+                <Minus size={14} />
+              </button>
+              <span className="w-8 text-center font-mono font-bold text-slate-800 text-sm">
+                {editingUser.extraCvsPurchased || 0}
+              </span>
+              <button 
+                type="button"
+                onClick={() => setEditingUser({
+                  ...editingUser, 
+                  extraCvsPurchased: (editingUser.extraCvsPurchased || 0) + 1
+                })}
+                className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors text-slate-600 border border-slate-200 bg-white cursor-pointer"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+
 
           <div className="pt-4 border-t border-slate-100 flex flex-col gap-4">
             <div className="flex gap-3">

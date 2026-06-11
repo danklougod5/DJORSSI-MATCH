@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/services/version_service.dart';
 import 'package:djossimatch/core/cache/local_cache.dart';
 import 'package:djossimatch/core/services/match_notifier.dart';
 
@@ -32,7 +33,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
   void _onNewMatch() {
     // Eviter de spammer les rechargements s'il y a de multiples événements
     if (mounted) {
-      _loadMatches();
+      _loadMatches(forceRefresh: true);
     }
   }
 
@@ -42,8 +43,8 @@ class _MatchesScreenState extends State<MatchesScreen> {
     super.dispose();
   }
 
-  Future<void> _loadMatches() async {
-    // 0. Charger le cache immédiatement (hors ligne)
+  Future<void> _loadMatches({bool forceRefresh = false}) async {
+    // 0. Charger le cache immédiatement (hors ligne ou affichage rapide)
     try {
       final cachedMatches = await LocalCache.load(LocalCache.matchesKey);
       if (cachedMatches != null && cachedMatches is List && mounted) {
@@ -56,28 +57,43 @@ class _MatchesScreenState extends State<MatchesScreen> {
       debugPrint('Erreur lecture cache matches: $e');
     }
 
+    // 0.5 Si le cache est frais (TTL) et qu'on ne force pas le rafraîchissement, s'arrêter là
+    try {
+      final isFresh = await LocalCache.isFresh(LocalCache.matchesKey, LocalCache.matchesTTL);
+      if (isFresh && !forceRefresh) {
+        debugPrint('*** [CACHE] Matches chargés depuis le cache frais (TTL) - Pas d\'appel réseau ***');
+        return;
+      }
+    } catch (e) {
+      debugPrint('Erreur vérification fraîcheur cache matches: $e');
+    }
+
+    // Sinon, charger depuis Supabase
+    setState(() => _isLoading = _matches.isEmpty);
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
       final profileResponse = await _supabase
           .from('profiles')
-          .select('is_premium')
+          .select('is_premium, premium_until')
           .eq('id', userId)
           .maybeSingle();
 
-      final isPremium = profileResponse?['is_premium'] ?? false;
-      final premiumUntilRaw = profileResponse?['premium_until'];
-      if (isPremium && premiumUntilRaw != null) {
-        final premiumUntil = DateTime.parse(premiumUntilRaw);
-        _isPremium = premiumUntil.isAfter(DateTime.now());
-      } else {
-        _isPremium = isPremium;
+      if (profileResponse != null) {
+        final isPremium = profileResponse['is_premium'] ?? false;
+        final premiumUntilRaw = profileResponse['premium_until'];
+        if (isPremium && premiumUntilRaw != null) {
+          final premiumUntil = DateTime.parse(premiumUntilRaw);
+          _isPremium = premiumUntil.isAfter(DateTime.now());
+        } else {
+          _isPremium = isPremium;
+        }
       }
 
       final response = await _supabase
           .from('applications')
-          .select('*, jobs(*)')
+          .select('id, status, created_at, user_id, job_id, jobs(id, company_name, job_title, whatsapp_number, contact_email, application_link, salary_range, location, description, experience, required_level, requires_cover_letter, cover_letter_instructions)')
           .eq('user_id', userId)
           .order('created_at', ascending: false);
 
@@ -156,7 +172,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
         elevation: 0,
       ),
       body: RefreshIndicator(
-        onRefresh: _loadMatches,
+        onRefresh: () => _loadMatches(forceRefresh: true),
         color: const Color(0xFFF97316),
         child: Column(
           children: [
@@ -182,7 +198,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
                         final match = filtered[index];
 
                         // Limit to 3 matches if Freemium
-                        final isLocked = !_isPremium && index >= 3;
+                        final isLocked = !_isPremium && index >= 3 && VersionService.showPremium;
                         return _buildMatchCard(match, isLocked: isLocked);
                       },
                     ),

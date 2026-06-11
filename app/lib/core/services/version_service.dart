@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -5,6 +6,106 @@ import 'package:url_launcher/url_launcher.dart';
 
 class VersionService {
   static final _supabase = Supabase.instance.client;
+  static bool showPremium = false;
+  static final ValueNotifier<bool> showPremiumNotifier = ValueNotifier<bool>(false);
+  static StreamSubscription? _subscription;
+
+  // --- Configuration dynamique des swipes (table app_config) ---
+  static int swipeLimit = 10;
+  static String swipeLimitTitle = 'Limite atteinte !';
+  static String swipeLimitMessage =
+      'Vous avez utilisé vos {limit} swipes gratuits pour aujourd\'hui.';
+  static final ValueNotifier<int> swipeLimitNotifier = ValueNotifier<int>(10);
+
+  // --- Période d'essai gratuite du générateur de CV ---
+  static bool cvTrialActive = false;
+  static DateTime? cvTrialEndDate;
+  static final ValueNotifier<bool> cvTrialNotifier = ValueNotifier<bool>(false);
+
+  /// Retourne true si le trial CV est actif ET que la date de fin n'est pas dépassée.
+  static bool get isCvTrialRunning {
+    if (!cvTrialActive) return false;
+    if (cvTrialEndDate == null) return true; // Pas de date → actif indéfiniment
+    return DateTime.now().isBefore(cvTrialEndDate!);
+  }
+
+  /// Applique la configuration du trial CV depuis une ligne app_config.
+  static void _applyCvTrialConfig(Map<String, dynamic> data) {
+    if (data.containsKey('cv_trial_active')) {
+      cvTrialActive = data['cv_trial_active'] == true;
+    }
+    if (data.containsKey('cv_trial_end_date')) {
+      final raw = data['cv_trial_end_date'];
+      if (raw == null) {
+        cvTrialEndDate = null;
+      } else {
+        cvTrialEndDate = DateTime.tryParse(raw.toString());
+      }
+    }
+    cvTrialNotifier.value = isCvTrialRunning;
+  }
+
+  /// Message de limite avec le placeholder {limit} remplacé par la valeur configurée.
+  static String formattedSwipeMessage() =>
+      swipeLimitMessage.replaceAll('{limit}', swipeLimit.toString());
+
+  /// Applique la configuration des swipes provenant d'une ligne app_config.
+  static void _applySwipeConfig(Map<String, dynamic> data) {
+    final rawLimit = data['swipe_limit'];
+    if (rawLimit != null) {
+      final parsed = rawLimit is int ? rawLimit : int.tryParse(rawLimit.toString());
+      if (parsed != null && parsed > 0) {
+        swipeLimit = parsed;
+        swipeLimitNotifier.value = parsed;
+      }
+    }
+
+    final rawTitle = data['swipe_limit_title'];
+    if (rawTitle is String && rawTitle.trim().isNotEmpty) {
+      swipeLimitTitle = rawTitle;
+    }
+
+    final rawMessage = data['swipe_limit_message'];
+    if (rawMessage is String && rawMessage.trim().isNotEmpty) {
+      swipeLimitMessage = rawMessage;
+    }
+  }
+
+  /// Écoute les changements en temps réel sur la table app_config
+  static void listenToChanges() {
+    debugPrint('VersionService: Tentative de connexion au Realtime...');
+    _supabase
+        .channel('app_config_changes')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'app_config',
+          callback: (payload) {
+            debugPrint('VersionService [REALTIME PAYLOAD]: ${payload.toString()}');
+            final data = payload.newRecord;
+            if (data.containsKey('show_premium')) {
+              final newValue = data['show_premium'] == true;
+              if (showPremium != newValue) {
+                showPremium = newValue;
+                showPremiumNotifier.value = newValue;
+                debugPrint('VersionService [REALTIME]: show_premium changé → $showPremium');
+              }
+            }
+            // Synchronise la configuration des swipes en temps réel
+            _applySwipeConfig(data);
+            debugPrint('VersionService [REALTIME]: swipe_limit → $swipeLimit');
+            // Synchronise le trial CV en temps réel
+            _applyCvTrialConfig(data);
+            debugPrint('VersionService [REALTIME]: cv_trial_active → $cvTrialActive');
+          },
+        )
+        .subscribe((status, [error]) {
+          debugPrint('VersionService [REALTIME STATUS]: $status');
+          if (error != null) {
+            debugPrint('VersionService [REALTIME ERROR]: $error');
+          }
+        });
+  }
 
   /// Vérifie si une mise à jour est requise et affiche un dialogue bloquant si c'est le cas.
   static Future<void> checkVersion(BuildContext context) async {
@@ -17,14 +118,26 @@ class VersionService {
       // Table suggérée : 'app_config' avec une ligne id=1
       final response = await _supabase
           .from('app_config')
-          .select('min_version, store_url')
+          .select()
           .eq('id', 1)
           .maybeSingle();
 
-      if (response == null) return;
+      if (response == null) {
+        debugPrint('VersionService: Aucune configuration trouvée pour id=1');
+        return;
+      }
+
+      debugPrint('VersionService: Config reçue: $response');
+      showPremium = response['show_premium'] == true;
+      showPremiumNotifier.value = showPremium; // On prévient l'UI de la valeur initiale
+      _applySwipeConfig(Map<String, dynamic>.from(response));
+      _applyCvTrialConfig(Map<String, dynamic>.from(response));
+      debugPrint(
+        'VersionService: Initialisation terminée. showPremium: $showPremium, swipeLimit: $swipeLimit',
+      );
 
       final minVersion = response['min_version'] as String?;
-      final storeUrl = response['store_url'] as String? ?? 'https://play.google.com/store/apps/details?id=com.djorssi.match';
+      final storeUrl = response['store_url'] as String? ?? 'https://play.google.com/store/apps/details?id=com.djossimatch.djossimatch';
 
       if (minVersion != null && _isVersionLower(currentVersion, minVersion)) {
         if (context.mounted) {

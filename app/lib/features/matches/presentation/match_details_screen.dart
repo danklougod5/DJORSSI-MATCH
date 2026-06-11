@@ -24,7 +24,7 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen> {
     final date = DateTime.parse(widget.match['created_at']);
     final companyName = job?['company_name'] ?? 'Inconnu';
     final jobTitle = job?['job_title'] ?? 'Poste Inconnu';
-    final salary = job?['salary'] ?? 'Non spécifié';
+    final salary = job?['salary'] ?? job?['salary_range'] ?? 'Non spécifié';
     final location = job?['location'] ?? 'Non spécifiée';
     final description = job?['description'] ?? 'Aucune description disponible.';
     final contractType = job?['contract_type'];
@@ -86,6 +86,13 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen> {
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.report_problem_outlined, color: Colors.red),
+            tooltip: 'Signaler cette offre',
+            onPressed: () => _showReportDialog(context, job?['id']),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(20.r),
@@ -465,6 +472,168 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showReportDialog(BuildContext context, String? jobId) {
+    if (jobId == null) return;
+    
+    String selectedReason = 'money_asked';
+    final detailsController = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.r),
+              ),
+              title: Row(
+                children: [
+                  const Icon(Icons.report_problem, color: Colors.red),
+                  SizedBox(width: 8.w),
+                  const Text('Signaler cette offre'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pourquoi signalez-vous cette offre ?',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                    RadioListTile<String>(
+                      title: const Text('Le recruteur demande de l\'argent / des frais'),
+                      value: 'money_asked',
+                      groupValue: selectedReason,
+                      activeColor: Colors.red,
+                      onChanged: (val) {
+                        if (val != null) setState(() => selectedReason = val);
+                      },
+                    ),
+                    RadioListTile<String>(
+                      title: const Text('Cette offre est fausse ou mensongère'),
+                      value: 'scam',
+                      groupValue: selectedReason,
+                      activeColor: Colors.red,
+                      onChanged: (val) {
+                        if (val != null) setState(() => selectedReason = val);
+                      },
+                    ),
+                    RadioListTile<String>(
+                      title: const Text('Comportement suspect ou inapproprié'),
+                      value: 'suspicious_behavior',
+                      groupValue: selectedReason,
+                      activeColor: Colors.red,
+                      onChanged: (val) {
+                        if (val != null) setState(() => selectedReason = val);
+                      },
+                    ),
+                    RadioListTile<String>(
+                      title: const Text('Autre raison'),
+                      value: 'other',
+                      groupValue: selectedReason,
+                      activeColor: Colors.red,
+                      onChanged: (val) {
+                        if (val != null) setState(() => selectedReason = val);
+                      },
+                    ),
+                    SizedBox(height: 16.h),
+                    TextField(
+                      controller: detailsController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: 'Détails complémentaires (Optionnel)',
+                        hintText: 'Décrivez ce qui s\'est passé...',
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                          borderSide: const BorderSide(color: Color(0xFFF97316)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text('Annuler'),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          setState(() => isSubmitting = true);
+                          try {
+                            final userId = _supabase.auth.currentUser?.id;
+                            if (userId == null) throw Exception('Utilisateur non connecté');
+
+                            await _supabase.from('job_reports').insert({
+                              'user_id': userId,
+                              'job_id': jobId,
+                              'reason': selectedReason,
+                              'details': detailsController.text.trim().isNotEmpty
+                                  ? detailsController.text.trim()
+                                  : null,
+                              'created_at': DateTime.now().toUtc().toIso8601String(),
+                            });
+
+                            if (context.mounted) {
+                              Navigator.pop(context); // Close dialog
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Signalement enregistré. Merci pour votre vigilance !'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Erreur lors du signalement : ${e.toString()}'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } finally {
+                            setState(() => isSubmitting = false);
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: isSubmitting
+                      ? SizedBox(
+                          height: 16.h,
+                          width: 16.h,
+                          child: const CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text('Signaler'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

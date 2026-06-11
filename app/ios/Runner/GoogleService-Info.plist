@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.djossimatch.djossimatch</string>
+	<string>com.djorssimatch.app</string>
 	<key>PROJECT_ID</key>
 	<string>axial-paratext-445114-k2</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:193633746870:ios:46dd59ec809b3d33108b17</string>
+	<string>1:193633746870:ios:39fcdbdc42a32ffe108b17</string>	
 </dict>
 </plist>

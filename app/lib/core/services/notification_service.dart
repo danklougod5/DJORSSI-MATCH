@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:djossimatch/core/routing/app_router.dart';
 
 class NotificationService {
   static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
@@ -34,7 +35,15 @@ class NotificationService {
         iOS: initializationSettingsIOS,
       );
 
-      await _localNotifications.initialize(initializationSettings);
+      await _localNotifications.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          final payload = response.payload;
+          if (payload != null && payload.isNotEmpty) {
+            _handleNotificationRoute(payload);
+          }
+        },
+      );
 
       // 3. Créer le canal Android pour les notifications à haute importance
       if (Platform.isAndroid) {
@@ -63,6 +72,7 @@ class NotificationService {
         FirebaseMessaging.onMessage.listen((RemoteMessage message) {
           RemoteNotification? notification = message.notification;
           AndroidNotification? android = message.notification?.android;
+          final jobId = message.data['job_id'];
 
           if (notification != null && !kIsWeb) {
             _localNotifications.show(
@@ -84,7 +94,28 @@ class NotificationService {
                   presentSound: true,
                 ),
               ),
+              payload: jobId,
             );
+          }
+        });
+
+        // 5. Gérer les messages quand l'utilisateur clique sur la notification (App en arrière-plan)
+        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+          final jobId = message.data['job_id'];
+          if (jobId != null) {
+            _handleNotificationRoute(jobId);
+          }
+        });
+
+        // 6. Gérer les messages quand l'app est fermée et s'ouvre via la notification
+        _firebaseMessaging.getInitialMessage().then((RemoteMessage? message) {
+          if (message != null) {
+            final jobId = message.data['job_id'];
+            if (jobId != null) {
+              Future.delayed(const Duration(milliseconds: 800), () {
+                _handleNotificationRoute(jobId);
+              });
+            }
           }
         });
       }
@@ -93,15 +124,41 @@ class NotificationService {
     }
   }
 
+  static void _handleNotificationRoute(String jobId) {
+    if (kDebugMode) print('NotificationService: Navigating to job $jobId');
+    try {
+      AppRouter.router.go('/?tab=swipe&job_id=$jobId');
+    } catch (e) {
+      if (kDebugMode) print('NotificationService: Error navigating: $e');
+    }
+  }
+
+
   static Future<void> updateToken() async {
     if (kDebugMode) print('NotificationService: Updating token...');
     String? token;
     try {
       if (Platform.isIOS) {
-        token = await _firebaseMessaging.getAPNSToken();
-      } else {
-        token = await _firebaseMessaging.getToken();
+        // Wait for APNS token to be available
+        String? apnsToken;
+        int retries = 0;
+        while (apnsToken == null && retries < 10) {
+          apnsToken = await _firebaseMessaging.getAPNSToken();
+          if (apnsToken == null) {
+            await Future.delayed(const Duration(seconds: 1));
+            retries++;
+            if (kDebugMode) print('NotificationService: Waiting for APNS token... (retry $retries)');
+          }
+        }
+        if (apnsToken == null) {
+          if (kDebugMode) print('NotificationService: Failed to get APNS token after 10 attempts');
+          return;
+        } else {
+          if (kDebugMode) print('NotificationService: APNS token found: $apnsToken');
+        }
       }
+
+      token = await _firebaseMessaging.getToken();
 
       if (token != null) {
         if (kDebugMode) print('NotificationService: Token found: $token');

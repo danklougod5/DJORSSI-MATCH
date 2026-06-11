@@ -7,6 +7,9 @@ import 'dart:io';
 import '../../../core/services/profile_notifier.dart';
 import '../../../core/utils/error_translator.dart';
 import '../../../core/utils/tag_normalizer.dart';
+import '../../../core/cache/local_cache.dart';
+import 'package:djossimatch/core/services/cv_quota_service.dart';
+import 'package:djossimatch/features/cv_generator/widgets/cv_paywall_sheet.dart';
 
 class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -30,6 +33,8 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   bool _isUploadingCV = false;
   bool _isLoadingTags = true;
   String? _selectedGender;
+  bool _showCvOptions = false;
+  bool _isQuotaReached = false;
 
   @override
   void initState() {
@@ -38,11 +43,41 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   }
 
   Future<void> _loadData() async {
-    // 1. Récupération dynamique des tags existants dans la base de données
+    // 1. Essayer de charger les tags depuis le cache d'abord
+    try {
+      final cachedTagsData = await LocalCache.loadIfFresh(LocalCache.tagsKey, LocalCache.tagsTTL);
+      if (cachedTagsData != null && cachedTagsData is Map) {
+        final sortedTags = List<String>.from(cachedTagsData['tags'] ?? []);
+        final sectorCounts = Map<String, int>.from(
+          (cachedTagsData['sectorCounts'] as Map?)?.map((k, v) => MapEntry(k.toString(), v as int)) ?? {},
+        );
+        final jobCounts = Map<String, int>.from(
+          (cachedTagsData['jobCounts'] as Map?)?.map((k, v) => MapEntry(k.toString(), v as int)) ?? {},
+        );
+
+        if (mounted) {
+          setState(() {
+            _availableTags = sortedTags;
+            _sectorCounts = sectorCounts;
+            _jobTagCounts = jobCounts;
+            _isLoadingTags = false;
+          });
+        }
+        debugPrint('*** [CACHE] Tags secteurs chargés depuis le cache (${sortedTags.length} tags) ***');
+        // Charger le profil et retourner (pas de requête réseau pour les tags)
+        await _loadProfile();
+        return;
+      }
+    } catch (e) {
+      debugPrint('Erreur lecture cache tags: $e');
+    }
+
+    // 2. Cache expiré ou absent → charger depuis Supabase
     try {
       final tagsResponse = await Supabase.instance.client
           .from('jobs')
           .select('tags')
+          .eq('is_approved', true)
           .timeout(
             const Duration(seconds: 10),
             onTimeout: () => throw Exception(
@@ -100,6 +135,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         return a.compareTo(b); // Alphabetical
       });
 
+      // Sauvegarder dans le cache pour la prochaine fois
+      await LocalCache.save(LocalCache.tagsKey, {
+        'tags': sortedTags,
+        'sectorCounts': sectorCounts,
+        'jobCounts': jobCounts,
+      });
+      debugPrint('*** [NETWORK] Tags secteurs chargés depuis Supabase (${sortedTags.length} tags) et mis en cache ***');
+
       if (mounted) {
         setState(() {
           _availableTags = sortedTags;
@@ -139,12 +182,26 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
             onTimeout: () => throw Exception('Délai d\'attente dépassé.'),
           );
 
+      bool activePremium = false;
+      int extraPurchased = 0;
+
       if (profile != null && mounted) {
+        final isPremiumVal = profile['is_premium'] ?? false;
+        final premiumUntilRaw = profile['premium_until'];
+        extraPurchased = (profile['extra_cvs_purchased'] ?? 0) as int;
+
+        activePremium = isPremiumVal;
+        if (isPremiumVal && premiumUntilRaw != null) {
+          final premiumUntil = DateTime.parse(premiumUntilRaw);
+          activePremium = premiumUntil.isAfter(DateTime.now());
+        }
+
         setState(() {
           _nameController.text = profile['full_name'] ?? '';
           _phoneController.text = profile['phone_number'] ?? '';
           _selectedGender = profile['sexe'];
           _cvUrl = profile['cv_url'];
+          _showCvOptions = false;
           if (profile['skills'] != null) {
             final skills = List<String>.from(profile['skills']);
             for (var skill in skills) {
@@ -164,6 +221,21 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
             }
           }
         });
+      }
+
+      // 3. Vérification du quota CV
+      try {
+        final quota = await CvQuotaService.canCreateCv(
+          isPremiumUser: activePremium,
+          extraPurchased: extraPurchased,
+        );
+        if (mounted) {
+          setState(() {
+            _isQuotaReached = !quota.allowed;
+          });
+        }
+      } catch (e) {
+        debugPrint('Erreur verification quota CV dans le profil: $e');
       }
     } catch (e) {
       debugPrint('Erreur lors du chargement du profil: $e');
@@ -429,39 +501,53 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
             ),
           ],
         ),
-        child: ElevatedButton(
-          onPressed: _isLoading ? null : _saveProfile,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).primaryColor,
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(vertical: 20.h),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20.r),
-            ),
-            elevation: 4,
-            shadowColor: Theme.of(context).primaryColor.withValues(alpha: 0.3),
-          ),
-          child: _isLoading
-              ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 20.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20.r),
+                    ),
+                    elevation: 4,
+                    shadowColor: Theme.of(context).primaryColor.withValues(alpha: 0.3),
                   ),
-                )
-              : Text(
-                  'ENREGISTRER LE PROFIL',
-                  style: TextStyle(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1,
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          'ENREGISTRER LE PROFIL',
+                          style: TextStyle(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                          ),
+                        ),
                 ),
+              ),
+            ),
+          ],
         ),
       ),
       body: SafeArea(
-        child: CustomScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: CustomScrollView(
           slivers: [
             // ── Partie haute : champs du formulaire (scrollable normalement) ──
             SliverToBoxAdapter(
@@ -529,54 +615,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
                     SizedBox(height: 24.h),
                     _buildLabel('Votre CV (Obligatoire)'),
-                    GestureDetector(
-                      onTap: _pickAndUploadCV,
-                      child: Container(
-                        padding: EdgeInsets.all(20.r),
-                        decoration: BoxDecoration(
-                          color: _cvUrl != null
-                              ? const Color(0xFFF0FDF4)
-                              : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(20.r),
-                          border: Border.all(
-                            color: _cvUrl != null
-                                ? const Color(0xFF22C55E)
-                                : const Color(0xFFE2E8F0),
-                            width: 2,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.cloud_upload_outlined,
-                              color: _cvUrl != null
-                                  ? const Color(0xFF22C55E)
-                                  : const Color(0xFFF97316),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: Text(
-                                _cvUrl != null
-                                    ? 'CV déjà ajouté !'
-                                    : 'Cliquez pour ajouter votre CV',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: _cvUrl != null
-                                      ? const Color(0xFF166534)
-                                      : const Color(0xFF0F172A),
-                                ),
-                              ),
-                            ),
-                            if (_isUploadingCV)
-                              const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    _buildCvSection(),
 
                     SizedBox(height: 24.h),
                     _buildLabel('Secteurs d\'activité'),
@@ -676,12 +715,14 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                                       style: TextStyle(fontSize: 18.sp),
                                     ),
                                     SizedBox(width: 6.w),
-                                    Text(
-                                      'Top opportunités (Offres)',
-                                      style: TextStyle(
-                                        fontSize: 14.sp,
-                                        fontWeight: FontWeight.w800,
-                                        color: const Color(0xFF0EA5E9),
+                                    Expanded(
+                                      child: Text(
+                                        'Top opportunités (Offres)',
+                                        style: TextStyle(
+                                          fontSize: 14.sp,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFF0EA5E9),
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -710,14 +751,16 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                                 color: const Color(0xFFF97316),
                               ),
                               SizedBox(width: 8.w),
-                              Text(
-                                _searchQuery.isEmpty
-                                    ? 'Tous les secteurs'
-                                    : 'Résultats de recherche',
-                                style: TextStyle(
-                                  fontSize: 15.sp,
-                                  fontWeight: FontWeight.w900,
-                                  color: const Color(0xFF0F172A),
+                              Expanded(
+                                child: Text(
+                                  _searchQuery.isEmpty
+                                      ? 'Tous les secteurs'
+                                      : 'Résultats de recherche',
+                                  style: TextStyle(
+                                    fontSize: 15.sp,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF0F172A),
+                                  ),
                                 ),
                               ),
                             ],
@@ -754,7 +797,9 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildLabel(String text) => Padding(
@@ -998,6 +1043,326 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCvSection() {
+    if (_cvUrl != null) {
+      return Container(
+        padding: EdgeInsets.all(16.r),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: const Color(0xFF22C55E), width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 24),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'CV enregistré',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15.sp,
+                          color: const Color(0xFF166534),
+                        ),
+                      ),
+                      SizedBox(height: 2.h),
+                      Text(
+                        'Votre CV est prêt pour postuler aux offres.',
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: const Color(0xFF1E6F3F),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                // Button to view current CV
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      if (_cvUrl != null) {
+                        final encodedUrl = Uri.encodeComponent(_cvUrl!);
+                        context.push('/cv_pdf_viewer?url=$encodedUrl&title=Mon%20CV');
+                      }
+                    },
+                    icon: const Icon(Icons.visibility_outlined, size: 16),
+                    label: const Text('Voir mon CV'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF166534),
+                      side: const BorderSide(color: Color(0xFF22C55E)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                // Button to replace/show options
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _showCvOptions = !_showCvOptions;
+                      });
+                    },
+                    icon: const Icon(Icons.sync, size: 16),
+                    label: const Text('Remplacer'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF22C55E),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_showCvOptions) ...[
+              const SizedBox(height: 16),
+              const Divider(color: Color(0xFFBBF7D0)),
+              const SizedBox(height: 12),
+              const Text(
+                'Choisissez une méthode pour remplacer votre CV :',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
+              ),
+              const SizedBox(height: 12),
+              _buildSelectionCards(),
+            ]
+          ],
+        ),
+      );
+    } else {
+      return _buildSelectionCards();
+    }
+  }
+
+  Widget _buildSelectionCards() {
+    return Column(
+      children: [
+        // Method 1: Upload CV (Always free and allowed)
+        _buildOptionCard(
+          title: 'Uploader mon CV existant',
+          subtitle: 'Sélectionnez un fichier PDF ou Word de votre appareil.',
+          icon: Icons.cloud_upload_outlined,
+          color: const Color(0xFF3B82F6), // Blue
+          isLoading: _isUploadingCV,
+          onTap: _pickAndUploadCV,
+        ),
+        SizedBox(height: 12.h),
+
+        // Method 2: Improve CV with IA
+        _buildOptionCard(
+          title: 'Améliorer / Importer avec l\'IA',
+          subtitle: 'Uploadez votre CV pour l\'améliorer et le structurer automatiquement par l\'IA.',
+          icon: Icons.auto_awesome_outlined,
+          color: const Color(0xFFF97316), // Orange
+          isLocked: _isQuotaReached,
+          onTap: () async {
+            if (_isQuotaReached) {
+              final paid = await CvPaywallSheet.show(context, PaymentReason.extraCv);
+              if (paid && mounted) {
+                _loadProfile();
+              }
+              return;
+            }
+
+            try {
+              final result = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: ['pdf'],
+                withData: true,
+              );
+              
+              if (result != null && result.files.isNotEmpty) {
+                final file = result.files.first;
+                final bytes = file.bytes;
+                if (bytes != null) {
+                  if (mounted) {
+                    await context.push('/cv_landing', extra: bytes);
+                    _loadProfile();
+                  }
+                } else if (file.path != null) {
+                  final fileIo = File(file.path!);
+                  final fileBytes = await fileIo.readAsBytes();
+                  if (mounted) {
+                    await context.push('/cv_landing', extra: fileBytes);
+                    _loadProfile();
+                  }
+                }
+              }
+            } catch (e) {
+              debugPrint('Erreur lors de la sélection du PDF pour amélioration: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Erreur: Impossible de lire le fichier sélectionné.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          },
+        ),
+        SizedBox(height: 12.h),
+
+        // Method 3: Créer mon CV manuellement
+        _buildOptionCard(
+          title: 'Créer mon CV manuellement',
+          subtitle: 'Remplissez vos informations étape par étape et choisissez un modèle.',
+          icon: Icons.edit_note_rounded,
+          color: const Color(0xFF10B981), // Green
+          isLocked: _isQuotaReached,
+          onTap: () async {
+            if (_isQuotaReached) {
+              final paid = await CvPaywallSheet.show(context, PaymentReason.extraCv);
+              if (paid && mounted) {
+                _loadProfile();
+              }
+              return;
+            }
+
+            await context.push('/cv_template_select');
+            _loadProfile();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOptionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    bool isLoading = false,
+    bool isLocked = false,
+    required VoidCallback onTap,
+  }) {
+    final displayColor = isLocked ? Colors.grey.shade400 : color;
+
+    return InkWell(
+      onTap: isLoading ? null : onTap,
+      borderRadius: BorderRadius.circular(16.r),
+      child: Container(
+        padding: EdgeInsets.all(16.r),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: isLocked ? Colors.grey.shade200 : const Color(0xFFE2E8F0), 
+            width: 1.5
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Icon Container
+            Container(
+              padding: EdgeInsets.all(12.r),
+              decoration: BoxDecoration(
+                color: displayColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: Icon(
+                isLocked ? Icons.lock_outline : icon, 
+                color: displayColor, 
+                size: 24.r
+              ),
+            ),
+            SizedBox(width: 16.w),
+            // Text Details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.bold,
+                            color: isLocked ? Colors.grey.shade500 : const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                      if (isLocked) ...[
+                        SizedBox(width: 6.w),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(6.r),
+                          ),
+                          child: Text(
+                            'Payant',
+                            style: TextStyle(
+                              fontSize: 9.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red.shade600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    isLocked 
+                        ? 'Limite de CV atteinte. Débloquez cette option ou uploadez un fichier directement.' 
+                        : subtitle,
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      color: Colors.grey.shade500,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 8.w),
+            // Action / Indicator
+            if (isLoading)
+              SizedBox(
+                width: 18.r,
+                height: 18.r,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(displayColor),
+                ),
+              )
+            else
+              Icon(
+                isLocked ? Icons.lock_outline : Icons.chevron_right_rounded,
+                color: Colors.grey.shade400,
+                size: 20.r,
+              ),
           ],
         ),
       ),

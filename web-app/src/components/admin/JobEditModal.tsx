@@ -160,6 +160,34 @@ const JobEditModal: React.FC<JobEditModalProps> = ({
             </div>
           </div>
 
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="flex items-center gap-3 p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl">
+              <input 
+                type="checkbox" 
+                id="is_ai_verified"
+                checked={editingJob.is_ai_verified || false} 
+                onChange={e => setEditingJob({...editingJob, is_ai_verified: e.target.checked})}
+                className="w-5 h-5 rounded-lg border-2 border-slate-200 text-primary focus:ring-primary/20 transition-all cursor-pointer"
+              />
+              <label htmlFor="is_ai_verified" className="text-xs font-black uppercase tracking-tight text-slate-700 cursor-pointer">
+                Offre vérifiée par AI (Badge)
+              </label>
+            </div>
+
+            <div className="flex items-center gap-3 p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl">
+              <input 
+                type="checkbox" 
+                id="is_approved"
+                checked={editingJob.is_approved !== false} 
+                onChange={e => setEditingJob({...editingJob, is_approved: e.target.checked})}
+                className="w-5 h-5 rounded-lg border-2 border-slate-200 text-primary focus:ring-primary/20 transition-all cursor-pointer"
+              />
+              <label htmlFor="is_approved" className="text-xs font-black uppercase tracking-tight text-slate-700 cursor-pointer">
+                Offre approuvée (Visible sur l'app)
+              </label>
+            </div>
+          </div>
+
           <div className="flex gap-4 pt-4">
             <button 
               type="button"

@@ -180,7 +180,46 @@ class DjossiSwipeCard extends StatelessWidget {
                       ),
                     ),
 
-                  if (isVerified) const SizedBox.shrink(),
+                  Container(
+                    margin: EdgeInsets.only(bottom: 8.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 10.w,
+                      vertical: 6.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isVerified ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: Colors.white24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (isVerified ? const Color(0xFF10B981) : const Color(0xFFD97706)).withOpacity(0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isVerified ? Icons.verified : Icons.warning_amber_rounded,
+                          size: 14.r,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 6.w),
+                        Text(
+                          isVerified
+                              ? 'Offre Vérifiée'
+                              : 'Non vérifiée (⚠️ Aucun frais demandé)',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
                   // Main content column wrapped in a Scrollable to avoid overflows
                   Expanded(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/services/version_service.dart';
 import '../../../core/utils/tag_normalizer.dart';
 
 class JobAlertsScreen extends StatefulWidget {
@@ -50,6 +51,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
         final tagsResponse = await _supabase
             .from('jobs')
             .select('tags')
+            .eq('is_approved', true)
             .timeout(
               const Duration(seconds: 10),
               onTimeout: () =>
@@ -169,7 +171,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
   }
 
   Future<void> _saveAlerts() async {
-    if (!_isPremium) return;
+    if (!_isPremium && VersionService.showPremium) return;
 
     setState(() => _isSaving = true);
     try {
@@ -241,7 +243,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      bottomNavigationBar: (_isLoading || !_isPremium)
+      bottomNavigationBar: (_isLoading || (!_isPremium && VersionService.showPremium))
           ? null
           : Container(
               padding: EdgeInsets.fromLTRB(
@@ -325,7 +327,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                     ),
                   ),
                 ),
-                if (!_isPremium) _buildPremiumLocker(),
+                if (!_isPremium && VersionService.showPremium) _buildPremiumLocker(),
               ],
             ),
     );
@@ -637,7 +639,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                         color: const Color(0xFFEA580C),
                       ),
                     ),
-                    if (_isPremium && _alertsEnabled) ...[
+                    if ((_isPremium || !VersionService.showPremium) && _alertsEnabled) ...[
                       SizedBox(width: 4.w),
                       GestureDetector(
                         onTap: () => setState(() => _selectedSectors.remove(sector)),
@@ -663,7 +665,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
     return FilterChip(
       label: Text(sector),
       selected: isSelected,
-      onSelected: (_isPremium && _alertsEnabled)
+      onSelected: (_isPremium || !VersionService.showPremium) && _alertsEnabled
           ? (val) {
               setState(() {
                 if (val) {
@@ -700,7 +702,7 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
     final count = _jobTagCounts[tag] ?? 0;
     final isSelected = _selectedSectors.contains(tag);
     return GestureDetector(
-      onTap: (_isPremium && _alertsEnabled)
+      onTap: (_isPremium || !VersionService.showPremium) && _alertsEnabled
           ? () => setState(
                 () => isSelected ? _selectedSectors.remove(tag) : _selectedSectors.add(tag),
               )

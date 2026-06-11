@@ -6,6 +6,7 @@ const NotificationsTab: React.FC = () => {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [target, setTarget] = useState<'all' | 'premium'>('all');
+  const [isPersonal, setIsPersonal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -27,7 +28,8 @@ const NotificationsTab: React.FC = () => {
         body: { 
           title, 
           message, 
-          target 
+          target,
+          is_personal: isPersonal
         }
       });
 
@@ -89,6 +91,39 @@ const NotificationsTab: React.FC = () => {
                   Membres Premium
                 </button>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700 uppercase tracking-wider ml-1">Personnalisation</label>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setIsPersonal(false)}
+                  className={`flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all font-bold ${
+                    !isPersonal 
+                      ? 'border-primary bg-primary/5 text-primary shadow-sm' 
+                      : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200'
+                  }`}
+                >
+                  Message Standard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPersonal(true)}
+                  className={`flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all font-bold ${
+                    isPersonal 
+                      ? 'border-violet-500 bg-violet-50 text-violet-700 shadow-sm' 
+                      : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200'
+                  }`}
+                >
+                  Message Intime / Perso
+                </button>
+              </div>
+              {isPersonal && (
+                <p className="text-xs text-violet-600 font-semibold bg-violet-50/50 p-3 rounded-xl border border-violet-100 mt-2">
+                  💡 Le prénom de l'utilisateur sera automatiquement ajouté au début du message (ex: "Dody, de nouvelles offres...").
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -164,7 +199,9 @@ const NotificationsTab: React.FC = () => {
                       <span className="text-[10px] text-slate-400 font-bold">Maintenant</span>
                     </div>
                     <p className="text-xs text-slate-600 font-medium leading-relaxed mt-1 line-clamp-3">
-                      {message || 'Le contenu de votre message s\'affichera ici.'}
+                      {isPersonal 
+                        ? `Dody, ${message ? (/[a-zA-ZÀ-ÿ]/.test(message.charAt(0)) ? message.charAt(0).toLowerCase() + message.slice(1) : message) : 'de nouvelles offres ont été ajoutées dans ton secteur...'}`
+                        : (message || 'Le contenu de votre message s\'affichera ici.')}
                     </p>
                   </div>
                 </div>
