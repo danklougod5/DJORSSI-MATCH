@@ -60,6 +60,8 @@ class AIJobValidator:
         - "required_level": Minimum education level (e.g., 'BAC+5', 'Licence')
         - "contact_email": The extracted email. IMPORTANT: ALWAYS extract if ending in @educarriere.net !
         - "whatsapp_number": The extracted phone number
+        - "requires_cover_letter": boolean (true if the text specifies that a cover letter or 'lettre de motivation' is required to apply, otherwise false)
+        - "cover_letter_instructions": string (instructions or consignes for the cover letter if mentioned, or null)
         
         CRITICAL: If you cannot find ANY valid contact_email OR whatsapp_number, you MUST return {{"is_job": false}}.
         - "deadline": Deadline in YYYY-MM-DD (ONLY if explicitly written in the text, otherwise null).
