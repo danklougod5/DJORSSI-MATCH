@@ -32,6 +32,8 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
   bool _isLoadingTags = true;
   List<String> _availableTags = [];
   final Set<String> _selectedTags = {};
+  String _tagSearchQuery = '';
+  final _tagSearchController = TextEditingController();
   bool _isSuccess = false;
 
   final List<String> _contractTypes = [
@@ -92,6 +94,7 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
     _descriptionController.dispose();
     _coverLetterController.dispose();
     _deadlineController.dispose();
+    _tagSearchController.dispose();
     super.dispose();
   }
 
@@ -142,7 +145,7 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
       'tags': tags,
       'contract_type': _contractType,
       'requires_cover_letter': _requiresCoverLetter,
-      'cover_letter_instructions': _requiresCoverLetter ? _coverLetterController.text.trim() : null,
+      'cover_letter_instructions': null,
       'deadline': _deadlineController.text.trim().isNotEmpty ? _deadlineController.text.trim() : null,
     };
 
@@ -157,7 +160,7 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
       'description': rawData['description'],
       'tags': tags,
       'requires_cover_letter': _requiresCoverLetter,
-      'cover_letter_instructions': rawData['cover_letter_instructions'],
+      'cover_letter_instructions': null,
       'deadline': rawData['deadline'],
       'is_ai_verified': false, // Scammers prevention: all recruiter jobs start unverified
       'is_approved': false, // Scammers prevention: recruiter jobs must be approved by admin
@@ -235,7 +238,7 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
             ),
             SizedBox(height: 24.h),
             Text(
-              'Offre publiée avec succès !',
+              'Offre soumise avec succès !',
               style: TextStyle(
                 fontSize: 22.sp,
                 fontWeight: FontWeight.bold,
@@ -244,14 +247,30 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 12.h),
-            Text(
-              'Votre offre est enregistrée et visible par les candidats.\n\nNote: Notre équipe va réviser votre offre sous peu pour lui attribuer le label de confiance "Vérifié".',
-              style: TextStyle(
-                fontSize: 14.sp,
-                color: const Color(0xFF64748B),
-                height: 1.5,
+            Container(
+              padding: EdgeInsets.all(16.r),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: const Color(0xFFFDE68A)),
               ),
-              textAlign: TextAlign.center,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.hourglass_top_rounded, color: const Color(0xFFF97316), size: 24.r),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: Text(
+                      'Votre offre est en attente de vérification par notre équipe.\n\nElle sera publiée et visible par les candidats après validation (sous 24h maximum).',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: const Color(0xFF92400E),
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             SizedBox(height: 40.h),
             SizedBox(
@@ -474,7 +493,7 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
                   ),
                   SizedBox(height: 4.h),
                   Text(
-                    'Sélectionnez les tags qui correspondent à l\'offre',
+                    'Recherchez et sélectionnez les tags qui correspondent à l\'offre',
                     style: TextStyle(
                       fontSize: 11.sp,
                       color: const Color(0xFF64748B),
@@ -500,38 +519,76 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
                     const Divider(),
                     SizedBox(height: 8.h),
                   ],
+                  // Search field for tags
+                  TextField(
+                    controller: _tagSearchController,
+                    decoration: InputDecoration(
+                      hintText: 'Rechercher un tag...',
+                      hintStyle: TextStyle(fontSize: 13.sp, color: const Color(0xFF94A3B8)),
+                      prefixIcon: Icon(Icons.search, size: 20.r, color: const Color(0xFF94A3B8)),
+                      suffixIcon: _tagSearchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.clear, size: 18.r, color: const Color(0xFF94A3B8)),
+                              onPressed: () => setState(() {
+                                _tagSearchController.clear();
+                                _tagSearchQuery = '';
+                              }),
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: const Color(0xFFF1F5F9),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                    ),
+                    onChanged: (val) => setState(() => _tagSearchQuery = val.toLowerCase()),
+                  ),
+                  SizedBox(height: 12.h),
                   if (_isLoadingTags)
                     const Center(child: CircularProgressIndicator(strokeWidth: 2))
                   else if (_availableTags.isEmpty)
                     Text('Aucun tag disponible', style: TextStyle(fontSize: 12.sp, color: const Color(0xFF94A3B8)))
                   else
-                    SizedBox(
-                      height: 200.h,
-                      child: SingleChildScrollView(
-                        child: Wrap(
-                          spacing: 6.w,
-                          runSpacing: 6.h,
-                          children: _availableTags.map((tag) {
-                            final isSelected = _selectedTags.contains(tag);
-                            return FilterChip(
-                              label: Text(tag, style: TextStyle(fontSize: 12.sp)),
-                              selected: isSelected,
-                              onSelected: (_) => setState(() {
-                                isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag);
-                              }),
-                              selectedColor: const Color(0xFFF97316).withValues(alpha: 0.15),
-                              checkmarkColor: const Color(0xFFF97316),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20.r),
-                                side: BorderSide(
-                                  color: isSelected ? const Color(0xFFF97316) : const Color(0xFFE2E8F0),
+                    Builder(builder: (context) {
+                      final filteredTags = _tagSearchQuery.isEmpty
+                          ? _availableTags
+                          : _availableTags.where((t) => t.toLowerCase().contains(_tagSearchQuery)).toList();
+                      if (filteredTags.isEmpty) {
+                        return Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16.h),
+                          child: Text('Aucun tag trouvé pour "$_tagSearchQuery"', style: TextStyle(fontSize: 12.sp, color: const Color(0xFF94A3B8))),
+                        );
+                      }
+                      return SizedBox(
+                        height: 200.h,
+                        child: SingleChildScrollView(
+                          child: Wrap(
+                            spacing: 6.w,
+                            runSpacing: 6.h,
+                            children: filteredTags.map((tag) {
+                              final isSelected = _selectedTags.contains(tag);
+                              return FilterChip(
+                                label: Text(tag, style: TextStyle(fontSize: 12.sp)),
+                                selected: isSelected,
+                                onSelected: (_) => setState(() {
+                                  isSelected ? _selectedTags.remove(tag) : _selectedTags.add(tag);
+                                }),
+                                selectedColor: const Color(0xFFF97316).withValues(alpha: 0.15),
+                                checkmarkColor: const Color(0xFFF97316),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20.r),
+                                  side: BorderSide(
+                                    color: isSelected ? const Color(0xFFF97316) : const Color(0xFFE2E8F0),
+                                  ),
                                 ),
-                              ),
-                            );
-                          }).toList(),
+                              );
+                            }).toList(),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    }),
                 ],
               ),
             ),
@@ -622,19 +679,53 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
                 },
               ),
             ),
-            if (_requiresCoverLetter) ...[
-              SizedBox(height: 16.h),
-              _buildTextField(
-                controller: _coverLetterController,
-                label: 'Instructions pour la lettre de motivation',
-                hint: 'Ex: Expliquez vos motivations et votre expérience de chauffeur...',
-                icon: Icons.edit_note,
-                validator: (v) => _requiresCoverLetter && v!.isEmpty
-                    ? 'Veuillez entrer des consignes pour la lettre'
-                    : null,
+            SizedBox(height: 32.h),
+
+            // Fraud warning with legal consequences
+            Container(
+              padding: EdgeInsets.all(16.r),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(16.r),
+                border: Border.all(color: const Color(0xFFFCA5A5), width: 1.5),
               ),
-            ],
-            SizedBox(height: 40.h),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.gavel_rounded,
+                    color: const Color(0xFFDC2626),
+                    size: 24.r,
+                  ),
+                  SizedBox(width: 12.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '⚠️ Avertissement légal',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF991B1B),
+                          ),
+                        ),
+                        SizedBox(height: 6.h),
+                        Text(
+                          'Toute publication d\'offre d\'emploi frauduleuse, trompeuse ou à caractère d\'arnaque est passible de poursuites judiciaires conformément à la loi ivoirienne.\n\nVotre identité est enregistrée. En cas de signalement, les informations seront transmises aux autorités compétentes.',
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: const Color(0xFFB91C1C),
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 24.h),
 
             // Submit Button
             SizedBox(
@@ -658,7 +749,7 @@ class _RecruiterPostJobScreenState extends State<RecruiterPostJobScreen> {
                         ),
                       )
                     : Text(
-                        'Publier l\'offre d\'emploi',
+                        'Soumettre pour vérification',
                         style: TextStyle(
                           fontSize: 16.sp,
                           fontWeight: FontWeight.bold,
