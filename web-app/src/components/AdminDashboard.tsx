@@ -13,7 +13,9 @@ import {
   ShieldAlert,
   Hand,
   FileText,
-  CheckSquare
+  CheckSquare,
+  Megaphone,
+  UserX
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -31,6 +33,8 @@ import ReportsTab from './admin/ReportsTab';
 import SwipesTab from './admin/SwipesTab';
 import CvTrialTab from './admin/CvTrialTab';
 import SupportTab from './admin/SupportTab';
+import AnnouncementsTab from './admin/AnnouncementsTab';
+import DeleteFeedbackTab from './admin/DeleteFeedbackTab';
 
 const cleanPhone = (phone: any): string => {
   if (!phone) return "";
@@ -46,7 +50,7 @@ const cleanPhone = (phone: any): string => {
 const COLORS = ['#FF8200', '#009A44', '#F43F5E', '#7C3AED'];
 
 const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'job-approval' | 'add-jobs' | 'all-jobs' | 'settings' | 'job-metrics' | 'notifications' | 'reports' | 'swipes' | 'cv-trial' | 'support'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'job-approval' | 'add-jobs' | 'all-jobs' | 'settings' | 'job-metrics' | 'notifications' | 'reports' | 'swipes' | 'cv-trial' | 'support' | 'announcements' | 'delete-feedback'>('overview');
   const [stats, setStats] = useState({
     totalUsers: 0,
     premiumUsers: 0,
@@ -93,10 +97,10 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       fetchReports();
     }
     
-    // Auto-refresh logs and status every 5 seconds
+    // Auto-refresh stats every 60 seconds (was 5s — caused Disk IO budget depletion)
     const interval = setInterval(() => {
       fetchStats();
-    }, 5000);
+    }, 60000);
     
     return () => clearInterval(interval);
   }, [activeTab]);
@@ -131,7 +135,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
       const { data: userData } = await supabase
         .from('profiles')
-        .select('id, full_name, is_premium, created_at, phone_number, skills, extra_cvs_purchased')
+        .select('id, full_name, is_premium, premium_until, created_at, phone_number, skills, extra_cvs_purchased')
         .order('is_premium', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(500);
@@ -141,6 +145,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           id: u.id,
           name: u.full_name || 'Anonyme',
           premium: u.is_premium,
+          premiumUntil: u.premium_until,
           date: new Date(u.created_at).toLocaleDateString(),
           phone: u.phone_number || '-',
           sector: Array.isArray(u.skills) ? u.skills.join(', ') : (u.skills || '-'),
@@ -169,10 +174,11 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       });
       setDailyActivity(activity);
 
-      const { data: allProfiles } = await supabase.from('profiles').select('skills');
-      if (allProfiles) {
+      // OPTIMIZATION: Compute top sectors from already-loaded userData (500 profiles)
+      // instead of doing a separate full table scan (SELECT skills FROM profiles)
+      if (userData) {
         const sectorCounts: Record<string, number> = {};
-        allProfiles.forEach((p: any) => {
+        userData.forEach((p: any) => {
           if (Array.isArray(p.skills)) {
              p.skills.forEach((s: string) => {
                if(s) sectorCounts[s] = (sectorCounts[s] || 0) + 1;
@@ -191,69 +197,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         setTopSectors(sorted);
       }
 
-      // 7. Job Metrics (Sectors & Contract Types)
-      const { data: allJobs } = await supabase.from('jobs').select('tags, job_title, description');
-      if (allJobs) {
-        const sectorCounts: Record<string, number> = {};
-        const contractCounts: Record<string, number> = {
-          'CDI': 0,
-          'CDD': 0,
-          'Stage': 0,
-          'Alternance': 0,
-          'Freelance': 0,
-          'Intérim': 0
-        };
-
-        const contractTerms = ['CDI', 'CDD', 'STAGE', 'ALTERNANCE', 'FREELANCE', 'INTERIM'];
-
-        allJobs.forEach((job: any) => {
-          let foundContractForThisJob = false;
-          
-          // 1. Check tags
-          if (Array.isArray(job.tags)) {
-            job.tags.forEach((tag: string) => {
-              const upperTag = tag.toUpperCase();
-              if (contractTerms.includes(upperTag)) {
-                const key = upperTag === 'STAGE' ? 'Stage' : upperTag;
-                const displayKey = (upperTag === 'CDI' || upperTag === 'CDD') ? upperTag : (key.charAt(0) + key.slice(1).toLowerCase());
-                contractCounts[displayKey] = (contractCounts[displayKey] || 0) + 1;
-                foundContractForThisJob = true;
-              } else if (tag) {
-                sectorCounts[tag] = (sectorCounts[tag] || 0) + 1;
-              }
-            });
-          }
-
-          // 2. Check title if not found in tags
-          if (!foundContractForThisJob) {
-            const titleUpper = (job.job_title || '').toUpperCase();
-            for (const term of contractTerms) {
-              if (titleUpper.includes(term)) {
-                const key = term === 'STAGE' ? 'Stage' : term;
-                const displayKey = (term === 'CDI' || term === 'CDD') ? term : (key.charAt(0) + key.slice(1).toLowerCase());
-                contractCounts[displayKey] = (contractCounts[displayKey] || 0) + 1;
-                break; // Found one, move to next job
-              }
-            }
-          }
-        });
-
-        const sortedJobSectors = Object.entries(sectorCounts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 10)
-          .map(([name, count]) => ({ name, count }));
-
-        const sortedContracts = Object.entries(contractCounts)
-          .filter(([_, count]) => count > 0)
-          .sort((a, b) => b[1] - a[1])
-          .map(([name, count]) => ({ name, count }));
-
-        setStats(prev => ({
-          ...prev,
-          jobSectors: sortedJobSectors,
-          contractTypes: sortedContracts
-        }));
-      }
+      // OPTIMIZATION: Job metrics are now computed inside fetchJobs() to avoid a full table scan
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -335,11 +279,75 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     try {
       const { data, error } = await supabase
         .from('jobs')
-        .select('*')
+        .select('id, job_title, company_name, description, deadline, required_level, location, source_url, is_ai_verified, is_approved, tags, contact_email, whatsapp_number, application_instructions, salary_range, created_at')
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       setJobsList(data || []);
+
+      // OPTIMIZATION: Compute job metrics here from the loaded jobs
+      // instead of doing a separate full table scan in fetchStats
+      if (data) {
+        const sectorCounts: Record<string, number> = {};
+        const contractCounts: Record<string, number> = {
+          'CDI': 0,
+          'CDD': 0,
+          'Stage': 0,
+          'Alternance': 0,
+          'Freelance': 0,
+          'Intérim': 0
+        };
+
+        const contractTerms = ['CDI', 'CDD', 'STAGE', 'ALTERNANCE', 'FREELANCE', 'INTERIM'];
+
+        data.forEach((job: any) => {
+          let foundContractForThisJob = false;
+          
+          // 1. Check tags
+          if (Array.isArray(job.tags)) {
+            job.tags.forEach((tag: string) => {
+              const upperTag = tag.toUpperCase();
+              if (contractTerms.includes(upperTag)) {
+                const key = upperTag === 'STAGE' ? 'Stage' : upperTag;
+                const displayKey = (upperTag === 'CDI' || upperTag === 'CDD') ? upperTag : (key.charAt(0) + key.slice(1).toLowerCase());
+                contractCounts[displayKey] = (contractCounts[displayKey] || 0) + 1;
+                foundContractForThisJob = true;
+              } else if (tag) {
+                sectorCounts[tag] = (sectorCounts[tag] || 0) + 1;
+              }
+            });
+          }
+
+          // 2. Check title if not found in tags
+          if (!foundContractForThisJob) {
+            const titleUpper = (job.job_title || '').toUpperCase();
+            for (const term of contractTerms) {
+              if (titleUpper.includes(term)) {
+                const key = term === 'STAGE' ? 'Stage' : term;
+                const displayKey = (term === 'CDI' || term === 'CDD') ? term : (key.charAt(0) + key.slice(1).toLowerCase());
+                contractCounts[displayKey] = (contractCounts[displayKey] || 0) + 1;
+                break;
+              }
+            }
+          }
+        });
+
+        const sortedJobSectors = Object.entries(sectorCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([name, count]) => ({ name, count }));
+
+        const sortedContracts = Object.entries(contractCounts)
+          .filter(([_, count]) => count > 0)
+          .sort((a, b) => b[1] - a[1])
+          .map(([name, count]) => ({ name, count }));
+
+        setStats(prev => ({
+          ...prev,
+          jobSectors: sortedJobSectors,
+          contractTypes: sortedContracts
+        }));
+      }
     } catch (err: any) {
       console.error("Error fetching jobs:", err);
     }
@@ -705,15 +713,16 @@ reader.readAsText(file);
   const handleTogglePremium = async (userId: string, currentStatus: boolean) => {
     try {
       const newStatus = !currentStatus;
+      const premiumUntilDate = newStatus ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null;
       
       // Optimistic update
-      setRecentUsersList(prev => prev.map(u => u.id === userId ? { ...u, premium: newStatus } : u));
+      setRecentUsersList(prev => prev.map(u => u.id === userId ? { ...u, premium: newStatus, premiumUntil: premiumUntilDate } : u));
 
       const { error } = await supabase
         .from('profiles')
         .update({ 
           is_premium: newStatus,
-          premium_until: newStatus ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null
+          premium_until: premiumUntilDate
         })
         .eq('id', userId);
       
@@ -757,6 +766,7 @@ reader.readAsText(file);
           full_name: editingUser.name,
           phone_number: editingUser.phone,
           is_premium: editingUser.premium,
+          premium_until: editingUser.premium ? editingUser.premiumUntil : null,
           skills: skillsArray,
           extra_cvs_purchased: editingUser.extraCvsPurchased || 0
         })
@@ -914,9 +924,11 @@ reader.readAsText(file);
     { id: 'add-jobs', label: 'Ajout d\'Annonces', icon: <Plus size={20} /> },
     { id: 'reports', label: 'Signalements', icon: <ShieldAlert size={20} /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell size={20} /> },
+    { id: 'announcements', label: 'Annonces de l\'App', icon: <Megaphone size={20} /> },
     { id: 'swipes', label: 'Swipes', icon: <Hand size={20} /> },
     { id: 'cv-trial', label: 'CV Essai', icon: <FileText size={20} /> },
     { id: 'support', label: 'Suggestions & Q&A', icon: <MessageSquare size={20} /> },
+    { id: 'delete-feedback', label: 'Désinscriptions', icon: <UserX size={20} /> },
     { id: 'job-approval', label: 'Approbations', icon: <CheckSquare size={20} /> },
     { id: 'settings', label: 'Sécurité', icon: <Settings size={20} /> },
   ];
@@ -1123,6 +1135,8 @@ reader.readAsText(file);
         {activeTab === 'swipes' && <SwipesTab />}
         {activeTab === 'cv-trial' && <CvTrialTab />}
         {activeTab === 'support' && <SupportTab />}
+        {activeTab === 'announcements' && <AnnouncementsTab />}
+        {activeTab === 'delete-feedback' && <DeleteFeedbackTab />}
         {activeTab === 'settings' && (
           <SettingsTab 
             handleUpdatePassword={handleUpdatePassword}

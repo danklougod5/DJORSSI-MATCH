@@ -8,6 +8,7 @@ import 'templates/cv_template_left_right.dart';
 import 'templates/cv_template_timeline.dart';
 import 'templates/cv_template_creative.dart';
 import 'templates/cv_template_elegant.dart';
+import 'templates/cv_template_executive.dart';
 
 class CvPdfGenerator {
   static final Map<String, CvTemplateBase> _templates = {
@@ -18,6 +19,7 @@ class CvPdfGenerator {
     'timeline': CvTemplateTimeline(),
     'creative': CvTemplateCreative(),
     'elegant': CvTemplateElegant(),
+    'executive': CvTemplateExecutive(),
   };
 
   static List<CvTemplateBase> get availableTemplates => _templates.values.toList();

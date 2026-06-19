@@ -67,7 +67,7 @@ class CvTemplateLeftRight extends CvTemplateBase {
                         ),
                         pw.Padding(
                           padding: const pw.EdgeInsets.only(right: 16),
-                          child: buildBulletText(cv.skills, textColor, primary, fontSize: 10, height: 1.4),
+                          child: buildBulletText(cv.skills, textColor, primary, fontSize: 10, height: 1.4, splitByDelimiterIfNoNewline: true),
                         ),
                       ],
 
@@ -101,7 +101,7 @@ class CvTemplateLeftRight extends CvTemplateBase {
                         ),
                       ],
 
-                      if (cv.experiences.isNotEmpty) ...[
+                      if (cv.experiences.isNotEmpty && cv.experiences.any((e) => e.isVisible)) ...[
                         pw.Padding(
                           padding: const pw.EdgeInsets.only(left: 16),
                           child: _buildSectionTitle('Expérience Professionnelle', primary),

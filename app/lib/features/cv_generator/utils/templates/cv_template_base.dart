@@ -1,4 +1,6 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -43,15 +45,46 @@ abstract class CvTemplateBase {
     PdfColor bulletColor, {
     double fontSize = 9,
     double height = 1.3,
+    bool splitByDelimiterIfNoNewline = false,
   }) {
     String cleanText = text.trim();
     if (cleanText.startsWith('[') && cleanText.endsWith(']')) {
       cleanText = cleanText.substring(1, cleanText.length - 1).trim();
     }
 
-    final sanitized = sanitizeText(cleanText);
-    // Split text into non-empty trimmed lines
-    final lines = sanitized.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    // 1. Split text into initial lines by newline
+    final initialLines = cleanText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    List<String> rawLines = [];
+
+    for (final line in initialLines) {
+      // If a line contains typical list delimiters on a single line (like ". -" or " - "), split it!
+      if (line.contains(' . - ') || line.contains('. - ') || line.contains(' - ')) {
+        final parts = line.split(RegExp(r'\s*\.?\s*-\s+'));
+        for (final part in parts) {
+          final trimmed = part.trim();
+          if (trimmed.isNotEmpty) {
+            rawLines.add(trimmed);
+          }
+        }
+      } else if (splitByDelimiterIfNoNewline && initialLines.length == 1) {
+        // Fallback split for skills if they don't have newlines
+        if (line.contains('•')) {
+          rawLines.addAll(line.split('•').map((l) => l.trim()).where((l) => l.isNotEmpty));
+        } else if (line.contains(',')) {
+          rawLines.addAll(line.split(',').map((l) => l.trim()).where((l) => l.isNotEmpty));
+        } else if (line.contains(';')) {
+          rawLines.addAll(line.split(';').map((l) => l.trim()).where((l) => l.isNotEmpty));
+        } else if (line.contains('|')) {
+          rawLines.addAll(line.split('|').map((l) => l.trim()).where((l) => l.isNotEmpty));
+        } else {
+          rawLines.add(line);
+        }
+      } else {
+        rawLines.add(line);
+      }
+    }
+
+    final lines = rawLines.map((line) => sanitizeText(line).trim()).where((line) => line.isNotEmpty).toList();
     
     if (lines.isEmpty) return pw.SizedBox();
 
@@ -138,7 +171,7 @@ abstract class CvTemplateBase {
     
     final buffer = StringBuffer();
     if (parts.isNotEmpty) {
-      buffer.write(' : ${parts.join(' – ')}');
+      buffer.write(' : ${parts.join(' - ')}');
     }
     
     if (exp.startDate.isNotEmpty || exp.endDate.isNotEmpty) {
@@ -204,14 +237,49 @@ abstract class CvTemplateBase {
     );
   }
 
+  static final Map<String, pw.ImageProvider> avatarCache = {};
+
   Future<pw.ImageProvider?> getAvatarImage(CvModel cv) async {
-    if (cv.personalInfo.showAvatar && cv.personalInfo.profileImageUrl != null && cv.personalInfo.profileImageUrl!.isNotEmpty) {
-      try {
-        return await networkImage(cv.personalInfo.profileImageUrl!);
-      } catch (e) {
-        print('Error loading avatar image: $e');
-      }
+    if (!cv.personalInfo.showAvatar ||
+        cv.personalInfo.profileImageUrl == null ||
+        cv.personalInfo.profileImageUrl!.isEmpty) {
+      debugPrint('[CV Avatar] showAvatar=${cv.personalInfo.showAvatar}, url=${cv.personalInfo.profileImageUrl}');
+      return null;
     }
+
+    final url = cv.personalInfo.profileImageUrl!;
+    if (avatarCache.containsKey(url)) {
+      debugPrint('[CV Avatar] Image trouvée dans le cache en mémoire : $url');
+      return avatarCache[url];
+    }
+
+    debugPrint('[CV Avatar] Tentative de chargement de l\'image: $url');
+
+    // Méthode 1 : Téléchargement direct via HTTP
+    try {
+      final response = await http.get(Uri.parse(url));
+      debugPrint('[CV Avatar] HTTP status: ${response.statusCode}, content-type: ${response.headers['content-type']}, taille: ${response.bodyBytes.length} octets');
+      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        final image = pw.MemoryImage(response.bodyBytes);
+        avatarCache[url] = image;
+        return image;
+      }
+    } catch (e) {
+      debugPrint('[CV Avatar] Erreur HTTP directe: $e');
+    }
+
+    // Méthode 2 : Fallback via networkImage (package printing)
+    try {
+      debugPrint('[CV Avatar] Fallback via networkImage...');
+      final image = await networkImage(url);
+      debugPrint('[CV Avatar] networkImage réussi !');
+      avatarCache[url] = image;
+      return image;
+    } catch (e) {
+      debugPrint('[CV Avatar] Erreur networkImage: $e');
+    }
+
+    debugPrint('[CV Avatar] ÉCHEC TOTAL du chargement de l\'image');
     return null;
   }
 

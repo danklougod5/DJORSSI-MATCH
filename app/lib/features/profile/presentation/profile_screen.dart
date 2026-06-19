@@ -186,7 +186,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
     if (confirmed == true) {
       await LocalCache.clearAll();
-      await _supabase.auth.signOut();
+      unawaited(_supabase.auth.signOut());
       if (mounted) {
         context.go('/auth');
       }
@@ -194,46 +194,25 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _deleteAccount() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          'Supprimer mon compte',
-          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          'Cette action est irréversible. Toutes vos candidatures, vos matches et vos informations personnelles seront définitivement supprimés.',
-          style: TextStyle(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Supprimer définitivement',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
+    final surveyResult = await _showDeleteSurveySheet(context);
+    if (surveyResult == null) return;
 
-    if (confirmed == true) {
-      setState(() => _isLoading = true);
-      try {
-        final userId = _supabase.auth.currentUser?.id;
-        final accessToken = _supabase.auth.currentSession?.accessToken;
-        if (userId == null || accessToken == null) {
-          throw 'Utilisateur non identifié ou session expirée. Veuillez vous reconnecter.';
-        }
+    setState(() => _isLoading = true);
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      final accessToken = _supabase.auth.currentSession?.accessToken;
+      if (userId == null || accessToken == null) {
+        throw 'Utilisateur non identifié ou session expirée. Veuillez vous reconnecter.';
+      }
 
-        // 1. Appeler l'Edge Function pour supprimer le compte définitivement (Auth + Profil)
-        await _supabase.functions.invoke(
-          'delete-account',
-        );
+      // 1. Appeler l'Edge Function pour supprimer le compte définitivement (Auth + Profil)
+      await _supabase.functions.invoke(
+        'delete-account',
+        body: {
+          'reason': surveyResult['reason'],
+          'feedback': surveyResult['feedback'],
+        },
+      );
 
         // 2. Déconnexion locale pour forcer le nettoyage de la session et du cache
         await LocalCache.clearAll();
@@ -284,6 +263,279 @@ class _ProfileScreenState extends State<ProfileScreen>
         }
       }
     }
+
+  Future<Map<String, String>?> _showDeleteSurveySheet(BuildContext context) async {
+    String? selectedReason;
+    final feedbackController = TextEditingController();
+    bool confirmIrreversible = false;
+
+    final reasons = [
+      "J'ai trouvé un travail grâce à l'application 🎉",
+      "J'ai trouvé un travail par un autre moyen",
+      "Je ne trouve pas d'offres intéressantes",
+      "L'application a trop de bugs",
+      "C'est trop cher / limites trop contraignantes",
+      "Autre raison",
+    ];
+
+    return await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(28.r),
+          topRight: Radius.circular(28.r),
+        ),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final isFormValid = selectedReason != null && confirmIrreversible;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24.w,
+                right: 24.w,
+                top: 24.h,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24.h,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40.w,
+                        height: 5.h,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20.h),
+                    Text(
+                      'Supprimer mon compte 😢',
+                      style: TextStyle(
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF0F172A),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 12.h),
+                    Text(
+                      'Nous sommes désolés de vous voir partir. Aidez-nous à nous améliorer en indiquant la raison de votre départ :',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: const Color(0xFF64748B),
+                        height: 1.4,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 20.h),
+                    // Reasons list
+                    ...reasons.map((reason) {
+                      final isSelected = selectedReason == reason;
+                      return GestureDetector(
+                        onTap: () {
+                          setSheetState(() {
+                            selectedReason = reason;
+                          });
+                        },
+                        child: Container(
+                          margin: EdgeInsets.only(bottom: 8.h),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 14.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? const Color(0xFFF97316).withOpacity(0.05)
+                                : const Color(0xFFF8FAFC),
+                            border: Border.all(
+                              color: isSelected
+                                  ? const Color(0xFFF97316)
+                                  : const Color(0xFFE2E8F0),
+                              width: 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(16.r),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isSelected
+                                    ? Icons.radio_button_checked_rounded
+                                    : Icons.radio_button_off_rounded,
+                                color: isSelected
+                                    ? const Color(0xFFF97316)
+                                    : const Color(0xFF94A3B8),
+                                size: 20.r,
+                              ),
+                              SizedBox(width: 12.w),
+                              Expanded(
+                                child: Text(
+                                  reason,
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    color: isSelected
+                                        ? const Color(0xFF0F172A)
+                                        : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    SizedBox(height: 16.h),
+                    // Optional feedback text field
+                    Text(
+                      'Un commentaire à ajouter ? (Optionnel)',
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF475569),
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    TextField(
+                      controller: feedbackController,
+                      maxLines: 3,
+                      maxLength: 500,
+                      decoration: InputDecoration(
+                        hintText: 'Partagez vos suggestions ou remarques...',
+                        hintStyle: TextStyle(
+                          fontSize: 13.sp,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16.r),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16.r),
+                          borderSide: const BorderSide(color: Color(0xFFF97316)),
+                        ),
+                        contentPadding: EdgeInsets.all(16.r),
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
+                    // Irreversible warning toggle
+                    GestureDetector(
+                      onTap: () {
+                        setSheetState(() {
+                          confirmIrreversible = !confirmIrreversible;
+                        });
+                      },
+                      child: Container(
+                        padding: EdgeInsets.all(12.r),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(16.r),
+                          border: Border.all(
+                            color: confirmIrreversible
+                                ? Colors.red.shade400
+                                : Colors.red.shade200,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Checkbox(
+                              value: confirmIrreversible,
+                              onChanged: (val) {
+                                setSheetState(() {
+                                  confirmIrreversible = val ?? false;
+                                });
+                              },
+                              activeColor: Colors.red,
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Text(
+                                "Je comprends que cette action est définitive et supprimera toutes mes données de manière irréversible.",
+                                style: TextStyle(
+                                  fontSize: 12.sp,
+                                  color: Colors.red.shade900,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 24.h),
+                    // Action Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 16.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16.r),
+                              ),
+                              side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            ),
+                            child: Text(
+                              'Garder mon compte',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12.w),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isFormValid
+                                ? () {
+                                    Navigator.pop(context, {
+                                      'reason': selectedReason!,
+                                      'feedback': feedbackController.text.trim(),
+                                    });
+                                  }
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: Colors.red.shade200,
+                              padding: EdgeInsets.symmetric(vertical: 16.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16.r),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              'Supprimer',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _shareApp() async {
@@ -311,7 +563,36 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     final user = _supabase.auth.currentUser;
-    final contactInfo = user?.phone ?? user?.email ?? 'Contact non disponible';
+    final profilePhone = _profileData?['phone_number']?.toString();
+    final profileEmail = _profileData?['email']?.toString();
+    final contactInfo = (profilePhone != null && profilePhone.isNotEmpty)
+        ? profilePhone
+        : (profileEmail != null && profileEmail.isNotEmpty)
+            ? profileEmail
+            : (user?.phone ?? user?.email ?? '');
+
+    final sexe = _profileData?['sexe']?.toString();
+    final IconData avatarIcon;
+    final Color avatarBgColor;
+    final Color avatarIconColor;
+
+    if (sexe == 'Femme') {
+      avatarIcon = Icons.face_3;
+      avatarBgColor = const Color(0xFFFDF2F8); // pink-50
+      avatarIconColor = const Color(0xFFEC4899); // pink-500
+    } else if (sexe == 'Homme') {
+      avatarIcon = Icons.face_6;
+      avatarBgColor = const Color(0xFFEFF6FF); // blue-50
+      avatarIconColor = const Color(0xFF3B82F6); // blue-500
+    } else {
+      avatarIcon = Icons.person;
+      avatarBgColor = const Color(0xFFF1F5F9); // slate-100
+      avatarIconColor = const Color(0xFF94A3B8); // slate-400
+    }
+
+    final isPremiumUser = ((_profileData?['is_premium'] ?? false) && VersionService.showPremium);
+    final Color bgToUse = isPremiumUser ? const Color(0xFFFFFBEB) : avatarBgColor;
+    final Color iconColorToUse = isPremiumUser ? const Color(0xFFF59E0B) : avatarIconColor;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -348,7 +629,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           shape: BoxShape.circle,
                           color: Colors.white,
                           border: Border.all(
-                            color: (_profileData?['is_premium'] ?? false)
+                            color: ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
                                 ? const Color(0xFFF59E0B)
                                 : Colors.white,
                             width: 4,
@@ -362,12 +643,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ],
                         ),
                         child: ClipOval(
-                          child: Icon(
-                            Icons.person,
-                            size: 60.r,
-                            color: (_profileData?['is_premium'] ?? false)
-                                ? const Color(0xFFF59E0B).withOpacity(0.5)
-                                : const Color(0xFF94A3B8),
+                          child: Container(
+                            color: bgToUse,
+                            alignment: Alignment.center,
+                            child: Icon(
+                              avatarIcon,
+                              size: 70.r,
+                              color: iconColorToUse,
+                            ),
                           ),
                         ),
                       ),
@@ -393,7 +676,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                     ],
                   ),
-                  SizedBox(height: 20.h),
+                  SizedBox(height: 12.h),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -405,7 +688,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           color: const Color(0xFF0F172A),
                         ),
                       ),
-                      if (_profileData?['is_premium'] ?? false)
+                      if ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
                         Padding(
                           padding: EdgeInsets.only(left: 8.w),
                           child: Icon(
@@ -423,16 +706,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                       vertical: 6.h,
                     ),
                     decoration: BoxDecoration(
-                      gradient: (_profileData?['is_premium'] ?? false)
+                      gradient: ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
                           ? const LinearGradient(
                               colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
                             )
                           : null,
-                      color: (_profileData?['is_premium'] ?? false)
+                      color: ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
                           ? null
                           : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(20.r),
-                      boxShadow: (_profileData?['is_premium'] ?? false)
+                      boxShadow: ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
                           ? [
                               BoxShadow(
                                 color: const Color(0xFFF59E0B).withOpacity(0.3),
@@ -445,7 +728,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (_profileData?['is_premium'] ?? false)
+                        if ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
                           Padding(
                             padding: EdgeInsets.only(right: 6.w),
                             child: Icon(
@@ -455,15 +738,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                             ),
                           ),
                         Text(
-                          (_profileData?['is_premium'] ?? false)
-                              ? 'MEMBRE VIP'
-                              : 'Utilisateur Freemium',
+                          VersionService.showPremium
+                              ? ((_profileData?['is_premium'] ?? false)
+                                  ? 'MEMBRE VIP'
+                                  : 'Utilisateur Freemium')
+                              : 'Candidat',
                           style: TextStyle(
                             fontSize: 11.sp,
                             fontWeight: FontWeight.w900,
                             letterSpacing:
-                                (_profileData?['is_premium'] ?? false) ? 1 : 0,
-                            color: (_profileData?['is_premium'] ?? false)
+                                ((_profileData?['is_premium'] ?? false) && VersionService.showPremium) ? 1 : 0,
+                            color: ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
                                 ? Colors.white
                                 : Colors.grey.shade600,
                           ),
@@ -471,24 +756,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ],
                     ),
                   ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    contactInfo,
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
                 ],
               ),
             ),
 
-            SizedBox(height: 32.h),
+            SizedBox(height: 16.h),
 
             // Premium Banner
-            _buildPremiumBanner(),
-
-            SizedBox(height: 16.h),
+            if (VersionService.showPremium) ...[
+              _buildPremiumBanner(),
+              SizedBox(height: 16.h),
+            ],
 
             // Section Secteurs d'intérêt (Skills)
             _buildCardSection(
@@ -656,12 +934,28 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildPremiumBanner() {
-    final isPremium = _profileData?['is_premium'] ?? false;
-    
     // Si le mode Premium est désactivé à distance (pour la validation Apple)
-    // et que l'utilisateur n'est pas déjà premium, on cache la bannière.
-    if (!VersionService.showPremium && !isPremium) {
+    // on cache systématiquement la bannière Premium.
+    if (!VersionService.showPremium) {
       return const SizedBox.shrink();
+    }
+
+    final isPremium = _profileData?['is_premium'] ?? false;
+    final premiumUntilRaw = _profileData?['premium_until'];
+    String subtitle = 'Boostez votre profil et matchez plus vite !';
+    if (isPremium) {
+      subtitle = 'Tous vos avantages sont activés ✓';
+      if (premiumUntilRaw != null) {
+        try {
+          final date = DateTime.parse(premiumUntilRaw.toString()).toLocal();
+          final day = date.day.toString().padLeft(2, '0');
+          final month = date.month.toString().padLeft(2, '0');
+          final year = date.year.toString();
+          subtitle = 'Premium actif jusqu\'au $day/$month/$year ✓';
+        } catch (e) {
+          debugPrint('Error parsing premium_until: $e');
+        }
+      }
     }
 
     return Container(
@@ -759,9 +1053,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        isPremium
-                            ? 'Tous vos avantages sont activés ✓'
-                            : 'Boostez votre profil et matchez plus vite !',
+                        subtitle,
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.95),
                           fontSize: 11.sp,

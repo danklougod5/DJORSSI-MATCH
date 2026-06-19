@@ -40,11 +40,13 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
   // Nouveaux états pour le Premium
   int _swipeCount = 0;
+  int _lastWrittenSwipeCount = 0; // Compteur de la dernière écriture en DB
   bool _isPremium = false;
   String? _cvUrl;
   String? _fullName;
   String? _sexe;
   bool _hasUnreadNotifications = false;
+  CardSwiperDirection _dragDirection = CardSwiperDirection.none;
 
   // File d'attente pour les envois d'email (éviter le rate-limiting)
   final List<Map<String, dynamic>> _emailQueue = [];
@@ -112,7 +114,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
           _jobs = [];
           _swiperKey++; // Force la reconstruction du CardSwiper
         });
-        _loadData();
+        _loadData(forceRefresh: true);
       }
     });
   }
@@ -121,7 +123,26 @@ class _SwipeScreenState extends State<SwipeScreen> {
   void dispose() {
     _profileSubscription?.cancel();
     _controller.dispose();
+    _saveFinalSwipeCount();
     super.dispose();
+  }
+
+  void _saveFinalSwipeCount() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId != null && _swipeCount != _lastWrittenSwipeCount) {
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      _supabase
+          .from('profiles')
+          .update({
+            'daily_swipe_count': _swipeCount,
+            'last_swipe_date': today,
+          })
+          .eq('id', userId)
+          .catchError((e) {
+            debugPrint('Erreur sauvegarde finale daily_swipe_count: $e');
+            return null;
+          });
+    }
   }
 
   void _setupRealtime() {
@@ -147,6 +168,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
                 _isPremium = premiumUntil.isAfter(DateTime.now());
               } else {
                 _isPremium = isPremium;
+              }
+              if (!VersionService.showPremium) {
+                _isPremium = true;
               }
               _cvUrl = data.first['cv_url'];
               _fullName = data.first['full_name'];
@@ -175,7 +199,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
                 _swiperKey++; // Force la reconstruction du CardSwiper
               });
               // 4. Recharger les offres avec les nouveaux secteurs
-              _loadData();
+              _loadData(forceRefresh: true);
             }
           }
         });
@@ -262,10 +286,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      // 1. Récupérer les infos du profil (is_premium et skills)
+      // 1. Récupérer les infos du profil (is_premium, skills, and daily swipe limits)
       final profileResponse = await _supabase
           .from('profiles')
-          .select('skills, is_premium, premium_until, full_name, cv_url, sexe')
+          .select('skills, is_premium, premium_until, full_name, cv_url, sexe, daily_swipe_count, last_swipe_date')
           .eq('id', userId)
           .maybeSingle();
 
@@ -277,6 +301,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
           _isPremium = premiumUntil.isAfter(DateTime.now());
         } else {
           _isPremium = isPremium;
+        }
+        if (!VersionService.showPremium) {
+          _isPremium = true;
         }
         _cvUrl = profileResponse['cv_url'];
         _fullName = profileResponse['full_name'];
@@ -313,7 +340,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       }
       _cachedSwipedIds = swipedJobIds;
 
-      // 2.5 Compteur de swipes quotidien — LOCAL (plus de requête réseau)
+      // 2.5 Compteur de swipes quotidien — LOCAL avec synchronisation DB si cache manquant/vidé
       final today = DateTime.now().toIso8601String().substring(0, 10);
       try {
         final cachedDate = await LocalCache.load(LocalCache.swipeCountDateKey);
@@ -322,16 +349,23 @@ class _SwipeScreenState extends State<SwipeScreen> {
           _swipeCount = cachedCount as int;
           debugPrint('*** [CACHE] Compteur swipes du jour: $_swipeCount ***');
         } else {
-          // Nouveau jour → réinitialiser le compteur
-          _swipeCount = 0;
+          // Si le cache est absent/obsolète (ex: après déconnexion), synchroniser depuis la DB
+          final dbDate = profileResponse?['last_swipe_date']?.toString();
+          final dbCount = profileResponse?['daily_swipe_count'] as int? ?? 0;
+          if (dbDate == today) {
+            _swipeCount = dbCount;
+          } else {
+            _swipeCount = 0;
+          }
           await LocalCache.save(LocalCache.swipeCountDateKey, today);
-          await LocalCache.save(LocalCache.swipeCountKey, 0);
-          debugPrint('*** [CACHE] Nouveau jour détecté, compteur remis à 0 ***');
+          await LocalCache.save(LocalCache.swipeCountKey, _swipeCount);
+          debugPrint('*** [DB-SYNC] Compteur swipes du jour synchronisé depuis la DB : $_swipeCount ***');
         }
       } catch (e) {
         debugPrint('Erreur lors du comptage des swipes: $e');
         _swipeCount = 0;
       }
+      _lastWrittenSwipeCount = _swipeCount;
 
       // 3. Récupérer les offres non swipées — PAGINÉ (50 max) avec filtrage serveur
       final swipedIdsList = swipedJobIds.toList();
@@ -570,6 +604,13 @@ class _SwipeScreenState extends State<SwipeScreen> {
     double totalScore = 0;
     int matchesCount = 0;
 
+    // On vérifie si l'utilisateur a des compétences sectorielles (non-contrat et non-génériques)
+    final hasSectorSkills = _userSkills.any((s) {
+      final sLower = s.toLowerCase().trim();
+      return !_isContractType(sLower) && !_isGenericTag(sLower);
+    });
+    bool matchedSectorSkill = false;
+
     // Normalisation basique (minuscules)
     final jobTitle = (job['job_title'] as String?)?.toLowerCase().trim() ?? '';
     final jobSpecialty =
@@ -584,6 +625,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       double currentSkillScore = 0;
       final skillLower = skill.toLowerCase().trim();
       final isContractTag = _isContractType(skillLower);
+      final isSectorSkill = !isContractTag && !_isGenericTag(skillLower);
       
       bool matchedThisSkill = false;
 
@@ -643,11 +685,19 @@ class _SwipeScreenState extends State<SwipeScreen> {
       if (matchedThisSkill) {
         totalScore += currentSkillScore;
         matchesCount++;
+        if (isSectorSkill) {
+          matchedSectorSkill = true;
+        }
       }
     }
 
     // FILTRAGE STRICT : Si l'utilisateur a des critères mais qu'aucun ne matche ce job
     if (matchesCount == 0 && _userSkills.isNotEmpty) {
+      return -100;
+    }
+
+    // Si l'utilisateur a des critères sectoriels, le job DOIT correspondre à au moins un critère sectoriel
+    if (hasSectorSkills && !matchedSectorSkill) {
       return -100;
     }
 
@@ -681,15 +731,15 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   /// Vérifie si un texte contient un mot ou pattern, avec gestion des frontières de mots
-  /// pour les mots courts afin d'éviter les faux positifs (ex: 'it' dans 'cuisine').
+  /// pour les mots courts afin d'éviter les faux positifs (ex: 'it' dans 'cuisine', ou 'tech' dans 'technicien').
   bool _matchWord(String text, String word) {
     final textLower = text.toLowerCase();
     final wordLower = TagNormalizer.normalizeKey(word);
 
     if (wordLower.isEmpty) return false;
 
-    if (wordLower.length <= 3) {
-      // Pour les mots courts (it, rh, cdd, btp), on exige des frontières de mots via Regex
+    if (wordLower.length <= 4) {
+      // Pour les mots courts et acronymes (it, rh, cdd, btp, tech, data), on exige des frontières de mots via Regex
       // \b assure que le mot est entouré d'espaces, ponctuation ou début/fin de ligne.
       final escaped = RegExp.escape(wordLower);
       return RegExp('\\b$escaped\\b', caseSensitive: false).hasMatch(textLower);
@@ -704,6 +754,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
     int? currentIndex,
     CardSwiperDirection direction,
   ) {
+    // Réinitialiser la direction du drag
+    setState(() {
+      _dragDirection = CardSwiperDirection.none;
+    });
+
     // BLOCAGE PHYSIQUE STRICT : Si pas premium et limite dynamique atteinte
     // On bloque TOUT mouvement (Gauche ou Droite)
     if (!_isPremium && _swipeCount >= VersionService.swipeLimit) {
@@ -779,6 +834,27 @@ class _SwipeScreenState extends State<SwipeScreen> {
               return null;
             }),
       );
+
+      // 1.5 Mettre à jour le compteur de swipes quotidien par pallier (tous les 5 swipes, ou si limite atteinte)
+      final reachedLimit = !_isPremium && _swipeCount >= VersionService.swipeLimit;
+      final isInterval = _swipeCount % 5 == 0;
+      if (isInterval || reachedLimit) {
+        _lastWrittenSwipeCount = _swipeCount;
+        final today = DateTime.now().toIso8601String().substring(0, 10);
+        unawaited(
+          _supabase
+              .from('profiles')
+              .update({
+                'daily_swipe_count': _swipeCount,
+                'last_swipe_date': today,
+              })
+              .eq('id', userId)
+              .catchError((e) {
+                debugPrint('Erreur mise à jour daily_swipe_count en DB: $e');
+                return null;
+              }),
+        );
+      }
 
       // 2. Traitement spécifique si c'est un swipe DROITE (postulation)
       if (direction == 'right') {
@@ -1029,7 +1105,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
               context.push('/premium').then((_) {
                 if (mounted) {
                   setState(() => _isLoading = true);
-                  _loadData();
+                  _loadData(forceRefresh: true);
                 }
               });
             },
@@ -1133,11 +1209,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
                 context.push('/premium').then((_) {
                   if (mounted) {
                     setState(() => _isLoading = true);
-                  _loadData();
-                }
-              });
-            },
-            style: ElevatedButton.styleFrom(
+                    _loadData(forceRefresh: true);
+                  }
+                });
+              },
+              style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF97316),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
@@ -1302,16 +1378,50 @@ class _SwipeScreenState extends State<SwipeScreen> {
                     .catchError((_) => null);
               }
 
-              String interestText = (_sexe == 'Femme')
-                  ? 'intéressée'
-                  : 'intéressé';
-              String companyText =
-                  (companyName.isNotEmpty &&
-                      companyName.toLowerCase() != 'inconnu')
-                  ? companyName
-                  : 'votre structure ou votre entreprise';
-              String textMessage =
-                  "Bonjour, je suis $interestText par le poste de $jobTitle au sein de $companyText vu sur Djorssi-Match. Veuillez trouver mon CV ci-joint.";
+              final cleanCompany = companyName.trim().toLowerCase();
+              final isCompanyKnown = companyName.trim().isNotEmpty &&
+                  cleanCompany != 'inconnu' &&
+                  cleanCompany != 'inconnue' &&
+                  cleanCompany != 'non précisé' &&
+                  cleanCompany != 'non precise' &&
+                  cleanCompany != 'non spécifié' &&
+                  cleanCompany != 'non specifie' &&
+                  cleanCompany != 'non renseigné' &&
+                  cleanCompany != 'non renseigne';
+
+              final e = (_sexe == 'Femme') ? 'e' : '';
+              final interestText = (_sexe == 'Femme') ? 'intéressée' : 'intéressé';
+
+              // Liste de formulations de messages pour WhatsApp (10 templates)
+              final List<String> messageTemplates = isCompanyKnown
+                  ? [
+                      "Bonjour, je suis très $interestText par le poste de $jobTitle au sein de $companyName vu sur Djorssi-Match. Veuillez trouver mon CV ci-joint.",
+                      "Bonjour, j'ai vu votre offre pour le poste de $jobTitle chez $companyName sur Djorssi-Match et je suis très $interestText. Mon CV est en pièce jointe.",
+                      "Bonjour, je me permets de vous contacter concernant le poste de $jobTitle au sein de $companyName publié sur Djorssi-Match. Mon profil correspondant à vos critères, je vous joins mon CV.",
+                      "Bonjour, $interestText$e par le poste de $jobTitle chez $companyName vu sur Djorssi-Match, je vous transmets mon CV ci-joint pour l'étude de ma candidature.",
+                      "Bonjour, je souhaite postuler à l'offre de $jobTitle au sein de $companyName parue sur Djorssi-Match. Vous trouverez mon CV ci-joint.",
+                      "Bonjour, c'est avec un grand intérêt que je vous soumets mon CV ci-joint pour le poste de $jobTitle chez $companyName vu sur Djorssi-Match.",
+                      "Bonjour, actuellement à la recherche de nouvelles opportunités, je postule pour le poste de $jobTitle au sein de $companyName (vu sur Djorssi-Match). Mon CV est joint.",
+                      "Bonjour, je vous contacte suite à votre annonce sur Djorssi-Match pour le poste de $jobTitle chez $companyName. Mon CV est ci-joint pour votre étude.",
+                      "Bonjour, motivé$e et disponible, je souhaite proposer ma candidature pour le poste de $jobTitle au sein de $companyName vu sur Djorssi-Match. Mon CV est joint.",
+                      "Bonjour, suite à votre publication sur Djorssi-Match, je serais ravi$e d'échanger avec vous sur le poste de $jobTitle chez $companyName. Vous trouverez mon CV ci-joint.",
+                    ]
+                  : [
+                      "Bonjour, je suis très $interestText par le poste de $jobTitle vu sur Djorssi-Match. Veuillez trouver mon CV ci-joint.",
+                      "Bonjour, j'ai vu votre offre pour le poste de $jobTitle sur Djorssi-Match et je suis très $interestText. Mon CV est en pièce jointe.",
+                      "Bonjour, je me permets de vous contacter concernant le poste de $jobTitle publié sur Djorssi-Match. Mon profil correspondant à vos critères, je vous joins mon CV.",
+                      "Bonjour, $interestText$e par le poste de $jobTitle vu sur Djorssi-Match, je vous transmets mon CV ci-joint pour l'étude de ma candidature.",
+                      "Bonjour, je souhaite postuler à l'offre de $jobTitle parue sur Djorssi-Match. Vous trouverez mon CV ci-joint.",
+                      "Bonjour, c'est avec un grand intérêt que je vous soumets mon CV ci-joint pour le poste de $jobTitle vu sur Djorssi-Match.",
+                      "Bonjour, actuellement à la recherche de nouvelles opportunités, je postule pour le poste de $jobTitle (vu sur Djorssi-Match). Mon CV est joint.",
+                      "Bonjour, je vous contacte suite à votre annonce sur Djorssi-Match pour le poste de $jobTitle. Mon CV est ci-joint pour votre étude.",
+                      "Bonjour, motivé$e et disponible, je souhaite proposer ma candidature pour le poste de $jobTitle vu sur Djorssi-Match. Mon CV est joint.",
+                      "Bonjour, suite à votre publication sur Djorssi-Match, je serais ravi$e d'échanger avec vous sur le poste de $jobTitle. Vous trouverez mon CV ci-joint.",
+                    ];
+
+              // Sélectionner un index basé sur la milliseconde actuelle pour simuler un choix aléatoire simple
+              final randomIndex = DateTime.now().millisecond % messageTemplates.length;
+              final textMessage = messageTemplates[randomIndex];
 
               final message = Uri.encodeComponent(textMessage);
               final whatsappAppUrl = Uri.parse(
@@ -1537,6 +1647,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
                                       controller: _controller,
                                       cardsCount: _jobs.length,
                                       onSwipe: _onSwipe,
+                                      onSwipeDirectionChange: (horizontalDirection, verticalDirection) {
+                                        setState(() {
+                                          _dragDirection = horizontalDirection;
+                                        });
+                                      },
                                       numberOfCardsDisplayed: _jobs.isEmpty 
                                           ? 1 
                                           : (_jobs.length >= 3 ? 3 : _jobs.length),
@@ -1552,6 +1667,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
                                       onEnd: () {
                                         setState(() {
                                           _jobs.clear();
+                                          _dragDirection = CardSwiperDirection.none;
                                         });
                                       },
                                       cardBuilder:
@@ -1711,7 +1827,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
                 TextButton.icon(
                   onPressed: () {
                     setState(() => _isLoading = true);
-                    _loadData();
+                    _loadData(forceRefresh: true);
                   },
                   icon: const Icon(Icons.refresh, size: 20),
                   label: Text(
@@ -1794,27 +1910,37 @@ class _SwipeScreenState extends State<SwipeScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildActionButton(Icons.close_rounded, Colors.red, () {
-              if (!_isPremium && _swipeCount >= VersionService.swipeLimit) {
-                _showPremiumLimitDialog();
-                return;
-              }
-              _controller.swipe(CardSwiperDirection.left);
-            }),
+            _buildActionButton(
+              Icons.close_rounded,
+              Colors.red,
+              () {
+                if (!_isPremium && _swipeCount >= VersionService.swipeLimit) {
+                  _showPremiumLimitDialog();
+                  return;
+                }
+                _controller.swipe(CardSwiperDirection.left);
+              },
+              isHighlighted: _dragDirection == CardSwiperDirection.left,
+            ),
             _buildActionButton(
               Icons.replay_rounded,
-              _isPremium ? const Color(0xFFF59E0B) : Colors.grey,
+              (_isPremium && VersionService.showPremium) ? const Color(0xFFF59E0B) : Colors.grey,
               _handleUndo,
               isMini: true,
               locked: false, // Cadenas retiré à la demande de l'utilisateur
             ),
-            _buildActionButton(Icons.favorite_rounded, Colors.green, () {
-              if (!_isPremium && _swipeCount >= VersionService.swipeLimit) {
-                _showPremiumLimitDialog();
-                return;
-              }
-              _controller.swipe(CardSwiperDirection.right);
-            }),
+            _buildActionButton(
+              Icons.favorite_rounded,
+              Colors.green,
+              () {
+                if (!_isPremium && _swipeCount >= VersionService.swipeLimit) {
+                  _showPremiumLimitDialog();
+                  return;
+                }
+                _controller.swipe(CardSwiperDirection.right);
+              },
+              isHighlighted: _dragDirection == CardSwiperDirection.right,
+            ),
           ],
         ),
       ),
@@ -1827,27 +1953,30 @@ class _SwipeScreenState extends State<SwipeScreen> {
     VoidCallback onPressed, {
     bool isMini = false,
     bool locked = false,
+    bool isHighlighted = false,
   }) {
     final size = isMini ? 55.r : 70.r;
     final iconSize = isMini ? 24.r : 32.r;
     return Stack(
       alignment: Alignment.center,
       children: [
-        Container(
-          width: size,
-          height: size,
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          width: isHighlighted ? size * 1.15 : size,
+          height: isHighlighted ? size * 1.15 : size,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isHighlighted ? color : Colors.white,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.2),
-                spreadRadius: 2.r,
-                blurRadius: 10.r,
+                color: color.withOpacity(isHighlighted ? 0.4 : 0.2),
+                spreadRadius: isHighlighted ? 6.r : 2.r,
+                blurRadius: isHighlighted ? 15.r : 10.r,
                 offset: Offset(0, 4.h),
               ),
             ],
-            border: _isPremium && !isMini && color == Colors.green
+            border: (_isPremium && VersionService.showPremium) && !isMini && color == Colors.green
                 ? Border.all(
                     color: const Color(0xFFF59E0B).withOpacity(0.5),
                     width: 2,
@@ -1855,7 +1984,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
                 : null,
           ),
           child: IconButton(
-            icon: Icon(icon, color: color, size: iconSize),
+            icon: Icon(
+              icon,
+              color: isHighlighted ? Colors.white : color,
+              size: isHighlighted ? iconSize * 1.1 : iconSize,
+            ),
             onPressed: onPressed,
           ),
         ),

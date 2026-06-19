@@ -34,11 +34,11 @@ class CvTemplateCreative extends CvTemplateBase {
 
             if (cv.skills.isNotEmpty) ...[
               _buildSectionTitle('Compétences', primary),
-              buildBulletText(cv.skills, textColor, primary, fontSize: 10, height: 1.4),
+              buildBulletText(cv.skills, textColor, primary, fontSize: 10, height: 1.4, splitByDelimiterIfNoNewline: true),
               pw.SizedBox(height: 20),
             ],
 
-            if (cv.experiences.isNotEmpty) ...[
+            if (cv.experiences.isNotEmpty && cv.experiences.any((e) => e.isVisible)) ...[
               _buildSectionTitle('Parcours Pro', primary),
               ...cv.experiences.where((e) => e.isVisible).map((e) => _buildExperienceItem(e, primary, secondary)),
               pw.SizedBox(height: 20),

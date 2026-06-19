@@ -248,8 +248,20 @@ serve(async (req) => {
       jobDescription,
     } = await req.json();
 
-    // Normalisation du nom de l'entreprise : éviter le "Non spécifié"
-    const isCompanyKnown = !!(jobCompany && jobCompany.toLowerCase() !== "non spécifié" && jobCompany.toLowerCase() !== "inconnu" && jobCompany.trim() !== "");
+    // Normalisation du nom de l'entreprise : éviter le "Non spécifié", "Non précisé", "Inconnu", etc.
+    const cleanCompany = jobCompany ? jobCompany.trim().toLowerCase() : "";
+    const isCompanyKnown = !!(
+      jobCompany &&
+      cleanCompany !== "" &&
+      cleanCompany !== "non spécifié" &&
+      cleanCompany !== "non specifie" &&
+      cleanCompany !== "non précisé" &&
+      cleanCompany !== "non precise" &&
+      cleanCompany !== "inconnu" &&
+      cleanCompany !== "inconnue" &&
+      cleanCompany !== "non renseigné" &&
+      cleanCompany !== "non renseigne"
+    );
     const finalCompany = isCompanyKnown ? jobCompany : "votre structure ou votre entreprise";
 
     if (!cvUrl || !jobTitle) {
@@ -352,19 +364,41 @@ serve(async (req) => {
       : "";
 
     const interestText = userSexe === "Femme" ? "interessee" : "interesse";
-    const companyContext = isCompanyKnown ? `chez ${finalCompany}` : `au sein de ${finalCompany}`;
+    const interestTextWithAccent = userSexe === "Femme" ? "intéressée" : "intéressé";
+    const e = userSexe === "Femme" ? "e" : "";
 
-    const emailBody = message
-      ? message
-      : `Bonjour,
+    const emailTemplates = isCompanyKnown
+      ? [
+          `Bonjour,\n\nJe suis très ${interestTextWithAccent} par le poste de ${jobTitle} chez ${jobCompany} vu sur Djorssi-Match.\n\nMon profil correspond à vos critères et vous trouverez mon CV en pièce jointe pour plus de détails sur mon parcours.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nJe me permets de postuler à l'offre de ${jobTitle} chez ${jobCompany} publiée sur Djorssi-Match. Mon profil correspond à vos critères de recherche, c'est pourquoi vous trouverez mon CV en pièce jointe.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nIntéressé${e} par le poste de ${jobTitle} au sein de ${jobCompany} vu sur Djorssi-Match, je vous soumets ma candidature. Veuillez trouver mon CV ci-joint pour de plus amples informations sur mon parcours.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nJe vous adresse ce message afin de manifester mon intérêt pour l'offre de ${jobTitle} chez ${jobCompany} parue sur Djorssi-Match. Mon CV est joint à ce mail.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nJe souhaite postuler à l'offre de ${jobTitle} au sein de ${jobCompany} publiée sur Djorssi-Match. Vous trouverez mon CV ci-joint.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nC'est avec beaucoup d'intérêt que je vous propose ma candidature pour le poste de ${jobTitle} chez ${jobCompany} (via Djorssi-Match). Mon CV est en pièce jointe.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nActuellement à la recherche d'une nouvelle opportunité, le poste de ${jobTitle} chez ${jobCompany} sur Djorssi-Match a retenu toute mon attention. Vous trouverez mon CV ci-joint.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nJe me permets de vous transmettre mon CV ci-joint en réponse à votre offre pour le poste de ${jobTitle} au sein de ${jobCompany} parue sur Djorssi-Match.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nMotivé${e} et disponible, je vous propose ma candidature au poste de ${jobTitle} chez ${jobCompany} vu sur Djorssi-Match. Mon CV est joint à cet email.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nSuite à votre annonce sur Djorssi-Match, je serais ravi${e} d'échanger avec vous sur le poste de ${jobTitle} chez ${jobCompany}. Mon CV est joint en annexe.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`
+        ]
+      : [
+          `Bonjour,\n\nJe suis très ${interestTextWithAccent} par le poste de ${jobTitle} vu sur Djorssi-Match.\n\nMon profil correspond à vos critères et vous trouverez mon CV en pièce jointe pour plus de détails sur mon parcours.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nJe me permets de postuler à l'offre de ${jobTitle} publiée sur Djorssi-Match. Mon profil correspond à vos critères de recherche, c'est pourquoi vous trouverez mon CV en pièce jointe.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nIntéressé${e} par le poste de ${jobTitle} vu sur Djorssi-Match, je vous soumets ma candidature. Veuillez trouver mon CV ci-joint pour de plus amples informations sur mon parcours.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nJe vous adresse ce message afin de manifester mon intérêt pour l'offre de ${jobTitle} parue sur Djorssi-Match. Mon CV est joint à ce mail.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nJe souhaite postuler à l'offre de ${jobTitle} publiée sur Djorssi-Match. Vous trouverez mon CV ci-joint.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nC'est avec beaucoup d'intérêt que je vous propose ma candidature pour le poste de ${jobTitle} (via Djorssi-Match). Mon CV est en pièce jointe.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nActuellement à la recherche d'une nouvelle opportunité, le poste de ${jobTitle} sur Djorssi-Match a retenu toute mon attention. Vous trouverez mon CV ci-joint.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nJe me permets de vous transmettre mon CV ci-joint en réponse à votre offre pour le poste de ${jobTitle} parue sur Djorssi-Match.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nMotivé${e} et disponible, je vous propose ma candidature au poste de ${jobTitle} vu sur Djorssi-Match. Mon CV est joint à cet email.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`,
+          `Bonjour,\n\nSuite à votre annonce sur Djorssi-Match, je serais ravi${e} d'échanger avec vous sur le poste de ${jobTitle}. Mon CV est joint en annexe.${coverLetterNote}\n\nCordialement,\n${applicantName}\nEmail: ${userEmail}`
+        ];
 
-Je suis très ${interestText} par le poste de ${jobTitle} ${companyContext} vu sur Djorssi-Match.
+    // Sélection aléatoire d'un template d'email (sécurisée)
+    const emailRandomArray = new Uint32Array(1);
+    crypto.getRandomValues(emailRandomArray);
+    const emailIndex = emailRandomArray[0] % emailTemplates.length;
 
-Mon profil correspond à vos critères et vous trouverez mon CV en pièce jointe pour plus de détails sur mon parcours.${coverLetterNote}
-
-Cordialement,
-${applicantName}
-Email: ${userEmail}`;
+    const emailBody = message ? message : emailTemplates[emailIndex];
 
     // 5. Send email via Resend
     if (!jobContactEmail || jobContactEmail.trim() === "") {

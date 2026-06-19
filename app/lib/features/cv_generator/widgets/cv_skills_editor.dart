@@ -133,7 +133,7 @@ class _CvSkillsEditorState extends State<CvSkillsEditor> {
 
     try {
       final supabase = Supabase.instance.client;
-      const prompt = "Tu es un expert en recrutement. Analyse le résumé de profil du candidat ci-dessous et propose une liste de compétences professionnelles et techniques clés correspondantes. Organise ces compétences par catégories logiques (ex: Compétences techniques, Outils, Soft Skills) et présente-les sous forme de liste avec des puces (•) pour chaque élément. Retourne UNIQUEMENT la liste finale de compétences structurées, sans introduction, sans conclusion et sans aucun commentaire.";
+      const prompt = "Tu es un expert en recrutement. Analyse le résumé de profil du candidat ci-dessous et propose une liste de compétences professionnelles et techniques clés correspondantes. Retourne uniquement une liste plate de compétences individuelles et précises, sans les regrouper par catégories, sans utiliser de deux-points (:) ou de parenthèses. Chaque compétence doit être courte, claire et être sur sa propre ligne précédée d'une puce (•). Retourne UNIQUEMENT la liste finale de compétences, sans introduction, sans conclusion et sans aucun commentaire.";
 
       final response = await supabase.functions.invoke(
         'cv-ai-assist',

@@ -39,6 +39,18 @@ class _CvTemplateSelectionScreenState extends State<CvTemplateSelectionScreen> {
     {'name': 'Chocolat', 'hex': '#78350F'},
     {'name': 'Gris Ardoise', 'hex': '#334155'},
     {'name': 'Noir Classique', 'hex': '#111827'},
+    {'name': 'Bleu Sarcelle', 'hex': '#0F766E'},
+    {'name': 'Vert Sauge', 'hex': '#4D7C0F'},
+    {'name': 'Prune', 'hex': '#86198F'},
+    {'name': 'Terracotta', 'hex': '#9A3412'},
+    {'name': 'Corail', 'hex': '#BE123C'},
+    {'name': 'Rose Poudré', 'hex': '#A21CAF'},
+    {'name': 'Moutarde', 'hex': '#B45309'},
+    {'name': 'Sapin', 'hex': '#064E3B'},
+    {'name': 'Bleu Acier', 'hex': '#0369A1'},
+    {'name': 'Aubergine', 'hex': '#4C1D95'},
+    {'name': 'Havane', 'hex': '#854D0E'},
+    {'name': 'Charbon', 'hex': '#1F2937'},
   ];
 
   final List<Map<String, String>> _secondaryPresets = [
@@ -50,10 +62,154 @@ class _CvTemplateSelectionScreenState extends State<CvTemplateSelectionScreen> {
     {'name': 'Vert Menthe', 'hex': '#10B981'},
     {'name': 'Bronze', 'hex': '#B45309'},
     {'name': 'Charbon', 'hex': '#1F2937'},
+    {'name': 'Sable', 'hex': '#78350F'},
+    {'name': 'Kaki', 'hex': '#3F6212'},
+    {'name': 'Vert Olive', 'hex': '#3F4F3F'},
+    {'name': 'Café', 'hex': '#543D2B'},
+    {'name': 'Lavande', 'hex': '#5B21B6'},
+    {'name': 'Taupe', 'hex': '#78716C'},
+    {'name': 'Gris Perle', 'hex': '#9CA3AF'},
+    {'name': 'Rose Ancien', 'hex': '#9D174D'},
   ];
 
   Color _parseColor(String hex) {
     return Color(int.parse(hex.replaceFirst('#', '0xff')));
+  }
+
+  bool _isPrimaryPreset(String hex) {
+    return _primaryPresets.any((p) => p['hex']!.toLowerCase() == hex.toLowerCase());
+  }
+
+  bool _isSecondaryPreset(String hex) {
+    return _secondaryPresets.any((s) => s['hex']!.toLowerCase() == hex.toLowerCase());
+  }
+
+  void _showCustomColorPicker(bool isPrimary) {
+    final controller = TextEditingController(
+      text: isPrimary ? _selectedPrimaryColor : _selectedSecondaryColor,
+    );
+    final formKey = GlobalKey<FormState>();
+    
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            String currentVal = controller.text.trim();
+            if (!currentVal.startsWith('#')) {
+              currentVal = '#$currentVal';
+            }
+            Color? previewColor;
+            try {
+              previewColor = _parseColor(currentVal);
+            } catch (_) {
+              previewColor = null;
+            }
+
+            return AlertDialog(
+              title: Text(isPrimary ? 'Couleur principale' : 'Couleur secondaire'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Entrez un code hexadécimal (ex: #FF5733) :'),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: controller,
+                      decoration: InputDecoration(
+                        hintText: '#CCCCCC',
+                        prefixIcon: previewColor != null
+                            ? Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: previewColor,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.grey),
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.colorize),
+                        border: const OutlineInputBorder(),
+                      ),
+                      onChanged: (val) {
+                        setDialogState(() {});
+                      },
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Veuillez entrer une couleur';
+                        }
+                        final clean = value.trim();
+                        final regex = RegExp(r'^#?[0-9a-fA-F]{6}$');
+                        if (!regex.hasMatch(clean)) {
+                          return 'Format invalide (ex: #FF5733)';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Palette rapide :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        '#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF',
+                        '#4B0082', '#8B00FF', '#FF1493', '#00FFFF', '#FF00FF',
+                        '#00FA9A', '#FFD700', '#FF4500', '#7FFF00', '#00CED1',
+                      ].map((hex) => GestureDetector(
+                        onTap: () {
+                          controller.text = hex;
+                          setDialogState(() {});
+                        },
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: _parseColor(hex),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                        ),
+                      )).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Annuler'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    if (formKey.currentState?.validate() == true) {
+                      String hex = controller.text.trim();
+                      if (!hex.startsWith('#')) {
+                        hex = '#$hex';
+                      }
+                      setState(() {
+                        if (isPrimary) {
+                          _selectedPrimaryColor = hex;
+                        } else {
+                          _selectedSecondaryColor = hex;
+                        }
+                      });
+                      Navigator.pop(ctx);
+                    }
+                  },
+                  child: const Text('Appliquer', style: TextStyle(color: Color(0xFFF97316))),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   CvModel _getPreviewCv(String templateId) {
@@ -362,6 +518,67 @@ class _CvTemplateSelectionScreenState extends State<CvTemplateSelectionScreen> {
             ),
           ],
         );
+      case 'executive':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      line(25, accent),
+                      const SizedBox(height: 2),
+                      line(15, secondary),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    line(12),
+                    line(12),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Container(width: 2, height: 6, color: accent),
+                const SizedBox(width: 4),
+                line(20, accent),
+              ],
+            ),
+            const Divider(height: 4, thickness: 0.5),
+            Row(
+              children: [
+                Expanded(child: line(30)),
+                const SizedBox(width: 8),
+                line(12),
+              ],
+            ),
+            line(45),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Container(width: 2, height: 6, color: accent),
+                const SizedBox(width: 4),
+                line(20, accent),
+              ],
+            ),
+            const Divider(height: 4, thickness: 0.5),
+            Row(
+              children: [
+                Expanded(child: line(30)),
+                const SizedBox(width: 8),
+                line(12),
+              ],
+            ),
+          ],
+        );
       default:
         return Container();
     }
@@ -577,43 +794,86 @@ class _CvTemplateSelectionScreenState extends State<CvTemplateSelectionScreen> {
             child: Wrap(
               spacing: 12,
               runSpacing: 12,
-              children: _primaryPresets.map((preset) {
-                final isSelected = _selectedPrimaryColor == preset['hex'];
-                final color = _parseColor(preset['hex']!);
-                
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedPrimaryColor = preset['hex']!;
-                    });
-                  },
+              children: [
+                ..._primaryPresets.map((preset) {
+                  final isSelected = _selectedPrimaryColor == preset['hex'];
+                  final color = _parseColor(preset['hex']!);
+                  
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedPrimaryColor = preset['hex']!;
+                      });
+                    },
+                    child: Tooltip(
+                      message: preset['name']!,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? Colors.black : Colors.transparent,
+                            width: 3,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white, size: 20)
+                            : null,
+                      ),
+                    ),
+                  );
+                }),
+                GestureDetector(
+                  onTap: () => _showCustomColorPicker(true),
                   child: Tooltip(
-                    message: preset['name']!,
+                    message: 'Personnalisé...',
                     child: Container(
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: color,
+                        color: Colors.white,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? Colors.black : Colors.transparent,
-                          width: 3,
+                          color: !_isPrimaryPreset(_selectedPrimaryColor) ? Colors.black : Colors.grey.shade300,
+                          width: !_isPrimaryPreset(_selectedPrimaryColor) ? 3 : 1,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withOpacity(0.05),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      child: isSelected
-                          ? const Icon(Icons.check, color: Colors.white, size: 20)
-                          : null,
+                      child: !_isPrimaryPreset(_selectedPrimaryColor)
+                          ? Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: _parseColor(_selectedPrimaryColor),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const Icon(Icons.check, color: Colors.white, size: 16),
+                              ],
+                            )
+                          : const Icon(Icons.colorize, color: Colors.grey, size: 20),
                     ),
                   ),
-                );
-              }).toList(),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
@@ -634,43 +894,86 @@ class _CvTemplateSelectionScreenState extends State<CvTemplateSelectionScreen> {
             child: Wrap(
               spacing: 12,
               runSpacing: 12,
-              children: _secondaryPresets.map((preset) {
-                final isSelected = _selectedSecondaryColor == preset['hex'];
-                final color = _parseColor(preset['hex']!);
-                
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedSecondaryColor = preset['hex']!;
-                    });
-                  },
+              children: [
+                ..._secondaryPresets.map((preset) {
+                  final isSelected = _selectedSecondaryColor == preset['hex'];
+                  final color = _parseColor(preset['hex']!);
+                  
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedSecondaryColor = preset['hex']!;
+                      });
+                    },
+                    child: Tooltip(
+                      message: preset['name']!,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected ? Colors.black : Colors.transparent,
+                            width: 3,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white, size: 20)
+                            : null,
+                      ),
+                    ),
+                  );
+                }),
+                GestureDetector(
+                  onTap: () => _showCustomColorPicker(false),
                   child: Tooltip(
-                    message: preset['name']!,
+                    message: 'Personnalisé...',
                     child: Container(
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: color,
+                        color: Colors.white,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? Colors.black : Colors.transparent,
-                          width: 3,
+                          color: !_isSecondaryPreset(_selectedSecondaryColor) ? Colors.black : Colors.grey.shade300,
+                          width: !_isSecondaryPreset(_selectedSecondaryColor) ? 3 : 1,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withOpacity(0.05),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      child: isSelected
-                          ? const Icon(Icons.check, color: Colors.white, size: 20)
-                          : null,
+                      child: !_isSecondaryPreset(_selectedSecondaryColor)
+                          ? Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: _parseColor(_selectedSecondaryColor),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const Icon(Icons.check, color: Colors.white, size: 16),
+                              ],
+                            )
+                          : const Icon(Icons.colorize, color: Colors.grey, size: 20),
                     ),
                   ),
-                );
-              }).toList(),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 32),
@@ -759,6 +1062,8 @@ class _CvTemplateSelectionScreenState extends State<CvTemplateSelectionScreen> {
         return 'En-tête stylisé & bannières.';
       case 'elegant':
         return 'Fines bordures, style chic.';
+      case 'executive':
+        return 'Style executive élégant avec barre verticale.';
       default:
         return '';
     }

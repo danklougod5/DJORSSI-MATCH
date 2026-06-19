@@ -21,10 +21,13 @@ import 'package:djossimatch/features/cv_generator/screens/cv_template_selection_
 import 'package:djossimatch/features/cv_generator/screens/cv_landing_screen.dart';
 import 'package:djossimatch/features/cv_generator/screens/cv_list_screen.dart';
 import 'package:djossimatch/features/cv_generator/screens/cv_pdf_viewer_screen.dart';
+import 'package:flutter/material.dart';
 import 'package:djossimatch/features/cv_generator/models/cv_model.dart';
 
 class AppRouter {
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   static final GoRouter router = GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: '/splash',
     redirect: (context, state) {
       final session = Supabase.instance.client.auth.currentSession;

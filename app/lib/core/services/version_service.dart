@@ -6,9 +6,73 @@ import 'package:url_launcher/url_launcher.dart';
 
 class VersionService {
   static final _supabase = Supabase.instance.client;
-  static bool showPremium = false;
+  static bool _showPremiumBase = false;
+  static bool? _userShowPremiumOverride;
+
+  static bool get showPremium {
+    if (_userShowPremiumOverride != null) {
+      return _userShowPremiumOverride!;
+    }
+    return _showPremiumBase;
+  }
+
+  static set showPremium(bool value) {
+    _showPremiumBase = value;
+  }
+
   static final ValueNotifier<bool> showPremiumNotifier = ValueNotifier<bool>(false);
   static StreamSubscription? _subscription;
+  static StreamSubscription<AuthState>? _authSubscription;
+
+  /// Charge dynamiquement l'override show_premium depuis la table profiles
+  static Future<void> updateUserOverride() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) {
+        _userShowPremiumOverride = null;
+        return;
+      }
+      final response = await _supabase
+          .from('profiles')
+          .select('show_premium')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (response != null && response['show_premium'] != null) {
+        _userShowPremiumOverride = response['show_premium'] == true;
+      } else {
+        _userShowPremiumOverride = null;
+      }
+      showPremiumNotifier.value = showPremium;
+      debugPrint('VersionService: updateUserOverride -> _userShowPremiumOverride = $_userShowPremiumOverride, showPremium = $showPremium');
+    } catch (e) {
+      debugPrint('VersionService: Erreur lors du chargement de show_premium override: $e');
+    }
+  }
+
+  /// Écoute en temps réel les changements du champ show_premium de l'utilisateur
+  static void _subscribeToProfileChanges(String userId) {
+    _subscription?.cancel();
+    _subscription = _supabase
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', userId)
+        .listen((data) {
+          debugPrint('VersionService [PROFILE REALTIME]: $data');
+          if (data.isNotEmpty) {
+            final newValue = data.first['show_premium'] == true;
+            final hasOverride = data.first['show_premium'] != null;
+            final newOverride = hasOverride ? newValue : null;
+            
+            if (_userShowPremiumOverride != newOverride) {
+              _userShowPremiumOverride = newOverride;
+              showPremiumNotifier.value = showPremium;
+              debugPrint('VersionService [PROFILE REALTIME]: show_premium changé → $showPremium');
+            }
+          }
+        }, onError: (err) {
+          debugPrint('VersionService [PROFILE REALTIME ERROR]: $err');
+        });
+  }
 
   // --- Configuration dynamique des swipes (table app_config) ---
   static int swipeLimit = 10;
@@ -21,6 +85,12 @@ class VersionService {
   static bool cvTrialActive = false;
   static DateTime? cvTrialEndDate;
   static final ValueNotifier<bool> cvTrialNotifier = ValueNotifier<bool>(false);
+
+  // --- Tarification Premium et CV ---
+  static int premiumPriceCfa = 2000;
+  static int extraCvPriceCfa = 500;
+  static final ValueNotifier<int> premiumPriceNotifier = ValueNotifier<int>(2000);
+  static final ValueNotifier<int> extraCvPriceNotifier = ValueNotifier<int>(500);
 
   /// Retourne true si le trial CV est actif ET que la date de fin n'est pas dépassée.
   static bool get isCvTrialRunning {
@@ -43,6 +113,30 @@ class VersionService {
       }
     }
     cvTrialNotifier.value = isCvTrialRunning;
+  }
+
+  /// Applique la configuration de tarification depuis une ligne app_config.
+  static void _applyPricingConfig(Map<String, dynamic> data) {
+    if (data.containsKey('premium_price_cfa')) {
+      final rawPrice = data['premium_price_cfa'];
+      if (rawPrice != null) {
+        final parsed = rawPrice is int ? rawPrice : int.tryParse(rawPrice.toString());
+        if (parsed != null && parsed >= 0) {
+          premiumPriceCfa = parsed;
+          premiumPriceNotifier.value = parsed;
+        }
+      }
+    }
+    if (data.containsKey('extra_cv_price_cfa')) {
+      final rawPrice = data['extra_cv_price_cfa'];
+      if (rawPrice != null) {
+        final parsed = rawPrice is int ? rawPrice : int.tryParse(rawPrice.toString());
+        if (parsed != null && parsed >= 0) {
+          extraCvPriceCfa = parsed;
+          extraCvPriceNotifier.value = parsed;
+        }
+      }
+    }
   }
 
   /// Message de limite avec le placeholder {limit} remplacé par la valeur configurée.
@@ -71,8 +165,27 @@ class VersionService {
     }
   }
 
-  /// Écoute les changements en temps réel sur la table app_config
+  /// Écoute les changements en temps réel sur la table app_config et profiles
   static void listenToChanges() {
+    final currentUser = _supabase.auth.currentUser;
+    if (currentUser != null) {
+      _subscribeToProfileChanges(currentUser.id);
+    }
+
+    _authSubscription ??= _supabase.auth.onAuthStateChange.listen((data) async {
+      final user = data.session?.user;
+      if (user != null) {
+        _subscribeToProfileChanges(user.id);
+      } else {
+        _subscription?.cancel();
+        _subscription = null;
+        _userShowPremiumOverride = null;
+        showPremiumNotifier.value = showPremium;
+      }
+      await updateUserOverride();
+      debugPrint('VersionService: Changement d\'auth détecté. showPremium = $showPremium');
+    });
+
     debugPrint('VersionService: Tentative de connexion au Realtime...');
     _supabase
         .channel('app_config_changes')
@@ -85,9 +198,9 @@ class VersionService {
             final data = payload.newRecord;
             if (data.containsKey('show_premium')) {
               final newValue = data['show_premium'] == true;
-              if (showPremium != newValue) {
-                showPremium = newValue;
-                showPremiumNotifier.value = newValue;
+              if (_showPremiumBase != newValue) {
+                _showPremiumBase = newValue;
+                showPremiumNotifier.value = showPremium;
                 debugPrint('VersionService [REALTIME]: show_premium changé → $showPremium');
               }
             }
@@ -97,6 +210,9 @@ class VersionService {
             // Synchronise le trial CV en temps réel
             _applyCvTrialConfig(data);
             debugPrint('VersionService [REALTIME]: cv_trial_active → $cvTrialActive');
+            // Synchronise la tarification en temps réel
+            _applyPricingConfig(data);
+            debugPrint('VersionService [REALTIME]: premiumPriceCfa → $premiumPriceCfa, extraCvPriceCfa → $extraCvPriceCfa');
           },
         )
         .subscribe((status, [error]) {
@@ -128,12 +244,13 @@ class VersionService {
       }
 
       debugPrint('VersionService: Config reçue: $response');
-      showPremium = response['show_premium'] == true;
-      showPremiumNotifier.value = showPremium; // On prévient l'UI de la valeur initiale
+      _showPremiumBase = response['show_premium'] == true;
+      await updateUserOverride(); // Charge l'override utilisateur
       _applySwipeConfig(Map<String, dynamic>.from(response));
       _applyCvTrialConfig(Map<String, dynamic>.from(response));
+      _applyPricingConfig(Map<String, dynamic>.from(response));
       debugPrint(
-        'VersionService: Initialisation terminée. showPremium: $showPremium, swipeLimit: $swipeLimit',
+        'VersionService: Initialisation terminée. showPremium: $showPremium, swipeLimit: $swipeLimit, premiumPrice: $premiumPriceCfa, extraCvPrice: $extraCvPriceCfa',
       );
 
       final minVersion = response['min_version'] as String?;

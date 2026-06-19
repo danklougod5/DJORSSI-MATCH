@@ -57,10 +57,18 @@ const CvTrialTab: React.FC = () => {
     cv_trial_active: false,
     cv_trial_end_date: '',
   });
+  const [pricingConfig, setPricingConfig] = useState({
+    premium_price_cfa: 2000,
+    extra_cv_price_cfa: 500,
+  });
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
+  const [pricingError, setPricingError] = useState('');
+  const [pricingSuccess, setPricingSuccess] = useState('');
 
   // CV Usage Metrics & Users State
   const [cvUsers, setCvUsers] = useState<CvUser[]>([]);
@@ -85,7 +93,7 @@ const CvTrialTab: React.FC = () => {
     try {
       const { data, error: fetchError } = await supabase
         .from('app_config')
-        .select('cv_trial_active, cv_trial_end_date')
+        .select('cv_trial_active, cv_trial_end_date, premium_price_cfa, extra_cv_price_cfa')
         .eq('id', 1)
         .maybeSingle();
 
@@ -97,6 +105,10 @@ const CvTrialTab: React.FC = () => {
           cv_trial_end_date: data.cv_trial_end_date
             ? new Date(data.cv_trial_end_date).toISOString().slice(0, 16) // datetime-local format
             : '',
+        });
+        setPricingConfig({
+          premium_price_cfa: data.premium_price_cfa ?? 2000,
+          extra_cv_price_cfa: data.extra_cv_price_cfa ?? 500,
         });
       }
     } catch (e: any) {
@@ -238,6 +250,44 @@ const CvTrialTab: React.FC = () => {
     }
   };
 
+  const handleSavePricing = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setPricingError('');
+    setPricingSuccess('');
+
+    const premiumPrice = Number(pricingConfig.premium_price_cfa);
+    const extraCvPrice = Number(pricingConfig.extra_cv_price_cfa);
+
+    if (isNaN(premiumPrice) || premiumPrice < 0) {
+      setPricingError('Le prix premium doit être un nombre positif ou nul.');
+      return;
+    }
+    if (isNaN(extraCvPrice) || extraCvPrice < 0) {
+      setPricingError('Le prix du CV supplémentaire doit être un nombre positif ou nul.');
+      return;
+    }
+
+    setIsSavingPricing(true);
+    try {
+      const { error: saveError } = await supabase
+        .from('app_config')
+        .update({
+          premium_price_cfa: premiumPrice,
+          extra_cv_price_cfa: extraCvPrice,
+        })
+        .eq('id', 1);
+
+      if (saveError) throw saveError;
+
+      setPricingSuccess('Tarification enregistrée avec succès. Les modifications sont appliquées sur l\'application en temps réel.');
+    } catch (e: any) {
+      setPricingError(e.message || "Erreur lors de l'enregistrement de la tarification.");
+    } finally {
+      setIsSavingPricing(false);
+    }
+  };
+
+
   const toggleExpandUser = (userId: string) => {
     if (expandedUserId === userId) {
       setExpandedUserId(null);
@@ -285,7 +335,7 @@ const CvTrialTab: React.FC = () => {
         
         {/* Left Column: Form Settings (5/12 width on lg) */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-full flex flex-col justify-between">
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
             <div>
               <h2 className="text-lg font-heading mb-1 flex items-center gap-2 text-slate-900">
                 <FileText className="text-primary" size={22} /> Période d'essai — CV
@@ -395,6 +445,84 @@ const CvTrialTab: React.FC = () => {
                   L'activation du toggle met à jour Supabase instantanément. L'application Flutter s'adapte sans redémarrage via Supabase Realtime.
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Card 2: Tarification Premium & CV */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <h2 className="text-lg font-heading mb-1 flex items-center gap-2 text-slate-900">
+                <TrendingUp className="text-cta" size={22} /> Tarification Premium & CV
+              </h2>
+              <p className="text-xs text-slate-500 mb-5">
+                Ajustez le prix de l'abonnement Premium et des CV supplémentaires de l'application en Francs CFA.
+              </p>
+
+              <form onSubmit={handleSavePricing} className="space-y-5">
+                {/* Abonnement Premium */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Forfait Illimité (Premium) / mois (F CFA)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={pricingConfig.premium_price_cfa}
+                    onChange={(e) =>
+                      setPricingConfig((c) => ({
+                        ...c,
+                        premium_price_cfa: parseInt(e.target.value, 10) || 0,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                  />
+                </div>
+
+                {/* CV Supplémentaire */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Tarif du CV supplémentaire (F CFA)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={pricingConfig.extra_cv_price_cfa}
+                    onChange={(e) =>
+                      setPricingConfig((c) => ({
+                        ...c,
+                        extra_cv_price_cfa: parseInt(e.target.value, 10) || 0,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                  />
+                </div>
+
+                {pricingError && (
+                  <div className="bg-red-50 text-red-600 px-3 py-2.5 rounded-xl flex items-center gap-2 text-xs">
+                    <AlertCircle size={14} /> {pricingError}
+                  </div>
+                )}
+                {pricingSuccess && (
+                  <div className="bg-green-50 text-green-600 px-3 py-2.5 rounded-xl flex items-center gap-2 text-xs animate-in zoom-in duration-300">
+                    <CheckCircle2 size={14} /> {pricingSuccess}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSavingPricing}
+                  className="w-full bg-primary text-white py-2.5 rounded-xl font-bold text-sm hover:shadow-lg hover:shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+                >
+                  {isSavingPricing ? (
+                    <>
+                      <RefreshCw className="animate-spin" size={16} />
+                      Enregistrement...
+                    </>
+                  ) : (
+                    'Enregistrer la tarification'
+                  )}
+                </button>
+              </form>
             </div>
           </div>
         </div>

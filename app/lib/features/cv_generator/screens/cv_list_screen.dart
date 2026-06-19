@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:djossimatch/core/services/profile_notifier.dart';
 import 'package:djossimatch/core/services/cv_quota_service.dart';
+import 'package:djossimatch/core/services/version_service.dart';
 import 'package:printing/printing.dart';
 import '../models/cv_model.dart';
 import '../services/cv_storage_service.dart';
@@ -22,12 +24,68 @@ class _CvListScreenState extends State<CvListScreen> {
   String? _error;
   bool _isUploading = false;
   CvQuotaInfo? _quotaInfo;
+  StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadCvs();
     _loadQuotaInfo();
+    _setupRealtime();
+  }
+
+  @override
+  void dispose() {
+    _profileSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _setupRealtime() {
+    final supabase = Supabase.instance.client;
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _profileSubscription = supabase
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', userId)
+        .listen((data) {
+          if (data.isNotEmpty && mounted) {
+            final profile = data.first;
+            final isPremiumVal = profile['is_premium'] ?? false;
+            final premiumUntilRaw = profile['premium_until'];
+            final extraPurchased = (profile['extra_cvs_purchased'] ?? 0) as int;
+            final showPremiumOverride = profile['show_premium'];
+
+            bool activePremium = isPremiumVal;
+            if (isPremiumVal && premiumUntilRaw != null) {
+              final premiumUntil = DateTime.parse(premiumUntilRaw);
+              activePremium = premiumUntil.isAfter(DateTime.now());
+            }
+
+            if (showPremiumOverride == false || !VersionService.showPremium) {
+              activePremium = true;
+            }
+
+            _updateQuotaWithDetails(activePremium, extraPurchased);
+          }
+        }, onError: (e) {
+          debugPrint('CvListScreen: profiles realtime error: $e');
+        });
+  }
+
+  Future<void> _updateQuotaWithDetails(bool isPremium, int extraPurchased) async {
+    try {
+      final info = await CvQuotaService.getQuotaInfo(
+        isPremiumUser: isPremium,
+        extraPurchased: extraPurchased,
+      );
+      if (mounted) {
+        setState(() => _quotaInfo = info);
+      }
+    } catch (e) {
+      debugPrint('Error updating quota details: $e');
+    }
   }
 
   Future<void> _loadQuotaInfo() async {
@@ -91,9 +149,17 @@ class _CvListScreenState extends State<CvListScreen> {
   }
 
   Future<void> _duplicateCv(CvModel cv) async {
+    final quotaResult = await CvQuotaService.canCreateCv();
+    if (!quotaResult.allowed) {
+      if (!mounted) return;
+      final paid = await CvPaywallSheet.show(context, PaymentReason.extraCv);
+      if (!paid) return;
+    }
+
     try {
       await CvStorageService.duplicateCv(cv);
       _loadCvs();
+      _loadQuotaInfo();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('CV dupliqué !'), duration: Duration(seconds: 2)),
@@ -101,7 +167,7 @@ class _CvListScreenState extends State<CvListScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Erreur : ${e.toString().replaceAll('Exception: ', '')}'), backgroundColor: Colors.red),
       );
     }
   }
@@ -293,6 +359,7 @@ class _CvListScreenState extends State<CvListScreen> {
       case 'modern': return 'Moderne';
       case 'minimalist': return 'Minimaliste';
       case 'elegant': return 'Élégant';
+      case 'executive': return 'Exécutif';
       case 'left_right': return 'Gauche-Droite';
       case 'timeline': return 'Chronologique';
       case 'creative': return 'Créatif';
@@ -330,18 +397,20 @@ class _CvListScreenState extends State<CvListScreen> {
               : _cvs.isEmpty
                   ? _buildEmptyView()
                   : _buildCvList(),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _handleCreateCv(),
-        backgroundColor: const Color(0xFFF97316),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: Text(
-          _quotaInfo != null && _quotaInfo!.remaining > 0
-              ? 'Nouveau CV (${_quotaInfo!.remaining} restant${_quotaInfo!.remaining > 1 ? "s" : ""})'
-              : 'Nouveau CV',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
+      floatingActionButton: (_isLoading || _cvs.isEmpty)
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _handleCreateCv(),
+              backgroundColor: const Color(0xFFF97316),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: Text(
+                _quotaInfo != null && _quotaInfo!.remaining > 0 && VersionService.showPremium
+                    ? 'Nouveau CV (${_quotaInfo!.remaining} restant${_quotaInfo!.remaining > 1 ? "s" : ""})'
+                    : 'Nouveau CV',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
     );
   }
 
@@ -693,12 +762,74 @@ class _CvListScreenState extends State<CvListScreen> {
             ),
           ],
         );
+      case 'executive':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      line(25, accent),
+                      const SizedBox(height: 2),
+                      line(15, secondary),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    line(12),
+                    line(12),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Container(width: 2, height: 6, color: accent),
+                const SizedBox(width: 4),
+                line(20, accent),
+              ],
+            ),
+            const Divider(height: 4, thickness: 0.5),
+            Row(
+              children: [
+                Expanded(child: line(30)),
+                const SizedBox(width: 8),
+                line(12),
+              ],
+            ),
+            line(45),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Container(width: 2, height: 6, color: accent),
+                const SizedBox(width: 4),
+                line(20, accent),
+              ],
+            ),
+            const Divider(height: 4, thickness: 0.5),
+            Row(
+              children: [
+                Expanded(child: line(30)),
+                const SizedBox(width: 8),
+                line(12),
+              ],
+            ),
+          ],
+        );
       default:
         return Container();
     }
   }
 
   Widget _buildQuotaBanner() {
+    if (!VersionService.showPremium) return const SizedBox.shrink();
     if (_quotaInfo == null) return const SizedBox.shrink();
     final info = _quotaInfo!;
     final remaining = info.remaining;
@@ -741,14 +872,14 @@ class _CvListScreenState extends State<CvListScreen> {
                 child: Row(
                   children: [
                     Icon(
-                      info.isPremium ? Icons.stars_rounded : Icons.account_circle_rounded,
-                      color: info.isPremium ? const Color(0xFFF59E0B) : const Color(0xFF64748B),
+                      (info.isPremium && VersionService.showPremium) ? Icons.stars_rounded : Icons.account_circle_rounded,
+                      color: (info.isPremium && VersionService.showPremium) ? const Color(0xFFF59E0B) : const Color(0xFF64748B),
                       size: 20,
                     ),
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        'Forfait ${info.tierLabel}',
+                        VersionService.showPremium ? 'Forfait ${info.tierLabel}' : 'Mon Compte',
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -834,7 +965,7 @@ class _CvListScreenState extends State<CvListScreen> {
               Expanded(
                 child: Text(
                   isAtLimit
-                      ? 'Limite atteinte · 500 F par CV supplémentaire'
+                      ? 'Limite atteinte · ${VersionService.extraCvPriceCfa} F par CV supplémentaire'
                       : '$remaining emplacement${remaining > 1 ? "s" : ""} disponible${remaining > 1 ? "s" : ""}',
                   style: TextStyle(
                     fontSize: 12,
@@ -843,9 +974,14 @@ class _CvListScreenState extends State<CvListScreen> {
                   ),
                 ),
               ),
-              if (!info.isPremium)
+              if (!info.isPremium && VersionService.showPremium)
                 GestureDetector(
-                  onTap: () => context.push('/premium'),
+                  onTap: () => context.push('/premium').then((_) {
+                    if (mounted) {
+                      _loadQuotaInfo();
+                      _loadCvs();
+                    }
+                  }),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(

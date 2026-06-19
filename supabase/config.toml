@@ -27,3 +27,23 @@ verify_jwt = true
 import_map = "./functions/cv-ai-assist/deno.json"
 entrypoint = "./functions/cv-ai-assist/index.ts"
 
+[functions.geniuspay-initiate]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/geniuspay-initiate/index.ts"
+
+[functions.geniuspay-webhook]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/geniuspay-webhook/index.ts"
+
+[functions.moyapay-webhook]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/moyapay-webhook/index.ts"
+
+[functions.reconcile-payments]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/reconcile-payments/index.ts"
+

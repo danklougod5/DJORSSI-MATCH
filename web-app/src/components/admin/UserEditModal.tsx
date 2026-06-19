@@ -82,12 +82,39 @@ const UserEditModal: React.FC<UserEditModalProps> = ({
             </div>
             <button 
               type="button"
-              onClick={() => setEditingUser({...editingUser, premium: !editingUser.premium})}
+              onClick={() => {
+                const newPremium = !editingUser.premium;
+                const defaultUntil = newPremium ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null;
+                setEditingUser({
+                  ...editingUser,
+                  premium: newPremium,
+                  premiumUntil: defaultUntil
+                });
+              }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editingUser.premium ? 'bg-cta' : 'bg-slate-300'}`}
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editingUser.premium ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
           </div>
+
+          {editingUser.premium && (
+            <div className="space-y-2 p-4 bg-amber-50/50 border border-amber-100 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+              <label className="text-[10px] font-black uppercase tracking-widest text-amber-700">Date d'expiration Premium</label>
+              <input 
+                type="datetime-local"
+                value={editingUser.premiumUntil ? new Date(editingUser.premiumUntil).toISOString().slice(0, 16) : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setEditingUser({
+                    ...editingUser, 
+                    premiumUntil: val ? new Date(val).toISOString() : null
+                  });
+                }}
+                className="w-full px-4 py-3 bg-white border border-amber-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 font-semibold"
+              />
+              <p className="text-[10px] text-amber-600 mt-1">Laissez vide pour un accès Premium permanent (sans date de fin).</p>
+            </div>
+          )}
 
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
             <div className="flex items-center gap-3">

@@ -14,6 +14,7 @@ class CvTemplateMinimalist extends CvTemplateBase {
     final primary = hexToPdfColor(cv.primaryColor);
     final secondary = hexToPdfColor(cv.secondaryColor);
     const textColor = PdfColor.fromInt(0xFF333333);
+    final avatarImage = await getAvatarImage(cv);
 
     pdf.addPage(
       pw.MultiPage(
@@ -22,7 +23,7 @@ class CvTemplateMinimalist extends CvTemplateBase {
         build: (pw.Context context) {
           return [
             // Center Header
-            _buildHeader(cv.personalInfo, primary, secondary),
+            _buildHeader(cv.personalInfo, primary, secondary, avatarImage),
             pw.SizedBox(height: 30),
             
             // Body
@@ -34,11 +35,11 @@ class CvTemplateMinimalist extends CvTemplateBase {
 
             if (cv.skills.isNotEmpty) ...[
               _buildSectionTitle('Compétences', primary),
-              buildBulletText(cv.skills, textColor, primary, fontSize: 10, height: 1.4),
+              buildBulletText(cv.skills, textColor, primary, fontSize: 10, height: 1.4, splitByDelimiterIfNoNewline: true),
               pw.SizedBox(height: 24),
             ],
 
-            if (cv.experiences.isNotEmpty) ...[
+            if (cv.experiences.isNotEmpty && cv.experiences.any((e) => e.isVisible)) ...[
               _buildSectionTitle('Expériences Professionnelles', primary),
               ...cv.experiences.where((e) => e.isVisible).map((e) => _buildExperienceItem(e, primary, secondary)),
               pw.SizedBox(height: 24),
@@ -72,36 +73,100 @@ class CvTemplateMinimalist extends CvTemplateBase {
     return pdf.save();
   }
 
-  pw.Widget _buildHeader(CvPersonalInfo info, PdfColor primary, PdfColor secondary) {
+  pw.Widget _buildHeader(CvPersonalInfo info, PdfColor primary, PdfColor secondary, pw.ImageProvider? avatarImage) {
     final visibleContacts = info.contactFields.where((f) => f.isVisible && f.value.isNotEmpty).toList();
 
-    pw.Widget buildContactInfo() {
+    pw.Widget buildContactInfo(pw.WrapAlignment wrapAlign) {
       if (visibleContacts.isEmpty) return pw.SizedBox();
       
       return pw.Wrap(
-        alignment: pw.WrapAlignment.center,
+        alignment: wrapAlign,
         spacing: 12,
         runSpacing: 4,
         children: visibleContacts.map((c) => pw.Text(c.value, style: pw.TextStyle(color: secondary, fontSize: 10))).toList(),
       );
     }
 
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
-      children: [
-        pw.Text(
-          info.fullName.toUpperCase(),
-          style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.normal, letterSpacing: 2, color: primary),
-        ),
-        if (info.jobTitle.isNotEmpty) ...[
-          pw.SizedBox(height: 6),
-          pw.Text(
-            info.jobTitle.toUpperCase(),
-            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: secondary, letterSpacing: 1),
+    pw.Widget buildContactInfoSplit() {
+      if (visibleContacts.isEmpty) return pw.SizedBox();
+      
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: visibleContacts.map((c) => pw.Text(c.value, style: pw.TextStyle(color: secondary, fontSize: 10))).toList(),
+      );
+    }
+
+    pw.Widget content;
+    if (info.layout == 'split') {
+      content = pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Expanded(
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                if (info.showAvatar) ...[
+                  buildAvatarWidget(info, avatarImage, size: 70),
+                  pw.SizedBox(width: 16),
+                ],
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        info.fullName.toUpperCase(),
+                        style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.normal, letterSpacing: 2, color: primary),
+                      ),
+                      if (info.jobTitle.isNotEmpty) ...[
+                        pw.SizedBox(height: 6),
+                        pw.Text(
+                          info.jobTitle.toUpperCase(),
+                          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: secondary, letterSpacing: 1),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
+          pw.SizedBox(width: 24),
+          buildContactInfoSplit(),
         ],
-        pw.SizedBox(height: 12),
-        buildContactInfo(),
+      );
+    } else {
+      final align = info.layout == 'left' ? pw.CrossAxisAlignment.start : pw.CrossAxisAlignment.center;
+      final wrapAlign = info.layout == 'left' ? pw.WrapAlignment.start : pw.WrapAlignment.center;
+      
+      content = pw.Column(
+        crossAxisAlignment: align,
+        children: [
+          if (info.showAvatar) ...[
+            buildAvatarWidget(info, avatarImage, size: 70),
+            pw.SizedBox(height: 12),
+          ],
+          pw.Text(
+            info.fullName.toUpperCase(),
+            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.normal, letterSpacing: 2, color: primary),
+          ),
+          if (info.jobTitle.isNotEmpty) ...[
+            pw.SizedBox(height: 6),
+            pw.Text(
+              info.jobTitle.toUpperCase(),
+              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: secondary, letterSpacing: 1),
+            ),
+          ],
+          pw.SizedBox(height: 12),
+          buildContactInfo(wrapAlign),
+        ],
+      );
+    }
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        content,
       ],
     );
   }

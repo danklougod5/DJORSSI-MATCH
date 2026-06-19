@@ -20,6 +20,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
   String? _userName;
   String? _phoneNumber;
   String? _email;
+  String? _premiumUntil;
   late StreamSubscription<List<Map<String, dynamic>>> _configSubscription;
 
   @override
@@ -40,7 +41,13 @@ class _PremiumScreenState extends State<PremiumScreen> {
       if (data.isNotEmpty && mounted) {
         setState(() {
           VersionService.showPremium = data.first['show_premium'] ?? false;
-          debugPrint('showPremium est maintenant: ${VersionService.showPremium}');
+          if (data.first['premium_price_cfa'] != null) {
+            VersionService.premiumPriceCfa = data.first['premium_price_cfa'] as int;
+          }
+          if (data.first['extra_cv_price_cfa'] != null) {
+            VersionService.extraCvPriceCfa = data.first['extra_cv_price_cfa'] as int;
+          }
+          debugPrint('showPremium: ${VersionService.showPremium}, premiumPrice: ${VersionService.premiumPriceCfa}, extraCvPrice: ${VersionService.extraCvPriceCfa}');
         });
       }
     }, onError: (error) {
@@ -75,6 +82,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
           setState(() {
             final isPremium = response['is_premium'] ?? false;
             final premiumUntilRaw = response['premium_until'];
+            _premiumUntil = premiumUntilRaw?.toString();
             if (isPremium && premiumUntilRaw != null) {
               final premiumUntil = DateTime.parse(premiumUntilRaw);
               _isPremium = premiumUntil.isAfter(DateTime.now());
@@ -113,6 +121,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
     }
   }
 
+  String _formatPrice(int price) {
+    final str = price.toString();
+    if (str.length > 3) {
+      return '${str.substring(0, str.length - 3)}.${str.substring(str.length - 3)}';
+    }
+    return str;
+  }
+
   Future<void> _activatePremium() async {
     if (_phoneNumber == null || _phoneNumber!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -127,7 +143,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
       if (userId == null) return;
 
       final initResult = await GeniusPayService.initiatePayment(
-        amount: 2000,
+        amount: VersionService.premiumPriceCfa.toDouble(),
         phone: _phoneNumber!,
         email: _email ?? '',
         name: _userName ?? 'Client Djorssi',
@@ -224,7 +240,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 _buildFeatureCard(
                   icon: Icons.description_rounded,
                   title: '3 CV PROFESSIONNELS INCLUS',
-                  description: 'Créez jusqu\'à 3 CV gratuitement contre 1 seul pour les comptes gratuits. CV supplémentaires à 500 F CFA.',
+                  description: 'Créez jusqu\'à 3 CV gratuitement contre 1 seul pour les comptes gratuits. CV supplémentaires à ${_formatPrice(VersionService.extraCvPriceCfa)} F CFA.',
                   color: const Color(0xFFF59E0B),
                 ),
                 const SizedBox(height: 40),
@@ -406,7 +422,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                '2.000',
+                _formatPrice(VersionService.premiumPriceCfa),
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 48.sp,
@@ -443,6 +459,19 @@ class _PremiumScreenState extends State<PremiumScreen> {
   }
 
   Widget _buildBottomAction() {
+    String? expiryText;
+    if (_isPremium && _premiumUntil != null) {
+      try {
+        final date = DateTime.parse(_premiumUntil!).toLocal();
+        final day = date.day.toString().padLeft(2, '0');
+        final month = date.month.toString().padLeft(2, '0');
+        final year = date.year.toString();
+        expiryText = 'Votre abonnement Premium expire le $day/$month/$year';
+      } catch (e) {
+        debugPrint('Error parsing expiry date: $e');
+      }
+    }
+
     return Container(
       padding: EdgeInsets.all(24.r),
       child: Column(
@@ -466,6 +495,18 @@ class _PremiumScreenState extends State<PremiumScreen> {
               ),
             ),
           ),
+          if (_isPremium && expiryText != null) ...[
+            SizedBox(height: 16.h),
+            Text(
+              expiryText,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
           if (!_isPremium) ...[
             SizedBox(height: 16.h),
             TextButton(

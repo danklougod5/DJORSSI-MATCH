@@ -35,6 +35,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   String? _selectedGender;
   bool _showCvOptions = false;
   bool _isQuotaReached = false;
+  bool _isLoadingQuota = true;
 
   @override
   void initState() {
@@ -232,14 +233,23 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         if (mounted) {
           setState(() {
             _isQuotaReached = !quota.allowed;
+            _isLoadingQuota = false;
           });
         }
       } catch (e) {
         debugPrint('Erreur verification quota CV dans le profil: $e');
+        if (mounted) {
+          setState(() {
+            _isLoadingQuota = false;
+          });
+        }
       }
     } catch (e) {
       debugPrint('Erreur lors du chargement du profil: $e');
       if (mounted) {
+        setState(() {
+          _isLoadingQuota = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(ErrorTranslator.translate(e)),
@@ -1175,8 +1185,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           subtitle: 'Uploadez votre CV pour l\'améliorer et le structurer automatiquement par l\'IA.',
           icon: Icons.auto_awesome_outlined,
           color: const Color(0xFFF97316), // Orange
-          isLocked: _isQuotaReached,
+          isLocked: _isLoadingQuota ? false : _isQuotaReached,
+          isLoading: _isLoadingQuota,
           onTap: () async {
+            if (_isLoadingQuota) return;
             if (_isQuotaReached) {
               final paid = await CvPaywallSheet.show(context, PaymentReason.extraCv);
               if (paid && mounted) {
@@ -1230,8 +1242,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           subtitle: 'Remplissez vos informations étape par étape et choisissez un modèle.',
           icon: Icons.edit_note_rounded,
           color: const Color(0xFF10B981), // Green
-          isLocked: _isQuotaReached,
+          isLocked: _isLoadingQuota ? false : _isQuotaReached,
+          isLoading: _isLoadingQuota,
           onTap: () async {
+            if (_isLoadingQuota) return;
             if (_isQuotaReached) {
               final paid = await CvPaywallSheet.show(context, PaymentReason.extraCv);
               if (paid && mounted) {

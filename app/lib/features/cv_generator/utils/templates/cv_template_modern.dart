@@ -52,12 +52,12 @@ class CvTemplateModern extends CvTemplateBase {
               ),
               pw.Padding(
                 padding: const pw.EdgeInsets.symmetric(horizontal: 32),
-                child: buildBulletText(cv.skills, textColor, primaryColor, fontSize: 10, height: 1.4),
+                child: buildBulletText(cv.skills, textColor, primaryColor, fontSize: 10, height: 1.4, splitByDelimiterIfNoNewline: true),
               ),
               pw.SizedBox(height: 20),
             ],
 
-            if (cv.experiences.isNotEmpty) ...[
+            if (cv.experiences.isNotEmpty && cv.experiences.any((e) => e.isVisible)) ...[
               pw.Padding(
                 padding: const pw.EdgeInsets.symmetric(horizontal: 32),
                 child: _buildSectionTitle('Expériences Professionnelles', primaryColor),

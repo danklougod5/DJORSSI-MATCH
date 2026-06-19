@@ -130,15 +130,26 @@ const UsersTab: React.FC<UsersTabProps> = ({
                       <p className="text-sm font-semibold text-slate-700">{user.phone}</p>
                       <p className="text-xs text-slate-400">{user.sector}</p>
                   </td>
-                  <td className="px-6 py-4 flex items-center gap-2">
-                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight ${user.premium ? 'bg-cta text-white shadow-sm shadow-cta/20' : 'bg-slate-100 text-slate-500'}`}>
-                      {user.premium ? 'Premium' : 'Standard'}
-                    </span>
-                    {user.extraCvsPurchased > 0 && (
-                      <span className="px-2 py-1 bg-primary/10 text-primary rounded-lg text-[10px] font-bold border border-primary/20">
-                        +{user.extraCvsPurchased} CV
-                      </span>
-                    )}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col gap-1 items-start">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight ${user.premium ? 'bg-cta text-white shadow-sm shadow-cta/20' : 'bg-slate-100 text-slate-500'}`}>
+                          {user.premium ? 'Premium' : 'Standard'}
+                        </span>
+                        {user.extraCvsPurchased > 0 && (
+                          <span className="px-2 py-1 bg-primary/10 text-primary rounded-lg text-[10px] font-bold border border-primary/20">
+                            +{user.extraCvsPurchased} CV
+                          </span>
+                        )}
+                      </div>
+                      {user.premium && (
+                        <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                          {user.premiumUntil 
+                            ? `Expire le : ${new Date(user.premiumUntil).toLocaleDateString()}` 
+                            : 'Accès permanent'}
+                        </p>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                       <p className="text-xs font-medium text-slate-500">{user.date}</p>

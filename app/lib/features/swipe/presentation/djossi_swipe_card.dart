@@ -441,15 +441,7 @@ class DjossiSwipeCard extends StatelessWidget {
                                     ],
                                   ),
                                   SizedBox(height: 8.h),
-                                  Text(
-                                    description!,
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontSize: 13.sp,
-                                      fontWeight: FontWeight.bold,
-                                      height: 1.4,
-                                    ),
-                                  ),
+                                  _buildDescriptionWidget(description!),
                                 ],
                               ),
                             ),
@@ -567,6 +559,50 @@ class DjossiSwipeCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDescriptionWidget(String text) {
+    final baseStyle = TextStyle(
+      color: Colors.white.withOpacity(0.9),
+      fontSize: 13.sp,
+      fontWeight: FontWeight.w500,
+      height: 1.4,
+    );
+
+    final List<InlineSpan> spans = [];
+    final parts = text.split('**');
+
+    for (int i = 0; i < parts.length; i++) {
+      final part = parts[i];
+      if (part.isEmpty) continue;
+
+      if (i % 2 == 1) {
+        // En gras (portées par ** **)
+        spans.add(
+          TextSpan(
+            text: part,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+        );
+      } else {
+        // Texte normal
+        spans.add(
+          TextSpan(
+            text: part,
+          ),
+        );
+      }
+    }
+
+    return RichText(
+      text: TextSpan(
+        style: baseStyle,
+        children: spans,
       ),
     );
   }

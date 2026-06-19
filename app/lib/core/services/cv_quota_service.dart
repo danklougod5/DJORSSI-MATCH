@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'version_service.dart';
 
 /// Manages CV creation and modification quotas based on user tier.
 ///
@@ -12,8 +13,8 @@ class CvQuotaService {
 
   static const int freeMaxCvs = 1;
   static const int premiumMaxCvs = 3;
-  static const double extraCvPrice = 500; // F CFA
-  static const double modificationPrice = 500; // F CFA
+  static double get extraCvPrice => VersionService.extraCvPriceCfa.toDouble();
+  static double get modificationPrice => VersionService.extraCvPriceCfa.toDouble();
 
   /// Fetch both premium status and extra CVs purchased in a single query
   static Future<UserQuotaDetails> getUserQuotaDetails() async {
@@ -23,7 +24,7 @@ class CvQuotaService {
 
       final response = await _supabase
           .from('profiles')
-          .select('is_premium, premium_until, extra_cvs_purchased')
+          .select('is_premium, premium_until, extra_cvs_purchased, show_premium')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -32,11 +33,18 @@ class CvQuotaService {
       final isPremiumVal = response['is_premium'] ?? false;
       final premiumUntilRaw = response['premium_until'];
       final extraPurchased = (response['extra_cvs_purchased'] ?? 0) as int;
+      final showPremiumOverride = response['show_premium'];
 
       bool activePremium = isPremiumVal;
       if (isPremiumVal && premiumUntilRaw != null) {
         final premiumUntil = DateTime.parse(premiumUntilRaw);
         activePremium = premiumUntil.isAfter(DateTime.now());
+      }
+
+      // Si show_premium est désactivé (false) pour cet utilisateur ou au niveau de l'app,
+      // on le traite comme premium (bypass de validation)
+      if (showPremiumOverride == false || !VersionService.showPremium) {
+        activePremium = true;
       }
 
       return UserQuotaDetails(isPremium: activePremium, extraCvsPurchased: extraPurchased);
@@ -84,6 +92,16 @@ class CvQuotaService {
 
   /// Check if the user can create a new CV (within quota)
   static Future<CvQuotaResult> canCreateCv({bool? isPremiumUser, int? extraPurchased}) async {
+    if (!VersionService.showPremium) {
+      return CvQuotaResult(
+        allowed: true,
+        currentCount: 0,
+        maxFree: 999,
+        extraPurchased: 0,
+        isPremium: true,
+      );
+    }
+
     bool premium;
     int extra;
 
@@ -124,6 +142,16 @@ class CvQuotaService {
 
   /// Check if the user can modify an existing CV (free users pay, premium users modify for free)
   static Future<CvQuotaResult> canModifyCv({bool? isPremiumUser, int? extraPurchased}) async {
+    if (!VersionService.showPremium) {
+      return CvQuotaResult(
+        allowed: true,
+        currentCount: 0,
+        maxFree: 999,
+        extraPurchased: 0,
+        isPremium: true,
+      );
+    }
+
     bool premium;
     int extra;
 

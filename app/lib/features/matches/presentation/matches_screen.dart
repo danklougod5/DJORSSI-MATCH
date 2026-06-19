@@ -22,12 +22,44 @@ class _MatchesScreenState extends State<MatchesScreen> {
   List<Map<String, dynamic>> _matches = [];
 
   String _selectedFilter = 'Tous';
+  StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadMatches();
     MatchNotifier.stream.addListener(_onNewMatch);
+    _setupRealtime();
+  }
+
+  void _setupRealtime() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _profileSubscription = _supabase
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', userId)
+        .listen((data) {
+          if (data.isNotEmpty && mounted) {
+            final profile = data.first;
+            final isPremium = profile['is_premium'] ?? false;
+            final premiumUntilRaw = profile['premium_until'];
+            bool activePremium = isPremium;
+            if (isPremium && premiumUntilRaw != null) {
+              final premiumUntil = DateTime.parse(premiumUntilRaw);
+              activePremium = premiumUntil.isAfter(DateTime.now());
+            }
+            if (!VersionService.showPremium) {
+              activePremium = true;
+            }
+            setState(() {
+              _isPremium = activePremium;
+            });
+          }
+        }, onError: (e) {
+          debugPrint('MatchesScreen: profiles realtime error: $e');
+        });
   }
 
   void _onNewMatch() {
@@ -40,6 +72,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
   @override
   void dispose() {
     MatchNotifier.stream.removeListener(_onNewMatch);
+    _profileSubscription?.cancel();
     super.dispose();
   }
 
@@ -89,6 +122,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
         } else {
           _isPremium = isPremium;
         }
+      }
+
+      if (!VersionService.showPremium) {
+        _isPremium = true;
       }
 
       final response = await _supabase
@@ -333,7 +370,11 @@ class _MatchesScreenState extends State<MatchesScreen> {
           ),
         ),
         child: InkWell(
-          onTap: () => context.push('/premium'),
+          onTap: () => context.push('/premium').then((_) {
+            if (mounted) {
+              _loadMatches(forceRefresh: true);
+            }
+          }),
           child: Padding(
             padding: EdgeInsets.all(20.r),
             child: Row(

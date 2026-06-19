@@ -20,6 +20,9 @@ class CvPaywallSheet extends StatefulWidget {
   /// Show the paywall bottom sheet. Returns true if payment was successful.
   /// Si la période d'essai CV est active, le paiement est bypassé automatiquement.
   static Future<bool> show(BuildContext context, PaymentReason reason) async {
+    if (!VersionService.showPremium) {
+      return true;
+    }
     // Pendant la période d'essai : modifications gratuites, mais les quotas de
     // création (1 CV freemium / 3 CV premium) restent en vigueur.
     if (VersionService.isCvTrialRunning && reason == PaymentReason.modification) {
@@ -83,7 +86,7 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
         return 'Vous avez atteint votre limite de création gratuite. '
             'Débloquez un emplacement supplémentaire pour créer un nouveau CV.';
       case PaymentReason.modification:
-        return 'La modification de vos CV existants nécessite un paiement unique de 500 F CFA par modification.';
+        return 'La modification de vos CV existants nécessite un paiement unique de ${VersionService.extraCvPriceCfa} F CFA par modification.';
       default:
         return '';
     }
@@ -346,9 +349,9 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        '500',
-                        style: TextStyle(
+                      Text(
+                        VersionService.extraCvPriceCfa.toString(),
+                        style: const TextStyle(
                           fontSize: 40,
                           fontWeight: FontWeight.w900,
                           color: Color(0xFFF97316),
@@ -457,14 +460,14 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
                                 strokeWidth: 2.5,
                               ),
                             )
-                          : const Row(
+                          : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.payment_rounded, size: 20),
-                                SizedBox(width: 10),
+                                const Icon(Icons.payment_rounded, size: 20),
+                                const SizedBox(width: 10),
                                 Text(
-                                  'Payer 500 F CFA',
-                                  style: TextStyle(
+                                  'Payer ${VersionService.extraCvPriceCfa} F CFA',
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
                                   ),

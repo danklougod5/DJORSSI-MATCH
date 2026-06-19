@@ -42,16 +42,16 @@ class CvModel {
   factory CvModel.mock() {
     return CvModel(
       personalInfo: CvPersonalInfo(
-        fullName: 'Jean Dupont',
+        fullName: 'Koffi Kouadio',
         jobTitle: 'Développeur Mobile Flutter',
         summary: 'Développeur passionné avec plus de 5 ans d\'expérience dans la création d\'applications mobiles performantes et intuitives. Spécialisé en Flutter et architecture propre.',
         showAvatar: true,
         layout: 'left',
         contactFields: [
-          CvContactField(id: 'email', iconName: 'email', label: 'Email', value: 'jean.dupont@email.com'),
+          CvContactField(id: 'email', iconName: 'email', label: 'Email', value: 'koffi.kouadio@email.com'),
           CvContactField(id: 'phone', iconName: 'phone', label: 'Téléphone', value: '+225 07 00 00 00 00'),
           CvContactField(id: 'location', iconName: 'location', label: 'Adresse', value: 'Abidjan, Côte d\'Ivoire'),
-          CvContactField(id: 'link', iconName: 'link', label: 'LinkedIn', value: 'linkedin.com/in/jeandupont'),
+          CvContactField(id: 'link', iconName: 'link', label: 'LinkedIn', value: 'linkedin.com/in/koffikouadio'),
         ],
       ),
       skills: '• Flutter & Dart\n• React Native & JavaScript\n• Native iOS (Swift) & Android (Kotlin)\n• State Management (Bloc, Riverpod, Provider)\n• Clean Architecture & SOLID Principles\n• CI/CD (GitHub Actions, Fastlane)\n• Firebase, Supabase & REST APIs\n• Méthodes Agiles (Scrum/Kanban)',

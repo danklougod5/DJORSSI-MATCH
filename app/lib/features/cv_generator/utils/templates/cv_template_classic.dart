@@ -32,11 +32,11 @@ class CvTemplateClassic extends CvTemplateBase {
 
             if (cv.skills.isNotEmpty) ...[
               _buildSectionTitle('Compétences', primary, secondary),
-              buildBulletText(cv.skills, const PdfColor.fromInt(0xFF1F2937), primary, fontSize: 10, height: 1.4),
+              buildBulletText(cv.skills, const PdfColor.fromInt(0xFF1F2937), primary, fontSize: 10, height: 1.4, splitByDelimiterIfNoNewline: true),
               pw.SizedBox(height: 15),
             ],
 
-            if (cv.experiences.isNotEmpty) ...[
+            if (cv.experiences.isNotEmpty && cv.experiences.any((e) => e.isVisible)) ...[
               _buildSectionTitle('Expériences Professionnelles', primary, secondary),
               ...cv.experiences.where((e) => e.isVisible).map((e) => _buildExperienceItem(e, primary, secondary)),
               pw.SizedBox(height: 15),

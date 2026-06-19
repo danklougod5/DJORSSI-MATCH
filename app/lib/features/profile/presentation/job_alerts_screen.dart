@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,17 +27,50 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
   final FocusNode _searchFocus = FocusNode();
 
   List<String> _availableSectors = [];
+  StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadAlertsAndProfile();
+    _setupRealtime();
+  }
+
+  void _setupRealtime() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _profileSubscription = _supabase
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', userId)
+        .listen((data) {
+          if (data.isNotEmpty && mounted) {
+            final profile = data.first;
+            final isPremium = profile['is_premium'] ?? false;
+            final premiumUntilRaw = profile['premium_until'];
+            bool activePremium = isPremium;
+            if (isPremium && premiumUntilRaw != null) {
+              final premiumUntil = DateTime.parse(premiumUntilRaw);
+              activePremium = premiumUntil.isAfter(DateTime.now());
+            }
+            if (!VersionService.showPremium) {
+              activePremium = true;
+            }
+            setState(() {
+              _isPremium = activePremium;
+            });
+          }
+        }, onError: (e) {
+          debugPrint('JobAlertsScreen: profiles realtime error: $e');
+        });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocus.dispose();
+    _profileSubscription?.cancel();
     super.dispose();
   }
 
@@ -122,6 +156,10 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
         } else {
           _isPremium = isPremium;
         }
+      }
+
+      if (!VersionService.showPremium) {
+        _isPremium = true;
       }
 
       // 3. Load alerts
@@ -840,7 +878,11 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => context.push('/premium'),
+                  onPressed: () => context.push('/premium').then((_) {
+                    if (mounted) {
+                      _loadAlertsAndProfile();
+                    }
+                  }),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF97316),
                     foregroundColor: Colors.white,

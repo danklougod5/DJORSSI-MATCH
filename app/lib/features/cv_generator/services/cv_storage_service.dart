@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:djossimatch/core/services/cv_quota_service.dart';
 import '../models/cv_model.dart';
 
 class CvStorageService {
@@ -30,6 +31,11 @@ class CvStorageService {
       return cv;
     } else {
       // Insert new
+      final quota = await CvQuotaService.canCreateCv();
+      if (!quota.allowed) {
+        throw Exception('Quota de création de CV atteint.');
+      }
+
       final response = await _supabase
           .from(_table)
           .insert(data)

@@ -55,7 +55,7 @@ serve(async (req) => {
     const reference = payload.data?.reference || payload.data?.id?.toString();
     const status = payload.data?.status;
 
-    if (event === "payment.success" || status === "completed") {
+    if (event === "payment.success" || event === "payment.completed" || status === "completed") {
         // Find the payment record
         const { data: payment, error: pError } = await supabase
             .from("payments")
@@ -137,6 +137,8 @@ serve(async (req) => {
             .from("payments")
             .update({ status: "FAILED" })
             .eq("pay_token", reference);
+    } else {
+        console.log(`Unhandled webhook event: ${event}, status: ${status}, reference: ${reference}`);
     }
 
     return new Response(JSON.stringify({ success: true }), {

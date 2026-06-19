@@ -58,6 +58,42 @@ serve(async (req) => {
     const userId = user.id;
     console.log(`Attempting to delete user: ${userId}`);
 
+    // Read body for feedback
+    let reason = "Non spécifié";
+    let feedback = "";
+    try {
+      const body = await req.json();
+      reason = body.reason || "Non spécifié";
+      feedback = body.feedback || "";
+    } catch (e) {
+      console.log("No JSON body or failed to parse body:", e);
+    }
+
+    // Fetch user details from profile to log before deletion
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('phone_number')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const phone = profile?.phone_number || "";
+    const email = user.email || "";
+
+    // Save feedback to delete_account_feedback
+    const { error: feedbackError } = await supabaseAdmin
+      .from('delete_account_feedback')
+      .insert({
+        user_id: userId,
+        phone_number: phone,
+        email: email,
+        reason: reason,
+        feedback: feedback
+      });
+    
+    if (feedbackError) {
+      console.error("Error saving feedback to DB:", feedbackError);
+    }
+
     // 4. Delete the user from Auth (This will trigger cascades if configured)
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 

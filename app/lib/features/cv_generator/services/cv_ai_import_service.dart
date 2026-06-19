@@ -85,21 +85,38 @@ class CvAiImportService {
     // Skills
     final skills = (json['skills'] ?? '').toString().trim();
 
+    // Helper to check if a string is empty or contains only dashes/spaces
+    bool isPlaceholder(String val) {
+      final clean = val.replaceAll(RegExp(r'^[-—–\s]+$'), '');
+      return clean.isEmpty;
+    }
+
     // Experiences
     final List<CvExperience> experiences = [];
     if (json['experiences'] != null && json['experiences'] is List) {
       for (final exp in json['experiences']) {
+        final jobTitle = (exp['jobTitle'] ?? '').toString().trim();
+        final company = (exp['company'] ?? '').toString().trim();
+        final description = (exp['description'] ?? '').toString().trim();
+        final location = (exp['location'] ?? '').toString().trim();
+        final startDate = (exp['startDate'] ?? '').toString().trim();
         final endDate = (exp['endDate'] ?? '').toString().trim();
+
+        // Skip completely empty or placeholder experiences
+        if (isPlaceholder(jobTitle) && isPlaceholder(company) && isPlaceholder(description)) {
+          continue;
+        }
+
         final isPresent = endDate.toLowerCase() == 'présent' || 
                           endDate.toLowerCase() == 'present' || 
                           endDate.toLowerCase() == 'actuel';
         experiences.add(CvExperience(
-          jobTitle: (exp['jobTitle'] ?? '').toString().trim(),
-          company: (exp['company'] ?? '').toString().trim(),
-          location: (exp['location'] ?? '').toString().trim(),
-          startDate: (exp['startDate'] ?? '').toString().trim(),
+          jobTitle: jobTitle,
+          company: company,
+          location: location,
+          startDate: startDate,
           endDate: endDate,
-          description: (exp['description'] ?? '').toString().trim(),
+          description: description,
           isVisible: true,
           isPresent: isPresent,
         ));
@@ -110,17 +127,32 @@ class CvAiImportService {
     final List<CvEducation> educations = [];
     if (json['educations'] != null && json['educations'] is List) {
       for (final edu in json['educations']) {
+        final degree = (edu['degree'] ?? '').toString().trim();
+        final institution = (edu['institution'] ?? '').toString().trim();
+        final description = (edu['description'] ?? '').toString().trim();
+        final location = (edu['location'] ?? '').toString().trim();
+        final startDate = (edu['startDate'] ?? '').toString().trim();
         final endDate = (edu['endDate'] ?? '').toString().trim();
+
+        // Skip completely empty, placeholder or dummy educations
+        if (isPlaceholder(degree) && isPlaceholder(institution) && isPlaceholder(description)) {
+          continue;
+        }
+        // Also skip if it doesn't have a valid degree or institution name (e.g. just a dash duplicate)
+        if (isPlaceholder(degree) && isPlaceholder(institution)) {
+          continue;
+        }
+
         final isPresent = endDate.toLowerCase() == 'présent' || 
                           endDate.toLowerCase() == 'present' || 
                           endDate.toLowerCase() == 'actuel';
         educations.add(CvEducation(
-          degree: (edu['degree'] ?? '').toString().trim(),
-          institution: (edu['institution'] ?? '').toString().trim(),
-          location: (edu['location'] ?? '').toString().trim(),
-          startDate: (edu['startDate'] ?? '').toString().trim(),
+          degree: degree,
+          institution: institution,
+          location: location,
+          startDate: startDate,
           endDate: endDate,
-          description: (edu['description'] ?? '').toString().trim(),
+          description: description,
           isVisible: true,
           isPresent: isPresent,
         ));
@@ -132,14 +164,20 @@ class CvAiImportService {
     if (json['projects'] != null && json['projects'] is List) {
       for (final proj in json['projects']) {
         final name = (proj['name'] ?? '').toString().trim();
-        if (name.isNotEmpty) {
-          projects.add(CvProject(
-            name: name,
-            role: (proj['role'] ?? '').toString().trim(),
-            date: (proj['date'] ?? '').toString().trim(),
-            description: (proj['description'] ?? '').toString().trim(),
-          ));
+        final role = (proj['role'] ?? '').toString().trim();
+        final description = (proj['description'] ?? '').toString().trim();
+        final date = (proj['date'] ?? '').toString().trim();
+
+        if (isPlaceholder(name) && isPlaceholder(description)) {
+          continue;
         }
+
+        projects.add(CvProject(
+          name: name,
+          role: role,
+          date: date,
+          description: description,
+        ));
       }
     }
 
@@ -148,7 +186,7 @@ class CvAiImportService {
     if (json['activities'] != null && json['activities'] is List) {
       for (final act in json['activities']) {
         final actStr = act.toString().trim();
-        if (actStr.isNotEmpty) {
+        if (actStr.isNotEmpty && !isPlaceholder(actStr)) {
           activities.add(actStr);
         }
       }

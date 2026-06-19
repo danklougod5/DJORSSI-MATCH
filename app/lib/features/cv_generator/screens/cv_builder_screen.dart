@@ -71,8 +71,14 @@ class _CvBuilderScreenState extends State<CvBuilderScreen> {
               IconButton(
                 icon: const Icon(Icons.visibility_outlined),
                 tooltip: 'Aperçu temporaire',
-                onPressed: () {
-                  context.push('/cv_preview?allow_edit=true', extra: _cvModel);
+                onPressed: () async {
+                  final result = await context.push<CvModel>('/cv_preview?allow_edit=true', extra: _cvModel);
+                  if (result != null && mounted) {
+                    setState(() {
+                      _cvModel = result;
+                    });
+                    _autoSave();
+                  }
                 },
               ),
             ],
@@ -141,11 +147,17 @@ class _CvBuilderScreenState extends State<CvBuilderScreen> {
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           final cvModelToUse = _cvModel;
                           ScaffoldMessenger.of(innerContext).hideCurrentSnackBar();
                           if (innerContext.mounted) {
-                            innerContext.push('/cv_preview?allow_edit=true', extra: cvModelToUse);
+                            final result = await innerContext.push<CvModel>('/cv_preview?allow_edit=true', extra: cvModelToUse);
+                            if (result != null && mounted) {
+                              setState(() {
+                                _cvModel = result;
+                              });
+                              _autoSave();
+                            }
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -182,6 +194,7 @@ class _CvBuilderScreenState extends State<CvBuilderScreen> {
       case 'timeline': return 'Chronologique';
       case 'creative': return 'Créatif';
       case 'elegant': return 'Élégant';
+      case 'executive': return 'Exécutif';
       default: return 'Classique';
     }
   }
@@ -472,8 +485,14 @@ class _CvBuilderScreenState extends State<CvBuilderScreen> {
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: ElevatedButton.icon(
-            onPressed: () {
-              context.push('/cv_preview?allow_edit=true', extra: _cvModel);
+            onPressed: () async {
+              final result = await context.push<CvModel>('/cv_preview?allow_edit=true', extra: _cvModel);
+              if (result != null && mounted) {
+                setState(() {
+                  _cvModel = result;
+                });
+                _autoSave();
+              }
             },
             icon: const Icon(Icons.picture_as_pdf),
             label: const Text('Voir le résultat final'),

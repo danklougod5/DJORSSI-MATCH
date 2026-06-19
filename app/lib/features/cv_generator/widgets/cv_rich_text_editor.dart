@@ -208,7 +208,7 @@ class _CvRichTextEditorState extends State<CvRichTextEditor> {
       if (widget.labelText != null) {
         systemContent += 'Le champ concerné est : "${widget.labelText}". ';
         if (widget.labelText!.toLowerCase().contains('compétence')) {
-          systemContent += 'Organise les compétences saisies par catégories logiques et claires, en utilisant des puces (•) pour chaque compétence ou sous-élément. Corrige l\'orthographe des technologies ou termes techniques. ';
+          systemContent += 'Propose une liste plate de compétences individuelles et précises, sans les regrouper par catégories, sans utiliser de deux-points (:) ou de parenthèses. Chaque compétence doit être courte, claire et être sur sa propre ligne précédée d\'une puce (•). Ne crée pas de sous-éléments. Corrige l\'orthographe des technologies ou termes techniques. ';
         } else if (widget.labelText!.toLowerCase().contains('expérience') || widget.labelText!.toLowerCase().contains('responsabilité')) {
           systemContent += 'Formate le contenu sous forme de liste à puces (•). Chaque puce doit impérativement commencer par un verbe d\'action fort (ex: "Concevoir", "Gérer", "Optimiser") ou un nom d\'action (ex: "Conception de...", "Gestion de...", "Optimisation de..."). Évite les tournures personnelles comme "Je" ou "Nous". Rend les phrases concises, percutantes et valorise les résultats et réalisations concrètes. ';
         } else if (widget.labelText!.toLowerCase().contains('projet')) {

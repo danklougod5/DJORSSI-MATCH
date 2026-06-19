@@ -42,12 +42,12 @@ class CvTemplateTimeline extends CvTemplateBase {
               _buildSectionTitle('Compétences', primary),
               pw.Padding(
                 padding: const pw.EdgeInsets.only(left: 12),
-                child: buildBulletText(cv.skills, textColor, primary, fontSize: 10, height: 1.4),
+                child: buildBulletText(cv.skills, textColor, primary, fontSize: 10, height: 1.4, splitByDelimiterIfNoNewline: true),
               ),
               pw.SizedBox(height: 20),
             ],
 
-            if (cv.experiences.isNotEmpty) ...[
+            if (cv.experiences.isNotEmpty && cv.experiences.any((e) => e.isVisible)) ...[
               _buildSectionTitle('Parcours Professionnel', primary),
               pw.Padding(
                 padding: const pw.EdgeInsets.only(left: 8),

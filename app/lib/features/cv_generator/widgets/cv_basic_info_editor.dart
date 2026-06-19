@@ -123,7 +123,7 @@ class _CvBasicInfoEditorState extends State<CvBasicInfoEditor> {
         body: {
           'action': 'polish_text',
           'text': text,
-          'systemContent': 'Tu es un expert en recrutement et en rédaction de CV. Ton rôle est de reformuler, polir et améliorer le profil/résumé professionnel de l\'utilisateur pour le rendre plus percutant, professionnel et vendeur. Garde le résumé au format paragraphe. Conserve la même langue (Français). Retourne UNIQUEMENT le texte corrigé et poli final, sans aucun commentaire ou texte d\'accompagnement.',
+          'systemContent': 'Tu es un expert en recrutement et en rédaction de CV. Ton rôle est de reformuler, polir et améliorer le résumé professionnel du candidat pour le rendre percutant et très naturel. Rédige impérativement à la PREMIÈRE PERSONNE DU SINGULIER ("Je", "Mon", "Mes") et jamais à la troisième personne. Évite absolument la "langue de bois" corporative et les clichés génériques d\'IA (comme "contribuer activement à la performance globale", "mettre mes compétences au service de", "recherche un poste stimulant"). Raconte simplement et humainement l\'expertise, les compétences pratiques du candidat et ce qu\'il apporte au quotidien. Garde le résumé au format paragraphe fluide de 3 phrases maximum. Conserve la même langue (Français). Retourne UNIQUEMENT le texte corrigé et poli final, sans aucun commentaire ou texte d\'accompagnement.',
         },
       ).timeout(const Duration(seconds: 30));
 
