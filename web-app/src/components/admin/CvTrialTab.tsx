@@ -17,7 +17,7 @@ import {
   Eye,
   FileSpreadsheet
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase, fetchProfilesInBatches } from '../../lib/supabase';
 
 interface CvTrialConfig {
   cv_trial_active: boolean;
@@ -122,15 +122,36 @@ const CvTrialTab: React.FC = () => {
     setIsLoadingCvData(true);
     setCvFetchError('');
     try {
-      // Fetch all CVs
-      const { data: cvs, error: cvsErr } = await supabase
-        .from('user_cvs')
-        .select('id, user_id, title, template_id, primary_color, secondary_color, created_at')
-        .order('created_at', { ascending: false });
+      // Fetch ALL CVs using pagination (Supabase limits to 1000 per request)
+      const PAGE_SIZE = 1000;
+      let allCvs: any[] = [];
+      let page = 0;
+      let hasMore = true;
 
-      if (cvsErr) throw cvsErr;
+      while (hasMore) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        
+        const { data: batch, error: batchErr } = await supabase
+          .from('user_cvs')
+          .select('id, user_id, title, template_id, primary_color, secondary_color, created_at')
+          .order('created_at', { ascending: false })
+          .range(from, to);
 
-      if (!cvs || cvs.length === 0) {
+        if (batchErr) throw batchErr;
+
+        if (batch && batch.length > 0) {
+          allCvs = allCvs.concat(batch);
+          hasMore = batch.length === PAGE_SIZE; // If we got a full page, there might be more
+          page++;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      console.log(`[CV Metrics] Fetched ${allCvs.length} total CVs across ${page} page(s)`);
+
+      if (allCvs.length === 0) {
         setCvUsers([]);
         setTemplateCounts({});
         setMetrics({
@@ -142,11 +163,11 @@ const CvTrialTab: React.FC = () => {
       }
 
       // Fetch unique user profiles
-      const userIds = Array.from(new Set(cvs.map((c: any) => c.user_id)));
-      const { data: profiles, error: profilesErr } = await supabase
-        .from('profiles')
-        .select('id, full_name, phone_number, is_premium, skills')
-        .in('id', userIds);
+      const userIds = Array.from(new Set(allCvs.map((c: any) => c.user_id))) as string[];
+      const { data: profiles, error: profilesErr } = await fetchProfilesInBatches(
+        userIds,
+        'id, full_name, phone_number, is_premium, skills'
+      );
 
       if (profilesErr) throw profilesErr;
 
@@ -159,7 +180,7 @@ const CvTrialTab: React.FC = () => {
       const cvUsersList: CvUser[] = [];
       const userCvGroups: Record<string, any[]> = {};
 
-      cvs.forEach((cv: any) => {
+      allCvs.forEach((cv: any) => {
         if (!userCvGroups[cv.user_id]) {
           userCvGroups[cv.user_id] = [];
         }
@@ -192,13 +213,13 @@ const CvTrialTab: React.FC = () => {
       setCvUsers(cvUsersList);
 
       // Compute metrics
-      const totalCvs = cvs.length;
+      const totalCvs = allCvs.length;
       const totalCreators = cvUsersList.length;
       const avgCvsPerCreator = totalCreators > 0 ? Number((totalCvs / totalCreators).toFixed(1)) : 0;
 
       // Compute template counts
       const counts: Record<string, number> = {};
-      cvs.forEach((c: any) => {
+      allCvs.forEach((c: any) => {
         const tId = c.template_id || 'classic';
         counts[tId] = (counts[tId] || 0) + 1;
       });

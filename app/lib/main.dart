@@ -13,7 +13,6 @@ import 'package:djossimatch/features/cv_generator/screens/cv_list_screen.dart';
 import 'package:djossimatch/core/routing/app_router.dart';
 import 'package:djossimatch/core/services/version_service.dart';
 import 'package:djossimatch/core/services/notification_service.dart';
-import 'package:djossimatch/core/services/announcement_service.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:upgrader/upgrader.dart';
@@ -138,9 +137,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     VersionService.showPremiumNotifier.addListener(_onPremiumChanged);
     VersionService.listenToChanges();
 
-    // Initialiser le gestionnaire global d'annonces
-    AnnouncementService.instance.initialize();
-
     // Vérifier la version, demander la permission ATT et mettre à jour le token de notification
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await VersionService.checkVersion(context);
@@ -158,7 +154,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void dispose() {
     VersionService.showPremiumNotifier.removeListener(_onPremiumChanged);
-    AnnouncementService.instance.dispose();
     super.dispose();
   }
 

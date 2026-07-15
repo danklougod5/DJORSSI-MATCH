@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mémoire - Djorssi-Match</title>
+    <style>
+        
+    @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+        --font-serif: 'Crimson Pro', 'Georgia', 'Times New Roman', serif;
+        --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+        --color-text: #1a1a1a;
+        --color-muted: #555555;
+        --color-primary: #1e3a8a; /* Deep Academic Blue */
+        --color-border: #e2e8f0;
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: var(--font-serif);
+        font-size: 12pt;
+        line-height: 1.6;
+        color: var(--color-text);
+        background-color: #ffffff;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Conteneur principal simulant une page de mémoire */
+    .memoire-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 50px 70px;
+        background: #ffffff;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        border-radius: 8px;
+    }
+
+    /* Règle spécifique pour l'impression physique et PDF */
+    @media print {
+        body {
+            font-size: 12pt;
+            background-color: #ffffff;
+        }
+        .memoire-container {
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+            box-shadow: none;
+            border-radius: 0;
+        }
+        .page-break {
+            page-break-before: always;
+            break-before: page;
+        }
+        a {
+            text-decoration: none;
+            color: var(--color-text);
+        }
+        .no-print {
+            display: none;
+        }
+    }
+
+    /* Typographie */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: var(--font-sans);
+        color: var(--color-primary);
+        font-weight: 700;
+        line-height: 1.3;
+        margin-top: 1.5em;
+        margin-bottom: 0.5em;
+        page-break-after: avoid;
+    }
+
+    h1 {
+        font-size: 24pt;
+        text-align: center;
+        margin-top: 2em;
+        margin-bottom: 1.5em;
+        text-transform: uppercase;
+        border-bottom: 2px solid var(--color-primary);
+        padding-bottom: 15px;
+    }
+
+    h2 {
+        font-size: 18pt;
+        border-bottom: 1px solid var(--color-border);
+        padding-bottom: 8px;
+        margin-top: 2.2em;
+    }
+
+    h3 {
+        font-size: 14pt;
+        margin-top: 1.8em;
+    }
+
+    h4 {
+        font-size: 12pt;
+        color: var(--color-muted);
+        font-weight: 600;
+    }
+
+    p {
+        margin-top: 0;
+        margin-bottom: 1.2em;
+        text-align: justify;
+        text-indent: 1.5em; /* Retrait de première ligne typiquement académique */
+    }
+
+    p.no-indent {
+        text-indent: 0;
+    }
+
+    /* Listes */
+    ul, ol {
+        margin-top: 0;
+        margin-bottom: 1.2em;
+        padding-left: 2em;
+    }
+
+    li {
+        margin-bottom: 0.5em;
+        text-align: justify;
+    }
+
+    /* Citations / Extraits */
+    blockquote {
+        font-style: italic;
+        border-left: 4px solid var(--color-primary);
+        margin: 1.5em 0;
+        padding: 0.5em 1.5em;
+        color: var(--color-muted);
+        background-color: #f8fafc;
+        text-indent: 0;
+    }
+    
+    blockquote p {
+        text-indent: 0;
+        margin-bottom: 0;
+    }
+
+    /* Tableaux */
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 2em 0;
+        font-size: 11pt;
+        font-family: var(--font-sans);
+        page-break-inside: avoid;
+    }
+
+    th, td {
+        border: 1px solid var(--color-border);
+        padding: 10px 12px;
+        text-align: left;
+    }
+
+    th {
+        background-color: #f1f5f9;
+        font-weight: 600;
+        color: var(--color-primary);
+    }
+
+    tr:nth-child(even) {
+        background-color: #f8fafc;
+    }
+
+    /* Blocs de code (Mermaid et placeholders de captures) */
+    pre {
+        background-color: #f8fafc;
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        padding: 15px;
+        overflow-x: auto;
+        font-family: Consolas, Monaco, 'Courier New', monospace;
+        font-size: 10pt;
+        margin: 1.5em 0;
+        page-break-inside: avoid;
+    }
+
+    code {
+        font-family: Consolas, Monaco, 'Courier New', monospace;
+        background-color: #f1f5f9;
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-size: 9.5pt;
+    }
+
+    pre code {
+        background-color: transparent;
+        padding: 0;
+        font-size: 10pt;
+    }
+
+    /* Placeholders de capture d'écran */
+    .screenshot-placeholder {
+        background: #fdf2f8;
+        border: 2px dashed #db2777;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 2em 0;
+        text-align: center;
+        font-family: var(--font-sans);
+        font-size: 10.5pt;
+        color: #be185d;
+        page-break-inside: avoid;
+    }
+    
+    .screenshot-placeholder h5 {
+        margin: 0 0 8px 0;
+        color: #be185d;
+        font-size: 11pt;
+        text-transform: uppercase;
+        font-weight: 700;
+    }
+    
+    .screenshot-placeholder p {
+        text-align: center;
+        text-indent: 0;
+        margin: 0;
+        font-style: italic;
+    }
+
+    /* Panneau d'actions flottant */
+    .action-panel {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 1000;
+        font-family: var(--font-sans);
+    }
+
+    .action-button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 20px;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 10pt;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transition: all 0.2s ease;
+        text-decoration: none;
+        border: none;
+    }
+
+    .action-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.22);
+    }
+
+    .btn-pdf {
+        background-color: #dc2626; /* Rouge PDF */
+        color: white;
+    }
+    .btn-pdf:hover {
+        background-color: #b91c1c;
+    }
+
+    .btn-word {
+        background-color: #2563eb; /* Bleu Word */
+        color: white;
+    }
+    .btn-word:hover {
+        background-color: #1d4ed8;
+    }
+
+    .btn-print {
+        background-color: #0d9488; /* Vert Émeraude */
+        color: white;
+    }
+    .btn-print:hover {
+        background-color: #0f766e;
+    }
+
+    .action-button svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+    }
+
+    /* Style spécifique pour Mermaid UML */
+    .mermaid {
+        display: flex;
+        justify-content: center;
+        margin: 2em 0;
+        background: #fafafa;
+        padding: 20px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        page-break-inside: avoid;
+        width: 100%;
+        overflow-x: auto;
+    }
+    
+    .mermaid svg {
+        max-width: 100% !important;
+        height: auto;
+    }
+    </css_styles>
+    
+    </style>
+</head>
+<body>
+    <div class="action-panel no-print">
+        <a class="action-button btn-pdf" href="memoire_complet.pdf" download="memoire_complet.pdf" title="Télécharger le mémoire au format PDF officiel">
+            <svg viewBox="0 0 24 24">
+                <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+            </svg>
+            Télécharger le PDF
+        </a>
+        <a class="action-button btn-word" href="memoire_complet.docx" download="memoire_complet.docx" title="Télécharger le mémoire au format Microsoft Word">
+            <svg viewBox="0 0 24 24">
+                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+            </svg>
+            Télécharger en Word (.docx)
+        </a>
+        <button class="action-button btn-print" onclick="window.print()" title="Imprimer ou enregistrer manuellement le mémoire">
+            <svg viewBox="0 0 24 24">
+                <path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/>
+            </svg>
+            Imprimer / PDF Manuel
+        </button>
+    </div>
+
+    <div class="memoire-container">
+        <div style="text-align: center; font-family: var(--font-serif); margin-top: 50px;">
+    <h2>INSTITUT IVOIRIEN DE TECHNOLOGIE</h2>
+    <br><br><br><br>
+    <h1 style="border-bottom: none; font-size: 20pt; line-height: 1.4;">CONCEPTION ET IMPLÉMENTATION D'UNE PLATEFORME DE RECRUTEMENT PRÉDICTIVE BASÉE SUR UN ALGORITHME DE MATCHING : <br>APPROCHE MOBILE-FIRST AVEC FLUTTER ET BACKEND SERVERLESS SUPABASE</h1>
+    <br><br><br>
+    <p style="text-align: center; font-size: 14pt; font-weight: bold; text-indent: 0;">Projet : Djorssi-Match</p>
+    <br><br><br><br><br>
+</div>
+
+<div class="page-break" style="page-break-before: always; break-before: page;"></div>
+
+<h2 id="dedicaces">DÉDICACES</h2>
+<p><em>[Espace réservé pour vos dédicaces. Par exemple : À ma famille, pour leur soutien inconditionnel tout au long de mes études...]</em></p>
+<div class="page-break" style="page-break-before: always; break-before: page;"></div>
+
+<h2 id="contenu">CONTENU</h2>
+<p>Dédicaces ............................................................................ (page en romain)
+Remerciements ........................................................................ (page en romain)
+Introduction Générale ................................................................ 1</p>
+<p><strong>PREMIÈRE PARTIE : ÉTUDE ET BESOINS</strong> ............................................... page</p>
+<p>Chapitre 1 : Étude théorique et état de l'art ........................................ page
+Chapitre 2 : Analyse et spécifications ............................................... page</p>
+<p><strong>DEUXIÈME PARTIE : CONCEPTION ET ARCHITECTURE</strong> ..................................... page</p>
+<p>Chapitre 3 : Conception et modélisation .............................................. page
+Chapitre 4 : Écosystème technologique ................................................ page</p>
+<p><strong>TROISIÈME PARTIE : IMPLÉMENTATION ET TESTS</strong> ....................................... page</p>
+<p>Chapitre 5 : Fonctionnalités avancées ................................................ page
+Chapitre 6 : Tests et mise en production ............................................. page</p>
+<p>Conclusion Générale .................................................................. page
+Bibliographie ........................................................................ page
+Annexes / Appendice .................................................................. page</p>
+<div class="page-break" style="page-break-before: always; break-before: page;"></div>
+
+<div class="page-break"></div>
+<h2 id="introduction-generale">INTRODUCTION GÉNÉRALE</h2>
+<h3 id="1-contexte-de-letude-la-transformation-numerique-du-marche-de-lemploi-en-afrique-et-en-cote-divoire">1. Contexte de l'étude : La transformation numérique du marché de l'emploi en Afrique et en Côte d'Ivoire</h3>
+<p>L'Afrique subsaharienne, et plus particulièrement la Côte d'Ivoire, traverse une période de mutation économique, démographique et technologique sans précédent (Banque Mondiale 2024). Caractérisé par une vitalité démographique exceptionnelle, le continent africain abrite la population la plus jeune du monde, constituant un atout économique majeur mais aussi un défi structurel colossal. En Côte d'Ivoire, cette dynamique est particulièrement prononcée : plus de 60 % de la population est âgée de moins de 25 ans. Selon les données récentes du gouvernement ivoirien et des institutions économiques internationales, le pays doit générer entre 200 000 et 250 000 emplois formels chaque année pour absorber l'afflux constant de nouveaux diplômés sur le marché du travail.</p>
+<p>Cependant, le marché de l'emploi ivoirien se heurte à des dysfonctionnements structurels profonds. Plus de 90 % des emplois actifs se situent aujourd'hui dans le secteur informel, caractérisé par une forte précarité, des revenus instables et une absence de couverture sociale ou de protection juridique. De plus, les employeurs dénoncent régulièrement une inadéquation qualitative croissante entre les compétences issues des formations académiques traditionnelles et les besoins réels des entreprises modernes, en particulier dans les secteurs porteurs tels que le numérique, l'agro-industrie, le BTP, la logistique et les services financiers.</p>
+<p>Parallèlement à cette pression démographique et économique, la Côte d'Ivoire connaît une révolution numérique fulgurante. Les statistiques récentes de l'Autorité de Régulation des Télécommunications/TIC de Côte d'Ivoire (ARTCI) révèlent un taux de pénétration de la téléphonie mobile dépassant les 180 %. Le taux de pénétration d'Internet, tiré par la démocratisation des smartphones, de la 3G, de la 4G et de la mise en œuvre progressive de la 5G, avoisine les 45 %, totalisant plus de 13 millions d'utilisateurs actifs d'Internet. Ce bond technologique modifie radicalement les modes de consommation, de communication et, inévitablement, les méthodes de recherche d'emploi.</p>
+<p>Dans ce contexte, le recrutement 2.0 (ou l'e-recrutement) s'est progressivement imposé. Des plateformes mondiales comme LinkedIn ou des solutions régionales telles que Novojob et EduCarriere ont numérisé la publication d'offres d'emploi. Néanmoins, la simple numérisation des offres ne suffit plus à résoudre les dysfonctionnements du marché.</p>
+<h3 id="2-problematique-et-lacune-de-recherche-linefficacite-des-methodes-de-recherche-demploi-classiques">2. Problématique et lacune de recherche : L'inefficacité des méthodes de recherche d'emploi classiques</h3>
+<p>Malgré l'existence de plateformes d'offres d'emploi numérisées, le processus de recrutement reste perçu par la majorité des acteurs comme lent, opaque et hautement inefficace. La lacune méthodologique majeure des solutions actuelles réside dans leur incapacité à traiter de manière automatisée, sémantique et mobile l'adéquation en temps réel entre les profils locaux et les offres d'emploi, perpétuant ainsi une forte asymétrie de l'information.</p>
+<p><strong>Du point de vue du candidat :</strong>
+Le chercheur d'emploi ivoirien fait face à ce qui est communément appelé le "trou noir" des candidatures. Le processus classique nécessite de remplir de longs formulaires web (souvent peu optimisés pour les téléphones mobiles), de téléverser des Curriculum Vitae (CV) au format PDF, et de rédiger des lettres de motivation standardisées. Une fois la candidature envoyée, l'absence de retour est la norme. Le manque de feedback engendre une perte de temps considérable, un épuisement psychologique et une forte anxiété chez les jeunes diplômés. De plus, sur des réseaux sociaux populaires comme Facebook ou WhatsApp, les candidats sont exposés à une prolifération d'offres frauduleuses (scams) difficiles à vérifier, qui abusent de leur vulnérabilité financière.</p>
+<p><strong>Du point de vue du recruteur :</strong>
+Les entreprises et les départements de Ressources Humaines (RH) souffrent du phénomène inverse : la sur-sollicitation. La facilité d'envoi de CV par e-mail ou via les portails d'emploi génère un volume incontrôlable de candidatures non qualifiées. Les recruteurs passent un temps disproportionné à trier manuellement des centaines de candidatures hors sujet. Cette asymétrie de l'information (les candidats ne savent pas ce que le recruteur veut vraiment, le recruteur n'a pas le temps de découvrir le véritable potentiel d'un candidat) crée une friction majeure.</p>
+<p>La problématique centrale de ce mémoire peut donc se résumer par la question de recherche suivante :
+<strong>Comment concevoir et implémenter une solution technologique intégrée capable de réduire de manière drastique les frictions entre les recruteurs et les chercheurs d'emploi, tout en s'adaptant aux réalités d'un marché fortement mobile et en automatisant la qualification des profils ?</strong></p>
+<h3 id="3-importance-et-justification-de-la-recherche-linteret-pratique-de-djorssi-match">3. Importance et justification de la recherche : L'intérêt pratique de "Djorssi-Match"</h3>
+<p>L'importance de cette étude réside dans sa capacité à proposer une réponse technique et ergonomique directe à l'asymétrie informationnelle du marché du travail ivoirien. Les applications pratiques de cette recherche sont immédiates et répondent directement à la question « Et alors ? » de l'effort de développement : réduire le délai moyen de recrutement pour les PME ivoiriennes, fournir aux chercheurs d'emploi un canal transparent et rassurant pour postuler via leur équipement technologique principal (le smartphone), et sécuriser les opportunités professionnelles en éliminant les offres frauduleuses.</p>
+<p>Face à cette problématique, ce projet de mémoire a pour ambition de présenter <strong>Djorssi-Match</strong>, une plateforme de recrutement de nouvelle génération conçue spécifiquement pour adresser les réalités locales tout en utilisant des paradigmes technologiques de pointe.</p>
+<p><strong>L'objectif principal</strong> de ce travail est de concevoir, modéliser et implémenter un algorithme de matching intelligent intégré au sein d'une architecture applicative "mobile-first" et "Serverless".</p>
+<p>De manière plus détaillée, les <strong>objectifs spécifiques</strong> sont les suivants :
+1. <strong>Éliminer la friction de candidature</strong> en remplaçant les longs formulaires par une expérience utilisateur (UX) ludique et instantanée, inspirée des applications de rencontre (le "Swipe-to-Apply").
+2. <strong>Automatiser le tri pour les recruteurs</strong> via un algorithme de matching prédictif et heuristique qui calcule un score de compatibilité entre le profil du candidat et les exigences de l'offre.
+3. <strong>Restaurer le lien humain</strong> en favorisant un contact direct (notamment via WhatsApp, e-mail ou des appels téléphoniques) une fois qu'un "match" est validé, brisant ainsi le silence habituel des processus de recrutement.
+4. <strong>Alimenter la base de données de manière autonome</strong> grâce à un moteur de "Scraping" intelligent, couplé à des modèles d'Intelligence Artificielle (IA) locaux, permettant de contourner le problème du "démarrage à froid" (Cold Start Problem).
+5. <strong>Démocratiser l'accès aux services premium</strong> en proposant un modèle Freemium avec intégration de solutions de paiement par Mobile Money adaptées aux usages locaux en Côte d'Ivoire.</p>
+<p>Ce projet ne se contente pas de proposer un énième "Job Board" (tableau d'offres d'emploi). L'innovation majeure de "Djorssi-Match" réside dans son changement de paradigme cognitif, ergonomique et technologique. En adoptant une approche <strong>"Mobile-First"</strong>, l'application s'aligne sur l'équipement technologique principal de la population ivoirienne (le smartphone). En introduisant le modèle de <strong>"Swipe"</strong>, l'application gamifie un processus historiquement anxiogène, transformant la corvée de la recherche d'emploi en une action fluide, rapide et presque divertissante. D'un point de vue technologique, le choix de <strong>Supabase</strong> en tant que Backend-as-a-Service (BaaS) permet une scalabilité exceptionnelle et une gestion en temps réel (Real-time). L'utilisation d'un algorithme de matching intégré directement en base de données ou via des fonctions intermédiaires permet de garantir un temps de réponse très faible (latence inférieure à 200 millisecondes), une contrainte critique pour maintenir l'engagement de l'utilisateur lors de l'action rapide du "Swipe". Enfin, "Djorssi-Match" propose un modèle d'affaires "Freemium" hybride, qui démocratise l'accès à l'information tout en proposant des fonctionnalités avancées monétisables par Mobile Money, assurant ainsi la viabilité économique de la plateforme.</p>
+<h3 id="4-hypothese-de-travail">4. Hypothèse de travail</h3>
+<p>Pour répondre à notre question de recherche et orienter notre démarche, nous formulons l'hypothèse suivante :
+<strong>Notre hypothèse de travail est que l'intégration d'une ergonomie "Swipe-to-Apply" couplée à un algorithme de matching prédictif basé sur le contenu, sous une architecture Serverless hautement optimisée, permet de réduire les frictions de recrutement de manière significative et d'optimiser l'adéquation profil-emploi en temps réel sur un marché fortement orienté mobile.</strong>
+Cette hypothèse repose sur le postulat que l'élimination des barrières administratives classiques au profit d'un geste d'engagement rapide ("Swipe") et le tri automatisé direct par le calcul d'un score de compatibilité réduisent la latence de traitement des dossiers et suppriment le sentiment de "trou noir" des candidatures par l'activation d'un contact direct post-match.</p>
+<h3 id="5-perimetre-de-letude-et-methodologie-de-travail">5. Périmètre de l'étude et méthodologie de travail</h3>
+<p>Ce mémoire couvre l'intégralité du cycle de vie du développement logiciel (Software Development Life Cycle), de la conception théorique à la mise en production d'un écosystème complet.</p>
+<p>Le périmètre de notre étude englobe quatre composantes logicielles interconnectées :
+- <strong>Une Application Mobile (Frontend B2C) :</strong> Développée avec le framework <strong>Flutter</strong> de Google. Elle cible les chercheurs d'emploi, avec une interface réactive, une gestion d'état légère et réactive et une architecture propre (Clean Architecture).
+- <strong>Une Application Web (Frontend B2B/Admin) :</strong> Développée en <strong>React</strong> (Vite). Elle sert de tableau de bord d'administration pour la gestion des offres, la modération et l'analyse statistique.
+- <strong>Un Backend "Serverless" :</strong> Hébergé sur <strong>Supabase</strong> (basé sur PostgreSQL). Il gère la logique de la base de données, la sécurité granulaire via les Row Level Security (RLS), les Edge Functions pour les tâches asynchrones et l'authentification sécurisée par e-mail et OTP.
+- <strong>Un Module d'Automatisation (Scraper) :</strong> Développé en <strong>Python</strong>, ce module extrait, nettoie et qualifie automatiquement les offres d'emploi depuis diverses sources publiques (comme EduCarriere, Emploi.ci, RMO JobCenter, ProJobIvoire) en utilisant des LLM (Large Language Models) locaux pour la normalisation sémantique des données.</p>
+<p>La méthodologie adoptée s'appuie sur une démarche itérative et incrémentale. L'étude commencera par un état de l'art exhaustif, suivi d'une phase de spécification des besoins. Nous procéderons ensuite à la modélisation UML (Unified Modeling Language) de la solution, avant de détailler l'implémentation technique et les phases de tests.</p>
+<h3 id="6-structure-du-document">6. Structure du document</h3>
+<p>Le présent document s'organise autour de six chapitres principaux :
+- <strong>Le Chapitre I</strong> présente l'étude théorique et l'état de l'art, en analysant l'évolution du recrutement 2.0, les concepts de filtrage algorithmique, l'acceptation du mobile en Afrique et l'apport de la gamification.
+- <strong>Le Chapitre II</strong> est consacré à l'analyse et à la spécification des besoins fonctionnels et non fonctionnels, posant les bases de la solution à travers des scénarios d'utilisation clairs.
+- <strong>Le Chapitre III</strong> détaille la conception architecturale, la modélisation UML, le schéma relationnel conceptuel de la base de données et la formalisation mathématique de l'algorithme de matching.
+- <strong>Le Chapitre IV</strong> expose de manière exhaustive l'écosystème technologique mis en œuvre. Chaque technologie utilisée (Flutter, Supabase, Python, Ollama, etc.) fait l'objet d'une description théorique et structurelle approfondie.
+- <strong>Le Chapitre V</strong> approfondit l'implémentation de fonctionnalités complexes telles que la gestion des paiements par Mobile Money, les notifications Push FCM, le stockage sécurisé des CV et la recherche "Full-text".
+- <strong>Le Chapitre VI</strong>, enfin, aborde la stratégie de tests (unitaires, d'intégration et de charge), le pipeline d'intégration continue (CI/CD) et l'évaluation globale du système avant de clore par une conclusion générale et des perspectives de recherche.</p>
+<hr />
+<div class="page-break"></div>
+<h2 id="chapitre-i-etude-theorique-et-etat-de-lart">CHAPITRE I : ÉTUDE THÉORIQUE ET ÉTAT DE L'ART</h2>
+<p>L'objectif de ce chapitre est de dresser un panorama exhaustif des concepts théoriques, technologiques et ergonomiques qui sous-tendent le domaine du recrutement numérique. En nous appuyant sur une revue de la littérature et une analyse comparative des solutions existantes, nous justifierons les choix paradigmatiques qui ont conduit à la conception de "Djorssi-Match".</p>
+<h3 id="11-le-recrutement-20-evolution-des-plateformes-demploi">1.1. Le recrutement 2.0 : Évolution des plateformes d'emploi</h3>
+<p>Le concept de recrutement a subi de profondes mutations au cours des deux dernières décennies, transitant de méthodes traditionnelles (petites annonces dans la presse, affichage physique, cooptation directe) vers un modèle hautement numérisé, communément appelé "Recrutement 2.0" ou "e-recrutement".</p>
+<h4 id="111-de-le-recrutement-passif-au-recrutement-proactif">1.1.1. De l'e-recrutement passif au recrutement proactif</h4>
+<p>La première génération des sites d'emploi (Job Boards 1.0) fonctionnait sur un modèle passif : les entreprises publiaient des annonces et attendaient que les candidats postulent via des formulaires lourds ou des envois d'e-mails. Ce modèle reproduisait numériquement les "petites annonces" papier.</p>
+<p>L'avènement du Recrutement 2.0 a été marqué par l'interactivité et l'émergence des réseaux sociaux professionnels. Des plateformes comme LinkedIn ont inversé la dynamique en permettant aux recruteurs de "chasser" activement des candidats (sourcing) grâce à la constitution de bases de données de profils (les CV-thèques en ligne). Le candidat est passé du statut de "demandeur" passif à celui de "talent" qu'il faut séduire, instaurant les bases de la notion de "Marque Employeur".</p>
+<h4 id="112-le-recrutement-30-et-lere-de-la-donnee">1.1.2. Le recrutement 3.0 et l'ère de la donnée</h4>
+<p>Aujourd'hui, nous assistons à la transition vers le "Recrutement 3.0", caractérisé par l'exploitation massive des données (Big Data) et de l'Intelligence Artificielle (IA). L'objectif n'est plus seulement de stocker des CV, mais de les comprendre sémantiquement, d'analyser le comportement des candidats et de prédire la réussite d'une embauche. C'est dans cette troisième ère que s'inscrit la volonté d'automatiser et de fiabiliser la mise en relation entre l'offre et la demande via des algorithmes de recommandation.</p>
+<h3 id="12-les-algorithmes-de-recommandation">1.2. Les algorithmes de recommandation</h3>
+<p>Les systèmes de recommandation sont des sous-classes de systèmes de filtrage de l'information qui cherchent à prédire la "note" ou la "préférence" qu'un utilisateur attribuerait à un élément (Adomavicius &amp; Tuzhilin 2005). Dans le contexte du recrutement, "l'élément" est une offre d'emploi ou un candidat. Il existe principalement deux approches algorithmiques dominantes.</p>
+<h4 id="121-filtrage-collaboratif-vs-filtrage-base-sur-le-contenu">1.2.1. Filtrage collaboratif vs Filtrage basé sur le contenu</h4>
+<p><strong>Le Filtrage Basé sur le Contenu (Content-Based Filtering) :</strong>
+Cette approche recommande des éléments en se basant sur la comparaison des attributs intrinsèques de l'élément avec le profil de l'utilisateur. Dans le cadre de Djorssi-Match, il s'agit de comparer les compétences (skills), le secteur d'activité, la localisation et les prétentions salariales du candidat avec les prérequis décrits dans l'offre d'emploi (titre, mots-clés, description).
+- <em>Avantages :</em> Il ne nécessite pas de données historiques d'autres utilisateurs. Il est donc très efficace pour surmonter le problème du "démarrage à froid" (Cold Start Problem) pour les nouvelles offres d'emploi fraîchement importées par un scraper.
+- <em>Inconvénients :</em> Il peut souffrir d'overspécialisation, enfermant le candidat dans une bulle de recommandations strictes (un développeur web ne se verra proposer que des offres contenant exactement les mots "développeur web").</p>
+<p><strong>Le Filtrage Collaboratif (Collaborative Filtering) :</strong>
+Cette approche repose sur l'historique d'interactions et les similarités entre utilisateurs. Elle part du postulat que si le Candidat A et le Candidat B ont postulé aux mêmes offres par le passé, une nouvelle offre qui intéresse le Candidat B a une forte probabilité d'intéresser le Candidat A.
+- <em>Avantages :</em> Permet la sérendipité (découvertes inattendues) et s'affranchit de la nécessité d'analyser parfaitement le contenu textuel des offres.
+- <em>Inconvénients :</em> Souffre lourdement du "démarrage à froid". Si un utilisateur ou une offre est nouveau sur la plateforme et n'a aucune interaction (aucun "Swipe"), le système est incapable de formuler une recommandation.</p>
+<p><em>Choix architectural :</em> Pour Djorssi-Match, le choix s'est porté sur un <strong>Filtrage basé sur le contenu</strong> augmenté par des règles heuristiques (gestion des synonymes, pondération de l'intitulé du poste vs la description, et pénalités de faux-positifs) afin de garantir une précision immédiate dès la création d'un profil, s'inscrivant ainsi dans la lignée des modèles récents d'appariement algorithmique appliqués aux ressources humaines (Malik &amp; Hu 2025).</p>
+<h4 id="122-le-concept-de-matching-en-temps-reel-et-semantique">1.2.2. Le concept de "Matching" en temps réel et sémantique</h4>
+<p>Le matching en temps réel implique que les scores de compatibilité soient recalculés dynamiquement à chaque modification de l'offre ou du profil. Avec l'architecture Serverless (Supabase) choisie, lorsqu'un utilisateur ajoute une compétence "Flutter" à son profil, la base de données PostgreSQL évalue instantanément son nouveau score de compatibilité avec des milliers d'offres en base. Ce traitement nécessite des indexations performantes (comme la recherche Full-Text vectorielle <code>tsvector</code>) pour garantir une latence inférieure à 200 ms, indispensable à la fluidité de l'expérience utilisateur.</p>
+<p>À plus long terme, la recherche s'oriente vers le <strong>Matching Sémantique Vectoriel</strong> (via l'extension <code>pgvector</code> de PostgreSQL). Cette technologie convertit les compétences et les offres en vecteurs mathématiques (Embeddings) de plusieurs centaines de dimensions. L'algorithme calcule ensuite la similarité cosinus entre le vecteur candidat et le vecteur offre, permettant de matcher des profils sur le sens profond des concepts plutôt que sur la stricte présence orthographique des mots-clés (par exemple, associer "conception mobile" et "développement iOS" de façon autonome).</p>
+<h3 id="13-lexperience-utilisateur-ux-dans-le-recrutement">1.3. L'expérience utilisateur (UX) dans le recrutement</h3>
+<p>L'évolution technologique des algorithmes ne peut être exploitée que si elle est servie par une interface utilisateur (UI) et une expérience utilisateur (UX) optimales.</p>
+<h4 id="131-limpact-de-la-gamification-le-modele-swipe-to-apply">1.3.1. L'impact de la "gamification" : Le modèle Swipe-to-Apply</h4>
+<p>La gamification consiste à utiliser des concepts et éléments de design de jeu dans des contextes non ludiques pour susciter l'engagement (Deterding et al. 2011). Dans le recrutement, le modèle "Swipe-to-Apply" (Balayer pour postuler) popularisé initialement par l'application de rencontre Tinder, représente une véritable révolution ergonomique.</p>
+<p>En remplaçant les formulaires chronophages par un geste simple (Swipe à droite pour postuler, Swipe à gauche pour ignorer), la charge cognitive du candidat est drastiquement réduite. Les avantages sont multiples :
+- <strong>Réduction de la friction :</strong> Le candidat postule "On-the-go", dans les transports ou pendant des moments de pause.
+- <strong>Micro-engagement :</strong> Le feedback visuel immédiat (le "Match") crée une boucle de dopamine qui encourage l'utilisateur à continuer d'explorer les offres, augmentant ainsi le temps passé sur l'application.
+- <strong>Réponse au phénomène d'anxiété :</strong> La recherche d'emploi est psychologiquement éprouvante. Le design ludique dédramatise le processus de candidature.</p>
+<p>Toutefois, la limite de ce modèle réside dans le risque de candidatures "impulsives" et non qualifiées. C'est pourquoi le Swipe doit impérativement être couplé à un <strong>algorithme de matching strict en amont</strong>, afin de ne présenter au candidat que des offres pour lesquelles il a une forte compatibilité.</p>
+<h4 id="132-le-modele-tam-technology-acceptance-model-applique-au-mobile-en-afrique">1.3.2. Le modèle TAM (Technology Acceptance Model) appliqué au Mobile en Afrique</h4>
+<p>Le modèle TAM (Technology Acceptance Model) formule que l'adoption d'une technologie dépend de deux facteurs principaux : l'utilité perçue et la facilité d'utilisation perçue (Venkatesh et al. 2003). En Afrique subsaharienne, et particulièrement en Côte d'Ivoire, l'utilité perçue d'une plateforme d'emploi mobile est maximale en raison du taux élevé de chômage des jeunes. Cependant, la facilité d'utilisation est souvent compromise par des barrières techniques : coût élevé de la bande passante Internet, fluctuations de la couverture réseau (zones blanches ou 3G dégradée), et manque d'expérience avec les interfaces complexes.</p>
+<p>L'approche "Mobile-First" et "Offline-First" (cache local) de Djorssi-Match résout cette équation. En stockant localement le flux de cartes de manière asynchrone, l'application fonctionne même lors de coupures réseau momentanées. De plus, l'authentification par code OTP e-mail élimine la nécessité de mémoriser et de saisir des mots de passe complexes, ce qui augmente considérablement l'utilité et la facilité perçue, propulsant ainsi l'acceptation globale de l'outil.</p>
+<h3 id="14-analyse-comparative-des-solutions-existantes">1.4. Analyse comparative des solutions existantes</h3>
+<p>Pour justifier le positionnement de Djorssi-Match, il est essentiel d'analyser l'écosystème concurrentiel existant.</p>
+<h4 id="141-linkedin">1.4.1. LinkedIn</h4>
+<ul>
+<li><strong>Forces :</strong> Réseau professionnel incontournable, immense base d'utilisateurs, interface puissante pour le "Personal Branding" et le B2B.</li>
+<li><strong>Faiblesses locales :</strong> C'est un outil très "élitiste" orienté vers les cadres supérieurs. La rédaction d'un profil LinkedIn attractif exige une excellente maîtrise des codes "corporate", ce qui exclut une grande partie de la jeunesse ivoirienne et du secteur informel ou technique. Le processus de candidature reste souvent redirigé vers des sites externes complexes. Le taux de réponse des entreprises y est extrêmement bas.</li>
+</ul>
+<h4 id="142-glassdoor-et-indeed">1.4.2. Glassdoor et Indeed</h4>
+<ul>
+<li><strong>Forces :</strong> Agrégateurs massifs, système d'avis sur les entreprises favorisant la transparence.</li>
+<li><strong>Faiblesses locales :</strong> Ces plateformes sont pensées pour des marchés occidentaux. Leurs algorithmes peinent à comprendre les subtilités sémantiques des diplômes locaux (BTS, DUT, Licences locales) ou des contrats spécifiques ivoiriens. Par ailleurs, leur interface mobile est souvent perçue comme une simple adaptation du site web (responsive) plutôt que comme une expérience pensée nativement pour le mobile.</li>
+</ul>
+<h4 id="143-portails-locaux-novojob-rmo-educarriere">1.4.3. Portails locaux (Novojob, RMO, EduCarriere)</h4>
+<ul>
+<li><strong>Forces :</strong> Très bonne pénétration du marché local, offres d'emploi réelles et vérifiées, prise en compte des contrats spécifiques (CDD, CDI, Stages de validation).</li>
+<li><strong>Faiblesses :</strong> UX/UI vieillissantes, absence de véritable algorithme de matching prédictif (le tri se fait souvent via de simples filtres de recherche ou par mots-clés rudimentaires). Le candidat fait toujours face au silence radio ("le trou noir") après l'envoi de son CV, car ces plateformes n'intègrent pas de pont direct (comme WhatsApp) vers le recruteur.</li>
+</ul>
+<h4 id="synthese-concurrentielle-et-positionnement">Synthèse concurrentielle et positionnement</h4>
+<p>L'analyse de l'état de l'art démontre qu'il existe un "vide technologique" sur le marché africain francophone :
+Aucun acteur local ne combine à la fois <strong>l'UX gamifiée et mobile</strong> des applications modernes (Swipe), <strong>l'intelligence algorithmique</strong> (Filtrage basé sur le contenu couplé à l'IA), et une <strong>volonté de contact direct</strong> brisant le silence du recrutement.
+C'est précisément à la convergence de ces trois axes que se positionne la proposition de valeur de Djorssi-Match.</p>
+<hr />
+<div class="page-break"></div>
+<h2 id="chapitre-ii-analyse-et-specification-des-besoins">CHAPITRE II : ANALYSE ET SPÉCIFICATION DES BESOINS</h2>
+<p>Avant d'entamer la conception architecturale et le développement de Djorssi-Match, il est impératif de définir avec précision les attentes des différentes parties prenantes du système. Ce chapitre s'attelle à l'analyse et à la spécification des besoins fonctionnels et non fonctionnels, ainsi qu'à la justification des choix technologiques préliminaires.</p>
+<h3 id="21-etude-des-besoins-fonctionnels">2.1. Étude des besoins fonctionnels</h3>
+<p>Un besoin fonctionnel décrit une action, un comportement ou un service spécifique que le système doit offrir à ses utilisateurs. Dans l'écosystème Djorssi-Match, nous identifions trois profils d'utilisateurs distincts : le Candidat, le Recruteur et l'Administrateur.</p>
+<h4 id="211-profil-candidat">2.1.1. Profil "Candidat"</h4>
+<p>Le candidat est l'utilisateur principal de l'application mobile. Pour garantir une adoption massive, son parcours utilisateur doit être dépourvu de toute friction.
+- <strong>Inscription et Authentification fluides :</strong> Le système doit permettre la création d'un compte sans mot de passe complexe, via l'envoi d'un code unique (OTP - One-Time Password) par e-mail.
+- <strong>Enrichissement du profil (Onboarding/Profile Builder) :</strong> Renseigner facilement ses informations clés : Nom, contacts (numéro de téléphone 10 chiffres ivoirien, WhatsApp), sexe (Homme/Femme), compétences (skills), secteur d'activité, et uploader son CV (avec validation magique de type PDF/DOC/DOCX).
+- <strong>Système de "Swipe" :</strong> Afficher les offres d'emploi sous forme de cartes défilantes. Le candidat peut "Swiper" à droite pour postuler instantanément, ou "Swiper" à gauche pour ignorer l'offre.
+- <strong>Gestion des candidatures (Matches) :</strong> Consulter l'historique de ses candidatures acceptées ou en attente, et surtout, accéder aux informations de contact direct (ex: WhatsApp, e-mail) du recruteur en cas de match.
+- <strong>Alertes d'emploi personnalisées :</strong> Recevoir des notifications e-mail ou des notifications Push lorsque de nouvelles offres correspondant à son profil sont disponibles.
+- <strong>Abonnement Premium :</strong> Souscrire à un abonnement payant pour bénéficier d'avantages exclusifs (swipes illimités, historique de match complet sans limite de 3 cartes, badge de candidat certifié, possibilité d'annuler/revenir sur un swipe, alertes mails dédiées).</p>
+<h4 id="212-profil-recruteur">2.1.2. Profil "Recruteur"</h4>
+<p>Le recruteur utilise principalement la plateforme pour sourcer des talents avec un minimum d'efforts administratifs.
+- <strong>Publication d'offres :</strong> Créer et publier des offres d'emploi, en spécifiant les compétences requises, le lieu et les tags.
+- <strong>Dashboard de gestion des candidatures :</strong> Une interface permettant de visualiser les candidats ayant "swipé à droite" sur leurs offres. Le recruteur doit voir un score de pertinence pré-calculé pour chaque profil.
+- <strong>Mise en relation directe :</strong> Contacter directement un candidat intéressant via les coordonnées fournies (e-mail, téléphone, WhatsApp) sans intermédiaire contraignant.</p>
+<h4 id="213-profil-administrateur">2.1.3. Profil "Administrateur"</h4>
+<p>L'administrateur est le garant du bon fonctionnement technique et éthique de la plateforme via une interface Web dédiée (React Admin).
+- <strong>Modération des offres et des profils :</strong> Approuver, modifier ou supprimer des offres d'emploi (notamment pour lutter contre les "scams") ou bannir des profils frauduleux.
+- <strong>Statistiques et Analytics :</strong> Accès à des tableaux de bord affichant les indicateurs clés de performance (KPIs) : nombre d'inscriptions quotidiennes, taux de "swipes" positifs, revenus des abonnements Premium.
+- <strong>Monitoring du Scraper :</strong> Surveiller l'état du module d'automatisation (Scraper Python), consulter les journaux d'erreurs (logs), et valider manuellement les offres extraites par l'Intelligence Artificielle en cas de doute.
+- <strong>Campagnes d'Abonnement Globales :</strong> Possibilité d'activer une campagne de promotion (par exemple, 24 heures de Premium gratuit pour tous les utilisateurs à l'occasion de la Fête du Travail) et d'envoyer des notifications Push de masse ciblées.</p>
+<h4 id="214-scenarios-detailles-des-modules-dutilisation">2.1.4. Scénarios détaillés des Modules d'Utilisation</h4>
+<ul>
+<li><strong>Module de Connexion OTP :</strong> L'utilisateur ouvre l'application, saisit son adresse e-mail. Le système génère un OTP à 6 chiffres et l'envoie sur sa boîte mail. L'utilisateur saisit ce code dans un délai de 15 minutes. Si le code correspond, la session utilisateur Supabase Auth est initialisée, ouvrant directement l'application.</li>
+<li><strong>Module de Swipe &amp; Application :</strong> Le candidat voit défiler des cartes d'offres triées par score. S'il effectue un mouvement de glissement vers la droite (Swipe Right), le système vérifie s'il possède un CV en base de données. Si oui, la candidature est insérée et un e-mail avec CV est transmis au recruteur. S'il effectue un glissement vers la gauche (Swipe Left), la carte disparaît et l'offre est marquée comme passée.</li>
+<li><strong>Module d'Abonnement Premium par Mobile Money :</strong> Le candidat clique sur "Devenir Premium". Il choisit son moyen de paiement (Wave, Orange Money ou MTN). Une requête est envoyée à GeniusPay. L'utilisateur saisit son numéro de téléphone, valide l'autorisation de prélèvement sur son mobile. Dès confirmation par le webhook GeniusPay, son profil passe en Premium pour une durée de 30 jours, débloquant l'accès à l'historique complet et supprimant les quotas quotidiens de 10 swipes.</li>
+</ul>
+<h3 id="22-etude-des-besoins-non-fonctionnels">2.2. Étude des besoins non fonctionnels</h3>
+<p>Les besoins non fonctionnels décrivent les critères qualitatifs et les contraintes de fonctionnement du système.</p>
+<h4 id="221-haute-disponibilite-et-tolerance-aux-pannes">2.2.1. Haute disponibilité et Tolérance aux pannes</h4>
+<p>La plateforme étant destinée à un usage grand public (B2C), elle doit être disponible 24h/24 et 7j/7. Le système doit être capable de gérer des pics de charge, notamment lors de campagnes de communication massives ou du lancement de notifications "Push" groupées, sans interruption de service.</p>
+<h4 id="222-securite-des-donnees-et-conformite-legale">2.2.2. Sécurité des données et Conformité légale</h4>
+<p>La gestion de données à caractère personnel (CV, numéros de téléphone, adresses e-mail) impose une sécurité drastique.
+- <strong>Chiffrement :</strong> Les données sensibles doivent être chiffrées en transit (HTTPS/TLS) et au repos.
+- <strong>Contrôle d'accès granulaire :</strong> Un utilisateur ne doit en aucun cas pouvoir lire ou altérer les données d'un autre utilisateur.
+- <strong>Conformité locale :</strong> Le système doit respecter la législation locale, notamment la Loi n°2013-450 relative à la protection des données à caractère personnel en Côte d'Ivoire, régulée par l'ARTCI.</p>
+<h4 id="223-performance-et-latence-critique-200ms">2.2.3. Performance et Latence critique (&lt; 200ms)</h4>
+<p>L'interaction principale de l'application est le "Swipe". Ce geste étant répétitif et rapide, la base de données et l'algorithme de matching doivent enregistrer la candidature et charger la carte suivante de manière quasi-instantanée. La spécification fixe un objectif de latence réseau et serveur inférieure à 200 millisecondes pour toute action de swipe, afin d'éviter toute frustration chez l'utilisateur.</p>
+<hr />
+<div class="page-break"></div>
+<h2 id="chapitre-iii-conception-architecturale-et-modelisation">CHAPITRE III : CONCEPTION ARCHITECTURALE ET MODÉLISATION</h2>
+<p>Ce chapitre traduit les spécifications établies précisément en modèles conceptuels et logiques robustes. Nous y détaillerons l'architecture du système, la modélisation UML, la conception de la base de données relationnelle et la formalisation mathématique de notre algorithme de matching.</p>
+<h3 id="31-cahier-des-charges-technique-architecture-multi-services">3.1. Cahier des charges technique : Architecture multi-services</h3>
+<p>Pour garantir la scalabilité et l'indépendance des composants, le système adopte une <strong>architecture multi-services</strong>. L'ensemble est découplé en trois grandes entités :
+1. <strong>Le Frontend (B2C et B2B) :</strong> Composé de l'application mobile Flutter pour les candidats et du Dashboard React pour les administrateurs. Ces clients n'embarquent aucune logique métier lourde ou algorithmique.
+2. <strong>Le Backend as a Service (BaaS) :</strong> Hébergé sur Supabase, il concentre la base de données PostgreSQL, le module d'authentification (Supabase Auth), le stockage de fichiers (Supabase Storage) et l'exécution de fonctions asynchrones (Edge Functions TypeScript Deno).
+3. <strong>Le Worker de Scraping :</strong> Un module Python indépendant, orchestré sur un serveur distant, chargé d'extraire, de nettoyer via Intelligence Artificielle locale (Ollama qwen2.5:7b), et d'insérer les nouvelles offres dans la base de données via l'API REST de Supabase.</p>
+<p>Ce découplage garantit que si le module de scraping subit une défaillance ou une mise à jour, l'application mobile (et donc l'expérience utilisateur) n'en est absolument pas affectée.</p>
+<h3 id="32-modelisation-uml-avancee">3.2. Modélisation UML avancée</h3>
+<p>La modélisation UML permet de visualiser les interactions complexes entre les acteurs et le système, facilitant ainsi la phase de développement.</p>
+<h4 id="321-diagramme-de-cas-dutilisation">3.2.1. Diagramme de cas d'utilisation</h4>
+<p>Le diagramme de cas d'utilisation illustre les fonctionnalités offertes aux différents acteurs du système Djorssi-Match : le <strong>Candidat</strong>, le <strong>Recruteur</strong> et l'<strong>Administrateur</strong>. Il met en évidence deux relations UML importantes :</p>
+<ul>
+<li><strong>&lt;<include>&gt;</strong> : Le cas « Swiper des offres d'emploi » inclut systématiquement le calcul du score de matching. Autrement dit, chaque swipe déclenche automatiquement l'algorithme de scoring.</li>
+<li><strong>&lt;<extends>&gt;</strong> : Le cas « Contacter le recruteur post-Match » est étendu par la vérification du statut Premium. Le candidat ne peut contacter un recruteur après un match que si le système confirme qu'il dispose d'un abonnement Premium actif. Sans ce statut, la fonctionnalité de contact reste verrouillée.</li>
+</ul>
+<p><img alt="Diagramme de cas d'utilisation" src="diagramme_cas_utilisation.png" /></p>
+<div class="codehilite"><pre><span></span><code><span class="nx">usecaseDiagram</span>
+<span class="w">    </span><span class="nx">actor</span><span class="w"> </span><span class="nx">Candidat</span>
+<span class="w">    </span><span class="nx">actor</span><span class="w"> </span><span class="nx">Recruteur</span>
+<span class="w">    </span><span class="nx">actor</span><span class="w"> </span><span class="nx">Administrateur</span>
+
+<span class="w">    </span><span class="kn">package</span><span class="w"> </span><span class="s">&quot;Système Djorssi-Match&quot;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nx">Candidat</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Calculer</span><span class="w"> </span><span class="nx">Score</span><span class="w"> </span><span class="nx">de</span><span class="w"> </span><span class="nx">Matching</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">Candidat</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Swiper</span><span class="w"> </span><span class="nx">des</span><span class="w"> </span><span class="nx">offres</span><span class="w"> </span><span class="nx">d</span><span class="err">&#39;</span><span class="nx">emploi</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">Candidat</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Vérifier</span><span class="w"> </span><span class="nx">statut</span><span class="w"> </span><span class="nx">Premium</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">Candidat</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Contacter</span><span class="w"> </span><span class="nx">le</span><span class="w"> </span><span class="nx">recruteur</span><span class="w"> </span><span class="nx">post</span><span class="o">-</span><span class="nx">Match</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">Candidat</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Créer</span><span class="w"> </span><span class="nx">un</span><span class="w"> </span><span class="nx">profil</span><span class="w"> </span><span class="nx">enrichi</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">Candidat</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Souscrire</span><span class="w"> </span><span class="nx">à</span><span class="w"> </span><span class="nx">l</span><span class="err">&#39;</span><span class="nx">abonnement</span><span class="w"> </span><span class="nx">Premium</span><span class="p">)</span>
+
+<span class="w">        </span><span class="nx">Recruteur</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Publier</span><span class="w"> </span><span class="nx">une</span><span class="w"> </span><span class="nx">offre</span><span class="w"> </span><span class="nx">d</span><span class="err">&#39;</span><span class="nx">emploi</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">Recruteur</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Consulter</span><span class="w"> </span><span class="nx">le</span><span class="w"> </span><span class="nx">Dashboard</span><span class="w"> </span><span class="nx">des</span><span class="w"> </span><span class="nx">Matchs</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">Recruteur</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Contacter</span><span class="w"> </span><span class="nx">le</span><span class="w"> </span><span class="nx">Candidat</span><span class="w"> </span><span class="nx">post</span><span class="o">-</span><span class="nx">Match</span><span class="p">)</span>
+
+<span class="w">        </span><span class="nx">Administrateur</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Modérer</span><span class="w"> </span><span class="nx">les</span><span class="w"> </span><span class="nx">offres</span><span class="w"> </span><span class="nx">et</span><span class="w"> </span><span class="nx">profils</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">Administrateur</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Gérer</span><span class="w"> </span><span class="nx">les</span><span class="w"> </span><span class="nx">abonnements</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="nx">Lancer</span><span class="w"> </span><span class="nx">campagnes</span><span class="p">)</span>
+<span class="w">        </span><span class="nx">Administrateur</span><span class="w"> </span><span class="o">--</span><span class="p">&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Envoyer</span><span class="w"> </span><span class="nx">push</span><span class="w"> </span><span class="nx">notifications</span><span class="w"> </span><span class="nx">FCM</span><span class="p">)</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="p">(</span><span class="nx">Swiper</span><span class="w"> </span><span class="nx">des</span><span class="w"> </span><span class="nx">offres</span><span class="w"> </span><span class="nx">d</span><span class="err">&#39;</span><span class="nx">emploi</span><span class="p">)</span><span class="w"> </span><span class="p">..&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Calculer</span><span class="w"> </span><span class="nx">Score</span><span class="w"> </span><span class="nx">de</span><span class="w"> </span><span class="nx">Matching</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="nx">include</span><span class="o">&gt;&gt;</span>
+<span class="w">    </span><span class="p">(</span><span class="nx">Vérifier</span><span class="w"> </span><span class="nx">statut</span><span class="w"> </span><span class="nx">Premium</span><span class="p">)</span><span class="w"> </span><span class="p">..&gt;</span><span class="w"> </span><span class="p">(</span><span class="nx">Contacter</span><span class="w"> </span><span class="nx">le</span><span class="w"> </span><span class="nx">recruteur</span><span class="w"> </span><span class="nx">post</span><span class="o">-</span><span class="nx">Match</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="kd">extends</span><span class="o">&gt;&gt;</span>
+</code></pre></div>
+
+<h4 id="322-diagramme-de-sequence-cycle-de-vie-dun-match">3.2.2. Diagramme de séquence : Cycle de vie d'un Match</h4>
+<p>Ce diagramme détaille la chorégraphie temporelle d'une action critique : le "Swipe" qui aboutit à une candidature (Match) et une postulation automatique.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">sequenceDiagram</span>
+<span class="w">    </span><span class="n">autonumber</span>
+<span class="w">    </span><span class="n">actor</span><span class="w"> </span><span class="n">C</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="n">Candidat</span><span class="w"> </span><span class="p">(</span><span class="n">App</span><span class="w"> </span><span class="n">Mobile</span><span class="p">)</span>
+<span class="w">    </span><span class="n">participant</span><span class="w"> </span><span class="n">B</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="n">Backend</span><span class="w"> </span><span class="p">(</span><span class="n">Supabase</span><span class="w"> </span><span class="n">Edge</span><span class="w"> </span><span class="kr">Function</span><span class="p">)</span>
+<span class="w">    </span><span class="n">participant</span><span class="w"> </span><span class="n">DB</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="n">Base</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">Données</span><span class="w"> </span><span class="p">(</span><span class="n">PostgreSQL</span><span class="p">)</span>
+<span class="w">    </span><span class="n">participant</span><span class="w"> </span><span class="n">FCM</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="n">Firebase</span><span class="w"> </span><span class="n">Cloud</span><span class="w"> </span><span class="n">Messaging</span>
+<span class="w">    </span><span class="n">actor</span><span class="w"> </span><span class="n">R</span><span class="w"> </span><span class="kr">as</span><span class="w"> </span><span class="n">Recruteur</span><span class="w"> </span><span class="p">(</span><span class="n">Email</span><span class="o">/</span><span class="n">WhatsApp</span><span class="p">)</span>
+
+<span class="w">    </span><span class="n">C</span><span class="o">-&gt;&gt;</span><span class="n">B</span><span class="o">:</span><span class="w"> </span><span class="n">Requête</span><span class="w"> </span><span class="n">d</span><span class="s">&#39;obtention des offres (triées par matching score)</span>
+<span class="s">    B-&gt;&gt;DB: Évaluation des offres correspondantes aux compétences</span>
+<span class="s">    DB--&gt;&gt;B: Liste des offres filtrées et ordonnées</span>
+<span class="s">    B--&gt;&gt;C: Affichage des cartes d&#39;</span><span class="n">offres</span>
+<span class="w">    </span><span class="n">C</span><span class="o">-&gt;&gt;</span><span class="n">C</span><span class="o">:</span><span class="w"> </span><span class="n">Swipe</span><span class="w"> </span><span class="err">à</span><span class="w"> </span><span class="n">Droite</span><span class="w"> </span><span class="p">(</span><span class="n">Postuler</span><span class="p">)</span>
+<span class="w">    </span><span class="n">C</span><span class="o">-&gt;&gt;</span><span class="n">DB</span><span class="o">:</span><span class="w"> </span><span class="n">INSERT</span><span class="w"> </span><span class="n">INTO</span><span class="w"> </span><span class="n">swipes_log</span><span class="w"> </span><span class="p">(</span><span class="n">direction</span><span class="o">:</span><span class="w"> </span><span class="s">&#39;right&#39;</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">INSERT</span><span class="w"> </span><span class="n">INTO</span><span class="w"> </span><span class="n">applications</span><span class="w"> </span><span class="p">(</span><span class="n">status</span><span class="o">:</span><span class="w"> </span><span class="s">&#39;pending&#39;</span><span class="p">)</span>
+<span class="w">    </span><span class="n">note</span><span class="w"> </span><span class="n">over</span><span class="w"> </span><span class="n">DB</span><span class="o">:</span><span class="w"> </span><span class="n">Déclenchement</span><span class="w"> </span><span class="n">automatique</span><span class="w"> </span><span class="n">du</span><span class="w"> </span><span class="n">Trigger</span><span class="w"> </span><span class="kr">SQL</span><span class="w"> </span><span class="n">post</span><span class="o">-</span><span class="n">application</span>
+<span class="w">    </span><span class="n">DB</span><span class="o">-&gt;&gt;</span><span class="n">B</span><span class="o">:</span><span class="w"> </span><span class="n">Appel</span><span class="w"> </span><span class="n">asynchrone</span><span class="w"> </span><span class="err">à</span><span class="w"> </span><span class="n">l</span><span class="s">&#39;Edge Function &quot;</span><span class="kr">apply</span><span class="o">-</span><span class="n">to</span><span class="o">-</span><span class="n">job</span><span class="s">&quot;</span>
+<span class="s">    B-&gt;&gt;DB: Récupération du CV PDF (Supabase Storage) &amp; Infos Candidat</span>
+<span class="s">    DB--&gt;&gt;B: Données du profil &amp; CV</span>
+<span class="s">    B-&gt;&gt;B: Génération d&#39;</span><span class="n">une</span><span class="w"> </span><span class="n">lettre</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">motivation</span><span class="w"> </span><span class="n">personnalisée</span><span class="w"> </span><span class="n">via</span><span class="w"> </span><span class="n">pdf</span><span class="o">-</span><span class="n">lib</span>
+<span class="w">    </span><span class="n">B</span><span class="o">-&gt;&gt;</span><span class="n">R</span><span class="o">:</span><span class="w"> </span><span class="n">Envoi</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">l</span><span class="s">&#39;e-mail de candidature (CV + Lettre jointes via Resend API)</span>
+<span class="s">    B-&gt;&gt;FCM: Notification Push de confirmation</span>
+<span class="s">    FCM--&gt;&gt;C: Affichage notification &quot;</span><span class="n">Candidature</span><span class="w"> </span><span class="n">envoyée</span><span class="w"> </span><span class="n">avec</span><span class="w"> </span><span class="n">succès</span><span class="w"> </span><span class="o">!</span><span class="s">&quot;</span>
+</code></pre></div>
+
+<h4 id="323-diagramme-de-classes-du-systeme">3.2.3. Diagramme de classes du système</h4>
+<p>Le diagramme de classes représente le modèle de données interne du système Djorssi-Match et illustre les relations logiques fondamentales entre nos entités PostgreSQL.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">classDiagram</span>
+<span class="w">    </span><span class="n">direction</span><span class="w"> </span><span class="n">TB</span>
+
+<span class="w">    </span><span class="o">%%</span><span class="w"> </span><span class="n">Entités</span><span class="w"> </span><span class="n">d</span><span class="s1">&#39;Authentification &amp; Utilisateur</span>
+<span class="w">    </span><span class="k">class</span><span class="w"> </span><span class="n">Admin</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">-</span><span class="n">id</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Integer</span>
+<span class="w">        </span><span class="o">-</span><span class="n">name</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">String</span>
+<span class="w">        </span><span class="o">+</span><span class="n">viewJobs</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">addJobs</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">deleteJobs</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">modifyJobs</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">moderateProfiles</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">viewLogs</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">class</span><span class="w"> </span><span class="n">Guest</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">+</span><span class="n">viewJobs</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">getRegistered</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">class</span><span class="w"> </span><span class="n">Profile</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">-</span><span class="n">id</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">String</span>
+<span class="w">        </span><span class="c1">#name : String</span>
+<span class="w">        </span><span class="c1">#phoneNumber : String</span>
+<span class="w">        </span><span class="c1">#cvUrl : String</span>
+<span class="w">        </span><span class="c1">#isPremium : Boolean</span>
+<span class="w">        </span><span class="o">+</span><span class="n">swipeRight</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">swipeLeft</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">makePayment</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">configureAlerts</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">uploadCV</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="o">%%</span><span class="w"> </span><span class="n">Entités</span><span class="w"> </span><span class="n">du</span><span class="w"> </span><span class="n">Cœur</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">l</span><span class="s1">&#39;Application (Recrutement)</span>
+<span class="w">    </span><span class="k">class</span><span class="w"> </span><span class="n">Job</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">-</span><span class="n">id</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Integer</span>
+<span class="w">        </span><span class="c1">#companyName : String</span>
+<span class="w">        </span><span class="c1">#jobTitle : String</span>
+<span class="w">        </span><span class="c1">#location : String</span>
+<span class="w">        </span><span class="c1">#salaryRange : String</span>
+<span class="w">        </span><span class="o">+</span><span class="n">calculateScore</span><span class="p">()</span><span class="w"> </span><span class="n">Float</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">class</span><span class="w"> </span><span class="n">Application</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">-</span><span class="n">id</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Integer</span>
+<span class="w">        </span><span class="c1">#status : String</span>
+<span class="w">        </span><span class="c1">#candidateId : String</span>
+<span class="w">        </span><span class="c1">#jobId : Integer</span>
+<span class="w">        </span><span class="o">+</span><span class="n">accept</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">        </span><span class="o">+</span><span class="n">reject</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="o">%%</span><span class="w"> </span><span class="n">Entités</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">Service</span><span class="w"> </span><span class="p">(</span><span class="n">Alerte</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Paiement</span><span class="p">)</span>
+<span class="w">    </span><span class="k">class</span><span class="w"> </span><span class="n">Payment</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">-</span><span class="n">id</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Integer</span>
+<span class="w">        </span><span class="c1">#profileId : String</span>
+<span class="w">        </span><span class="o">-</span><span class="n">payToken</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">String</span>
+<span class="w">        </span><span class="o">-</span><span class="n">amount</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Float</span>
+<span class="w">        </span><span class="o">-</span><span class="n">status</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="nb nb-Type">String</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="k">class</span><span class="w"> </span><span class="n">JobAlert</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="o">-</span><span class="n">id</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Integer</span>
+<span class="w">        </span><span class="c1">#profileId : String</span>
+<span class="w">        </span><span class="c1">#sectors : List~String~</span>
+<span class="w">        </span><span class="c1">#isActive : Boolean</span>
+<span class="w">        </span><span class="o">+</span><span class="n">toggleAlert</span><span class="p">()</span><span class="w"> </span><span class="nb nb-Type">void</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="o">%%</span><span class="w"> </span><span class="n">Relations</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="n">Association</span><span class="w"> </span><span class="n">Directe</span><span class="w"> </span><span class="n">Simple</span><span class="w"> </span><span class="p">(</span><span class="n">Exactement</span><span class="w"> </span><span class="n">comme</span><span class="w"> </span><span class="n">le</span><span class="w"> </span><span class="n">screenshot</span><span class="p">)</span>
+<span class="w">    </span><span class="n">Admin</span><span class="w"> </span><span class="s2">&quot;+1&quot;</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="s2">&quot;+0..*&quot;</span><span class="w"> </span><span class="n">Job</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Modère</span>
+<span class="w">    </span><span class="n">Admin</span><span class="w"> </span><span class="s2">&quot;+1&quot;</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="s2">&quot;+0..*&quot;</span><span class="w"> </span><span class="n">Profile</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Gère</span>
+<span class="w">    </span><span class="n">Guest</span><span class="w"> </span><span class="s2">&quot;+0..*&quot;</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="s2">&quot;+1..*&quot;</span><span class="w"> </span><span class="n">Job</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Consulte</span>
+<span class="w">    </span><span class="n">Profile</span><span class="w"> </span><span class="s2">&quot;+1&quot;</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="s2">&quot;+0..*&quot;</span><span class="w"> </span><span class="n">Application</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Effectue</span>
+<span class="w">    </span><span class="n">Application</span><span class="w"> </span><span class="s2">&quot;+0..*&quot;</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="s2">&quot;+1&quot;</span><span class="w"> </span><span class="n">Job</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Concerne</span>
+<span class="w">    </span><span class="n">Profile</span><span class="w"> </span><span class="s2">&quot;+1&quot;</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="s2">&quot;+0..1&quot;</span><span class="w"> </span><span class="n">JobAlert</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Configure</span>
+<span class="w">    </span><span class="n">Profile</span><span class="w"> </span><span class="s2">&quot;+1&quot;</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="s2">&quot;+0..*&quot;</span><span class="w"> </span><span class="n">Payment</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Règle</span>
+
+<span class="w">    </span><span class="o">%%</span><span class="w"> </span><span class="n">Styles</span><span class="w"> </span><span class="n">CSS</span><span class="w"> </span><span class="n">pour</span><span class="w"> </span><span class="n">reproduire</span><span class="w"> </span><span class="n">l</span><span class="s1">&#39;esthétique exacte du screenshot (Jaune vif, bordures noires)</span>
+<span class="w">    </span><span class="n">style</span><span class="w"> </span><span class="n">Admin</span><span class="w"> </span><span class="n">fill</span><span class="p">:</span><span class="c1">#FFEA00,stroke:#000000,stroke-width:1px</span>
+<span class="w">    </span><span class="n">style</span><span class="w"> </span><span class="n">Guest</span><span class="w"> </span><span class="n">fill</span><span class="p">:</span><span class="c1">#FFEA00,stroke:#000000,stroke-width:1px</span>
+<span class="w">    </span><span class="n">style</span><span class="w"> </span><span class="n">Profile</span><span class="w"> </span><span class="n">fill</span><span class="p">:</span><span class="c1">#FFEA00,stroke:#000000,stroke-width:1px</span>
+<span class="w">    </span><span class="n">style</span><span class="w"> </span><span class="n">Job</span><span class="w"> </span><span class="n">fill</span><span class="p">:</span><span class="c1">#FFEA00,stroke:#000000,stroke-width:1px</span>
+<span class="w">    </span><span class="n">style</span><span class="w"> </span><span class="n">Application</span><span class="w"> </span><span class="n">fill</span><span class="p">:</span><span class="c1">#FFEA00,stroke:#000000,stroke-width:1px</span>
+<span class="w">    </span><span class="n">style</span><span class="w"> </span><span class="n">Payment</span><span class="w"> </span><span class="n">fill</span><span class="p">:</span><span class="c1">#FFEA00,stroke:#000000,stroke-width:1px</span>
+<span class="w">    </span><span class="n">style</span><span class="w"> </span><span class="n">JobAlert</span><span class="w"> </span><span class="n">fill</span><span class="p">:</span><span class="c1">#FFEA00,stroke:#000000,stroke-width:1px</span>
+</code></pre></div>
+
+<h4 id="324-diagramme-detats-transitions-etats-dune-candidature">3.2.4. Diagramme d'états-transitions : États d'une candidature</h4>
+<p>Lorsqu'une candidature (application) est créée suite à un Swipe, elle traverse plusieurs états au cours de son cycle de vie.</p>
+<div class="codehilite"><pre><span></span><code><span class="n">stateDiagram</span><span class="o">-</span><span class="n">v2</span>
+<span class="w">    </span><span class="p">[</span><span class="o">*</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Pending</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Swipe</span><span class="w"> </span><span class="kr">Right</span><span class="w"> </span><span class="p">(</span><span class="n">Candidature</span><span class="w"> </span><span class="n">envoyée</span><span class="p">)</span>
+<span class="w">    </span><span class="n">Pending</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Viewed</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Le</span><span class="w"> </span><span class="n">recruteur</span><span class="w"> </span><span class="n">consulte</span><span class="w"> </span><span class="n">le</span><span class="w"> </span><span class="n">profil</span><span class="w"> </span><span class="n">sur</span><span class="w"> </span><span class="n">son</span><span class="w"> </span><span class="n">tableau</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">bord</span>
+<span class="w">    </span><span class="n">Viewed</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Accepted</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Le</span><span class="w"> </span><span class="n">recruteur</span><span class="w"> </span><span class="n">valide</span><span class="w"> </span><span class="n">le</span><span class="w"> </span><span class="n">profil</span><span class="w"> </span><span class="n">et</span><span class="w"> </span><span class="n">initie</span><span class="w"> </span><span class="n">le</span><span class="w"> </span><span class="n">contact</span>
+<span class="w">    </span><span class="n">Viewed</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="nf">Rejected</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Le</span><span class="w"> </span><span class="n">profil</span><span class="w"> </span><span class="n">ne</span><span class="w"> </span><span class="n">correspond</span><span class="w"> </span><span class="n">pas</span><span class="w"> </span><span class="n">aux</span><span class="w"> </span><span class="n">attentes</span>
+<span class="w">    </span><span class="n">Accepted</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="p">[</span><span class="o">*</span><span class="p">]</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Processus</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">recrutement</span><span class="w"> </span><span class="n">direct</span><span class="w"> </span><span class="p">(</span><span class="n">WhatsApp</span><span class="o">/</span><span class="n">Appel</span><span class="o">/</span><span class="n">E</span><span class="o">-</span><span class="n">mail</span><span class="p">)</span>
+<span class="w">    </span><span class="nf">Rejected</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="p">[</span><span class="o">*</span><span class="p">]</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Candidature</span><span class="w"> </span><span class="n">archivée</span>
+</code></pre></div>
+
+<h3 id="33-conception-de-la-base-de-donnees-postgresql">3.3. Conception de la base de données (PostgreSQL)</h3>
+<p>Le choix de PostgreSQL n'est pas anodin. C'est l'un des Systèmes de Gestion de Bases de Données Relationnelles (SGBDR) les plus puissants, offrant le support des types de données complexes essentiels à notre algorithme.</p>
+<h4 id="331-description-logique-et-structurelle-des-tables">3.3.1. Description logique et structurelle des tables</h4>
+<p>La structure relationnelle de la base de données est définie par plusieurs migrations SQL ordonnées. Le schéma est articulé autour des tables physiques suivantes :
+1. <strong><code>profiles</code> (Candidats) :</strong> Liée directement à la table système d'authentification de Supabase (<code>auth.users</code>). Elle contient toutes les informations biographiques du candidat, son statut Premium (<code>is_premium</code>, <code>premium_until</code>), ses compétences et son jeton d'appareil FCM pour les notifications.
+2. <strong><code>jobs</code> (Offres d'emploi) :</strong> Stocke les informations complètes sur les postes vacants, y compris les tags normalisés, le niveau requis, l'expérience, le salaire et les informations de contact (e-mail, WhatsApp, lien externe).
+3. <strong><code>applications</code> (Candidatures) :</strong> Table d'association modélisant le match et la postulation du candidat sur une offre, avec un état initialisé à <code>pending</code>. Elle résout la relation Many-to-Many entre <code>profiles</code> et <code>jobs</code> de façon unique via la contrainte <code>UNIQUE(candidate_id, job_id)</code>.
+4. <strong><code>swipes_log</code> (Historique des balayages) :</strong> Consigne chaque swipe (direction <code>left</code> ou <code>right</code>) afin d'éviter qu'une offre ne soit présentée plusieurs fois au même candidat et d'assurer le contrôle des quotas quotidiens de swipes.
+5. <strong><code>payments</code> (Paiements d'abonnements) :</strong> Gère le suivi transactionnel lié aux souscriptions premium et aux achats in-app via les passerelles mobiles locales.
+6. <strong><code>user_cvs</code> (CV générés in-app) :</strong> Stocke les Curriculum Vitae créés interactivement par les utilisateurs (titre du CV, données complètes structurées au format <code>JSONB</code>, couleurs graphiques, et identifiant du template sélectionné).
+7. <strong><code>app_config</code> (Configuration globale et tarification) :</strong> Table de configuration dynamique (ligne unique <code>ID=1</code>) stockant la limite quotidienne de swipes gratuits, le message d'alerte, les prix du Premium (<code>premium_price_cfa</code>) et des CV supplémentaires (<code>extra_cv_price_cfa</code>), ainsi que les paramètres d'essai gratuit pour le générateur de CV.
+8. <strong><code>job_alerts</code> (Abonnements aux alertes) :</strong> Gère les préférences d'alertes d'emploi des candidats par secteurs d'activité, utilisées pour cibler les notifications.
+9. <strong><code>feedbacks</code> &amp; <code>unsubscriptions</code> :</strong> Consignent les retours qualitatifs généraux, les notes (ratings) et les motifs de désabonnement des utilisateurs.
+10. <strong><code>delete_account_feedback</code> :</strong> Stocke de façon anonyme et persistante (même après suppression du compte) les raisons pour lesquelles un utilisateur a supprimé son compte, à des fins d'analyse de rétention.
+11. <strong><code>support_messages</code> :</strong> Gère la messagerie du support in-app entre les candidats et les administrateurs.</p>
+<h4 id="332-utilisation-de-types-avances-jsonb-et-arrays">3.3.2. Utilisation de types avancés : JSONB et Arrays</h4>
+<p>Pour éviter la prolifération de tables de jointure (qui ralentissent les requêtes de matching), nous exploitons la flexibilité de PostgreSQL :
+- <strong>Tableau (<code>TEXT[]</code>) :</strong> Les compétences du candidat sont stockées directement sous forme de tableau de textes (<code>skills TEXT[]</code>). De même, les tags d'une offre d'emploi sont stockés via <code>tags TEXT[]</code>. La comparaison s'effectue en mémoire très rapidement via des opérateurs de chevauchement d'arrays.
+- <strong>Format JSONB :</strong> La table <code>jobs</code> contient un champ <code>raw_data JSONB</code>. Ce champ permet au Scraper Python de sauvegarder l'intégralité du code HTML brut ou des métadonnées variables (sans schéma rigide) extraites du site source, afin de les traiter ultérieurement par l'Intelligence Artificielle sans casser le schéma SQL.</p>
+<h3 id="34-le-moteur-de-matching">3.4. Le Moteur de Matching</h3>
+<p>L'innovation centrale de Djorssi-Match repose sur son algorithme de calcul du score de compatibilité (Matching Score). Contrairement à une simple recherche par mots-clés, le système attribue des points selon la pertinence des compétences du candidat par rapport aux besoins réels de l'offre.</p>
+<h4 id="341-fonctionnement-de-lalgorithme">3.4.1. Fonctionnement de l'algorithme</h4>
+<p>Pour être extrêmement simple à comprendre et à défendre, le calcul du score de compatibilité se résume à une soustraction évidente :</p>
+<p><strong>Score Final = Points Gagnés - Points Perdus</strong></p>
+<p>Voici le schéma visuel de la décision prise par l'algorithme pour chaque offre d'emploi analysée :</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="n">TD</span>
+<span class="w">    </span><span class="n">A</span><span class="p">[</span><span class="n">Profil</span><span class="w"> </span><span class="n">Candidat</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Offre</span><span class="w"> </span><span class="n">d</span><span class="err">&#39;</span><span class="n">emploi</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">{</span><span class="n">Analyse</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">la</span><span class="w"> </span><span class="n">compatibilité</span><span class="p">}</span>
+
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;|</span><span class="mf">1.</span><span class="w"> </span><span class="n">Cumul</span><span class="w"> </span><span class="n">des</span><span class="w"> </span><span class="n">Points</span><span class="w"> </span><span class="n">Gagnés</span><span class="o">|</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="n">Points</span><span class="w"> </span><span class="n">Gagnés</span><span class="p">]</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C1</span><span class="p">[</span><span class="n">Type</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">contrat</span><span class="w"> </span><span class="n">recherché</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="o">+</span><span class="mi">300</span><span class="w"> </span><span class="n">à</span><span class="w"> </span><span class="o">+</span><span class="mi">400</span><span class="w"> </span><span class="n">pts</span><span class="p">]</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C2</span><span class="p">[</span><span class="n">Compétences</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Spécialité</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="o">+</span><span class="mi">80</span><span class="w"> </span><span class="n">à</span><span class="w"> </span><span class="o">+</span><span class="mi">150</span><span class="w"> </span><span class="n">pts</span><span class="p">]</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C3</span><span class="p">[</span><span class="n">Mots</span><span class="o">-</span><span class="n">clés</span><span class="w"> </span><span class="n">dans</span><span class="w"> </span><span class="n">le</span><span class="w"> </span><span class="n">Titre</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="o">+</span><span class="mi">50</span><span class="w"> </span><span class="n">à</span><span class="w"> </span><span class="o">+</span><span class="mi">100</span><span class="w"> </span><span class="n">pts</span><span class="p">]</span>
+<span class="w">    </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C4</span><span class="p">[</span><span class="n">Bonus</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">récence</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">l</span><span class="err">&#39;</span><span class="n">offre</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="o">+</span><span class="mi">20</span><span class="w"> </span><span class="n">à</span><span class="w"> </span><span class="o">+</span><span class="mi">50</span><span class="w"> </span><span class="n">pts</span><span class="p">]</span>
+
+<span class="w">    </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;|</span><span class="mf">2.</span><span class="w"> </span><span class="n">Incompatibilité</span><span class="w"> </span><span class="n">majeure</span><span class="o">|</span><span class="w"> </span><span class="n">D</span><span class="p">[</span><span class="n">Points</span><span class="w"> </span><span class="n">Perdus</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">-800</span><span class="w"> </span><span class="n">pts</span><span class="p">]</span>
+<span class="w">    </span><span class="n">D</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D1</span><span class="p">[</span><span class="n">Exemple</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Poste</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">Secrétaire</span><span class="w"> </span><span class="n">proposé</span><span class="w"> </span><span class="n">à</span><span class="w"> </span><span class="n">un</span><span class="w"> </span><span class="n">profil</span><span class="w"> </span><span class="n">d</span><span class="err">&#39;</span><span class="n">Ingénieur</span><span class="p">]</span>
+
+<span class="w">    </span><span class="n">C1</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">C2</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">C3</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">C4</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">E</span><span class="p">[</span><span class="n">Calcul</span><span class="w"> </span><span class="n">du</span><span class="w"> </span><span class="n">Score</span><span class="w"> </span><span class="n">Final</span><span class="p">]</span>
+<span class="w">    </span><span class="n">D1</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">E</span>
+
+<span class="w">    </span><span class="n">E</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F</span><span class="p">{</span><span class="n">Le</span><span class="w"> </span><span class="n">score</span><span class="w"> </span><span class="n">est</span><span class="o">-</span><span class="n">il</span><span class="w"> </span><span class="n">positif</span><span class="w"> </span><span class="o">?</span><span class="p">}</span>
+<span class="w">    </span><span class="n">F</span><span class="w"> </span><span class="o">--&gt;|</span><span class="n">Oui</span><span class="o">|</span><span class="w"> </span><span class="n">G</span><span class="p">[</span><span class="n">L</span><span class="err">&#39;</span><span class="n">offre</span><span class="w"> </span><span class="n">est</span><span class="w"> </span><span class="n">affichée</span><span class="w"> </span><span class="n">en</span><span class="w"> </span><span class="n">priorité</span><span class="w"> </span><span class="n">dans</span><span class="w"> </span><span class="n">le</span><span class="w"> </span><span class="n">flux</span><span class="p">]</span>
+<span class="w">    </span><span class="n">F</span><span class="w"> </span><span class="o">--&gt;|</span><span class="n">Non</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">Négatif</span><span class="o">|</span><span class="w"> </span><span class="n">H</span><span class="p">[</span><span class="n">L</span><span class="err">&#39;</span><span class="n">offre</span><span class="w"> </span><span class="n">est</span><span class="w"> </span><span class="n">masquée</span><span class="w"> </span><span class="n">automatiquement</span><span class="p">]</span>
+</code></pre></div>
+
+<h5 id="explication-des-regles-de-calcul">Explication des règles de calcul :</h5>
+<ol>
+<li><strong>Les Points Gagnés (Les Bonus) :</strong></li>
+<li><strong>Le Contrat (+300 à +400 pts) :</strong> Si le candidat recherche un type de contrat précis (ex: CDI) et que l'offre correspond, il obtient ses premiers points.</li>
+<li><strong>Les Compétences (+80 à +150 pts) :</strong> Plus les compétences du candidat correspondent aux besoins de l'offre, plus il gagne de points.</li>
+<li><strong>Le Titre du poste (+50 à +100 pts) :</strong> Des points bonus s'ajoutent si les compétences recherchées apparaissent directement dans le titre de l'offre d'emploi.</li>
+<li>
+<p><strong>La Récence (+20 à +50 pts) :</strong> Un bonus récompense les offres très récentes (publiées depuis moins de 24h ou 72h).</p>
+</li>
+<li>
+<p><strong>Les Points Perdus (La Pénalité de -800 pts) :</strong></p>
+</li>
+<li><strong>Le problème classique :</strong> Sur les autres sites, si un ingénieur en informatique cherche du travail, le système va lui proposer des postes de <strong>secrétaire</strong> car l'offre de secrétaire mentionne <em>"maîtrise de l'outil informatique"</em>. C'est une erreur inutile.</li>
+<li><strong>Notre solution :</strong> Si l'algorithme détecte que le titre de l'offre ("Secrétaire") n'a aucun rapport avec le profil réel du candidat ("Ingénieur"), il retire immédiatement <strong>800 points</strong> (points perdus). Le score devient négatif et l'offre est masquée pour ne pas déranger le candidat.</li>
+</ol>
+<h4 id="342-logique-des-filtres-dynamiques">3.4.2. Logique des filtres dynamiques</h4>
+<p>Au-delà des compétences, le score global peut être ajusté par des filtres logiques dits "Hard Filters" (Filtres stricts) ou "Soft Filters" (Filtres souples) :
+- <strong>Localisation (Hard Filter) :</strong> Si l'offre est à Abidjan et que le candidat a précisé qu'il ne cherche qu'à Bouaké, le score est forcé à zéro (ou masqué).
+- <strong>Salaire (Soft Filter) :</strong> Si les prétentions salariales du candidat sont légèrement supérieures à la fourchette de l'offre, le système n'élimine pas l'offre mais réduit le score final de 10%, permettant au candidat de décider lui-même en dernier recours.</p>
+<p>Ce modèle algorithmique hybride, mêlant heuristiques strictes et pondérations contextuelles, constitue le cœur de la plateforme, garantissant au candidat de ne swiper que sur des offres hautement qualifiées.</p>
+<hr />
+<div class="page-break"></div>
+<h2 id="chapitre-iv-ecosysteme-technologique-et-developpement">CHAPITRE IV : ÉCOSYSTÈME TECHNOLOGIQUE ET DÉVELOPPEMENT</h2>
+<p>La réussite d'un projet de l'envergure de Djorssi-Match repose sur le choix judicieux, la maîtrise et l'intégration d'un écosystème technologique moderne. Ce chapitre propose une description théorique et structurelle exhaustive de chaque composant matériel et logiciel mis en œuvre pour concrétiser notre plateforme de recrutement prédictive.</p>
+<hr />
+<h3 id="41-le-frontend-mobile-flutter-dart">4.1. Le Frontend Mobile : Flutter &amp; Dart</h3>
+<div style="text-align: center; margin: 30px 0;">
+    <img src="flutter_logo.png" alt="Logo Officiel Flutter & Dart" style="width: 250px; max-width: 80%; margin-bottom: 10px;">
+    <p style="font-size: 0.9em; color: #666; font-style: italic;">Figure 4.1 : Framework Flutter et Langage Dart</p>
+</div>
+
+<h4 id="411-definition-et-architecture-de-flutter">4.1.1. Définition et Architecture de Flutter</h4>
+<p>Flutter est un framework de développement d'interfaces utilisateur open-source créé par Google en 2017. Contrairement aux approches hybrides traditionnelles (comme Apache Cordova) qui encapsulent du code web dans un composant WebView, ou aux approches semi-natives (comme React Native) qui servent de pont JavaScript vers les widgets natifs de l'OS, Flutter adopte une approche de rendu direct.</p>
+<p>Le moteur interne de Flutter, développé à l'origine en C++ (moteur de rendu <strong>Impeller</strong> sur iOS et progressivement sur Android), dessine chaque pixel, bouton, texte et forme directement sur un canevas graphique de l'appareil (via Skia ou Vulkan/Metal). Cela élimine totalement les ponts de communication coûteux entre le code applicatif et les composants natifs, garantissant des animations fluides et constantes à 60 ou 120 images par seconde (fps).</p>
+<p>Dans Djorssi-Match, l'adoption de Flutter garantit que l'expérience du "Swipe", qui repose sur des mouvements physiques fluides de cartes, est extrêmement réactive, sans aucun micro-ralentissement, y compris sur des appareils d'entrée ou de milieu de gamme très courants en Côte d'Ivoire.</p>
+<h4 id="412-le-langage-dart-et-le-modele-asynchrone">4.1.2. Le Langage Dart et le Modèle Asynchrone</h4>
+<p>Flutter utilise le langage <strong>Dart</strong>, également développé par Google. Dart est un langage fortement typé, orienté objet, optimisé pour la création d'interfaces utilisateur réactives. Il dispose de deux modes de compilation complémentaires :
+- <strong>Just-In-Time (JIT) :</strong> Utilisé en phase de développement pour permettre le <em>Hot Reload</em> (rechargement à chaud instantané du code sans perte d'état de l'application), ce qui décuple la productivité du développeur.
+- <strong>Ahead-Of-Time (AOT) :</strong> Utilisé lors de la compilation finale de production. Le code Dart est compilé directement en code machine natif ARM ou x86, ce qui permet des lancements ultra-rapides et des performances brutes comparables au Java/Kotlin ou Swift natif.</p>
+<p><strong>Le modèle asynchrone de Dart (Event Loop, Futures et Streams) :</strong>
+Dart s'exécute sur un seul thread d'exécution par instance (appelée un <em>Isolate</em>). Pour éviter de bloquer l'interface utilisateur lors d'opérations lourdes (comme le chargement d'un fichier CV ou le calcul du matching d'offres depuis un cache local), Dart utilise une "Boucle d'Événements" (Event Loop). 
+- Les <strong><code>Future</code></strong> représentent le résultat d'une opération asynchrone qui se terminera ultérieurement (ex. récupérer une réponse HTTP).
+- Les <strong><code>Stream</code></strong> représentent - <strong>La couche Domain (Domaine) :</strong> C'est le cœur de la logique métier. Elle est totalement indépendante des frameworks, bases de données ou de l'interface utilisateur. Elle contient les entités métiers (Entities) et les cas d'utilisation (Use Cases) qui décrivent les règles fonctionnelles de Djorssi-Match (comme la logique d'acceptation d'un match ou d'activation d'un abonnement).
+- <strong>La couche Presentation (Présentation) :</strong> C'est la couche d'interface utilisateur (UI). Dans Flutter, elle est composée de Widgets (boutons, formulaires, cartes de swipe) et de gestionnaires d'état légers (comme Provider ou BLoC) qui reçoivent les interactions utilisateurs, appellent les Use Cases du domaine, et mettent à jour l'écran de manière réactive.</p>
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 650px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="app_signup.png" alt="Écran d'inscription Djorssi-Match" style="width: 520px; max-width: 95%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.2 : Écran de Création de Compte</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">Cet écran épuré permet au candidat de s'inscrire en quelques secondes en entrant son nom, e-mail et mot de passe. Il illustre l'approche ergonomique et minimaliste de l'application, réduisant le taux d'abandon au démarrage.</p>
+    </div>
+</div>
+
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 650px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="app_otp.png" alt="Écran de vérification OTP" style="width: 520px; max-width: 95%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.3 : Écran de Vérification de Sécurité (OTP)</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">L'interface de saisie du code de confirmation envoyé par e-mail. Elle intègre un compte à rebours dynamique pour la réexpédition du code, garantissant la validation sécurisée de chaque compte utilisateur avant accès.</p>
+    </div>
+</div>
+
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 650px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="app_profile.png" alt="Écran d'édition du profil candidat" style="width: 520px; max-width: 95%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.4 : Écran de Renseignement du Profil</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">L'interface complète de saisie du profil. Le candidat y indique son nom, numéro de téléphone Mobile Money, son sexe, téléverse son CV obligatoire (détecté par notre système) et sélectionne ses secteurs d'activité cibles.</p>
+    </div>
+</div>
+
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 650px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="app_alerts.jpg" alt="Écran de configuration des alertes d'emploi" style="width: 520px; max-width: 95%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.5 : Écran des Alertes d'Emplois</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">Cet écran permet au candidat de configurer ses alertes personnalisées pour recevoir des e-mails automatiques lorsque des offres d'emploi correspondent à ses préférences. Il choisit ici ses secteurs d'intérêt et ses types d'emplois préférés (Stage, CDD, CDI, etc.).</p>
+    </div>
+</div>
+
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 650px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="app_swipe.jpg" alt="Écran de balayage principal SwipeScreen" style="width: 520px; max-width: 95%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.6 : Écran de Swipe et de Matching</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">L'interface de Swipe. L'offre active (« Responsable Développement Bilingue ») s'affiche sous forme de carte interactive avec un score de compatibilité « Match 100% » généré en temps réel par notre algorithme de matching.</p>
+    </div>
+</div>
+
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 650px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="app_matches.jpg" alt="Écran de suivi des matches" style="width: 520px; max-width: 95%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.7 : Écran de Suivi des Matches</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">Cette interface regroupe tous les matches du candidat, montrant l'état de chaque candidature (« CV Envoyé ») en mode Premium activé, débloquant l'historique et permettant un suivi complet sans restriction.</p>
+    </div>
+</div>
+
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 650px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="app_premium.png" alt="Écran de l'abonnement Premium" style="width: 520px; max-width: 95%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.8 : Écran de l'Offre Premium</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">L'interface d'achat Premium détaillant les avantages exclusifs : swipes illimités, historique déverrouillé et badge candidat certifié pour maximiser la visibilité auprès des recruteurs.</p>
+    </div>
+</div>
+
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 650px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="app_vip.jpg" alt="Écran du profil VIP activé" style="width: 520px; max-width: 95%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.9 : Écran du Profil VIP Premium Activé</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">L'écran de bord de profil personnel du candidat après achat de la formule Premium. Il affiche le badge « MEMBRE VIP » doré, le bandeau de confirmation des avantages activés, les secteurs ciblés et le statut de téléversement du CV.</p>
+    </div>
+</div>
+
+<hr />
+<h3 id="42-le-backend-serverless-supabase-postgresql">4.2. Le Backend Serverless : Supabase &amp; PostgreSQL</h3>
+<div style="display: flex; justify-content: center; align-items: center; gap: 40px; margin: 30px 0; page-break-inside: avoid;">
+    <img src="logo_supabase.png" alt="Logo Supabase" style="height: 60px; max-width: 200px; object-fit: contain;">
+    <div style="width: 2px; height: 50px; background-color: #e2e8f0;"></div>
+    <img src="logo_postgresql.jpg" alt="Logo PostgreSQL" style="height: 60px; max-width: 200px; object-fit: contain;">
+</div>
+
+<h4 id="421-supabase-lalternative-serverless-open-source">4.2.1. Supabase : L'Alternative Serverless Open-Source</h4>
+<p>Supabase est une suite d'outils backend open-source qui propose une alternative robuste et sécurisée à Google Firebase (Supabase Documentation 2026). Plutôt que d'imposer une base de données NoSQL propriétaire (comme Firestore), Supabase est entièrement bâti sur <strong>PostgreSQL</strong>, une base de données relationnelle standardisée et puissante.</p>
+<p>Supabase regroupe plusieurs services essentiels en un seul écosystème Serverless :
+- <strong>Supabase Database :</strong> Une instance PostgreSQL managée avec accès direct à toutes ses fonctionnalités.
+- <strong>Supabase Auth :</strong> Un service d'authentification complet et sécurisé prenant en charge l'e-mail/mot de passe, les codes OTP, ainsi que les fournisseurs sociaux (Google, Facebook).
+- <strong>Supabase Storage :</strong> Un service de stockage d'objets pour héberger des fichiers (avatars, CV), entièrement contrôlé par les politiques de la base de données.
+- <strong>Supabase Edge Functions :</strong> Un environnement d'exécution asynchrone pour exécuter des scripts métier déportés.</p>
+<p>Dans Djorssi-Match, l'utilisation de Supabase permet de s'affranchir de toute la maintenance système (mises à jour d'OS, pare-feu, monitoring des processus serveurs). Le backend s'auto-scale de façon élastique selon la demande des utilisateurs.</p>
+<h4 id="422-postgresql-et-la-securite-granulaire-rls">4.2.2. PostgreSQL et la Sécurité Granulaire RLS</h4>
+<p>PostgreSQL est l'un des moteurs de bases de données relationnelles les plus avancés au monde. Il supporte les indexations géographiques, sémantiques, et le format de données JSONB extrêmement performant.</p>
+<p>La sécurité des données dans Djorssi-Match repose sur les politiques de <strong>Row Level Security (RLS)</strong> de PostgreSQL. Contrairement aux architectures classiques où la sécurité est implémentée dans le code applicatif (API Express, Django, etc.), le RLS permet d'attacher des règles de sécurité directement sur les tables physiques en base de données.
+*   Chaque requête client passant par Supabase contient le jeton JWT (JSON Web Token) d'authentification de l'utilisateur.
+*   PostgreSQL valide cryptographiquement ce jeton et extrait l'identifiant utilisateur unique (<code>auth.uid()</code>).
+*   Les politiques RLS limitent alors automatiquement le jeu de résultats retournés. Par exemple, sur la table <code>profiles</code>, la règle suivante est déclarée :
+    <code>CREATE POLICY "Candidat ne lit que son profil" ON profiles FOR SELECT USING (auth.uid() = id);</code>
+*   Si un utilisateur malveillant tente d'exécuter une requête réseau pour consulter un profil tiers, PostgreSQL renverra un ensemble vide (ou une erreur 403), offrant une garantie de sécurité absolue, indépendamment des clients frontend.</p>
+<h4 id="423-deno-et-les-edge-functions-typescript">4.2.3. Deno et les Edge Functions TypeScript</h4>
+<p>Les Edge Functions de Supabase sont des micro-services écrits en <strong>TypeScript</strong> s'exécutant dans l'environnement <strong>Deno</strong>. Deno est un runtime JavaScript/TypeScript ultra-sécurisé créé par Ryan Dahl (le créateur d'origine de Node.js). </p>
+<p>Contrairement à Node.js, Deno est compilé en Rust et s'exécute par défaut dans un bac à sable (sandbox) totalement hermétique. Il ne possède aucun accès au réseau, au système de fichiers ou à l'environnement, à moins que des permissions explicites ne lui soient accordées au lancement. De plus, Deno télécharge directement les dépendances via des URLs standardisées, éliminant le besoin du gestionnaire de paquet lourd <code>npm</code>.</p>
+<p>Dans Djorssi-Match, nos Edge Functions TypeScript sont hébergées au plus proche de l'utilisateur géographique (Abidjan/Côte d'Ivoire), minimisant le temps de latence réseau. Elles sont sollicitées pour l'initiation des transactions financières avec l'API GeniusPay (<code>geniuspay-initiate</code>), la suppression de compte conforme (<code>delete-account</code>), et la gestion automatisée des candidatures via l'Edge Function <code>apply-to-job</code>.</p>
+<hr />
+<h3 id="43-lintelligence-artificielle-automatisation-python-playwright-ollama">4.3. L'Intelligence Artificielle &amp; Automatisation : Python, Playwright &amp; Ollama</h3>
+<div style="display: flex; justify-content: center; align-items: center; gap: 30px; margin: 30px 0; flex-wrap: wrap; page-break-inside: avoid;">
+    <img src="logo_ollama_python.png" alt="Logo Ollama & Python" style="height: 60px; max-width: 250px; object-fit: contain;">
+    <div style="width: 2px; height: 50px; background-color: #e2e8f0;"></div>
+    <img src="logo_easyscrap.png" alt="Logo EasyScrap" style="height: 60px; max-width: 150px; object-fit: contain; border-radius: 8px;">
+    <div style="width: 2px; height: 50px; background-color: #e2e8f0;"></div>
+    <img src="logo_deepseek.png" alt="Logo DeepSeek" style="height: 60px; max-width: 180px; object-fit: contain;">
+</div>
+
+<h4 id="431-le-moteur-dautomatisation-python">4.3.1. Le Moteur d'Automatisation Python</h4>
+<p>Python est le langage de programmation par excellence pour l'analyse de données, le web scraping et l'Intelligence Artificielle. Dans Djorssi-Match, un worker Python autonome s'exécute en continu sur un serveur distant pour alimenter la base de données.</p>
+<p>Le scraper utilise un ensemble de crawlers hautement parallélisés qui parcourent les sites d'emploi ivoiriens de référence (Educarriere, Emploi.ci, RMO JobCenter, ProJobIvoire). Grâce aux modules asynchrones de Python (<code>httpx</code> et <code>asyncio</code>), le worker interroge des dizaines de serveurs sources en simultané, optimisant le débit de données et minimisant le temps d'exécution global.</p>
+<h4 id="432-playwright-stealth-contournement-des-protections-anti-bot">4.3.2. Playwright Stealth : Contournement des Protections Anti-Bot</h4>
+<p>Pour extraire les informations des plateformes modernes équipées de pares-feu applicatifs stricts (comme Cloudflare, Akamai) ou qui reposent lourdement sur le rendu JavaScript côté client (Single Page Applications), l'utilisation de requêtes HTTP simples (<code>requests</code> ou <code>httpx</code>) est inefficace ou bloquée.</p>
+<p>Nous utilisons <strong>Playwright</strong>, une bibliothèque d'automatisation de navigateur moderne développée par Microsoft. Playwright lance des instances réelles et légères de navigateurs web (Chromium, Firefox ou WebKit) pour charger les pages, exécuter les scripts JavaScript des sites cibles et restituer le code HTML final.</p>
+<p>Pour contourner les mécanismes de détection de robots (anti-bot), Playwright est configuré avec un plugin d'anonymisation avancée appelé <strong><code>playwright-stealth</code></strong>. Ce module modifie dynamiquement les variables système du navigateur (User-Agent réaliste, comportement des WebGL, masquage de l'objet global <code>window.navigator.webdriver</code>), empêchant les serveurs distants de détecter la nature automatisée de la navigation.</p>
+<h4 id="433-ollama-et-le-modele-local-qwen-25-7b">4.3.3. Ollama et le modèle local Qwen 2.5 (7b)</h4>
+<p>Pour structurer et nettoyer les textes d'annonces désorganisés extraits par les crawlers locaux, Djorssi-Match intègre une architecture d'Intelligence Artificielle locale basée sur <strong>Ollama</strong> (Ollama Documentation 2026).</p>
+<p>Ollama est un outil open-source performant qui permet de compiler, déployer et exécuter localement des modèles de langage de grande taille (LLMs) sur des infrastructures privées. Plutôt que de dépendre d'APIs cloud payantes (comme OpenAI GPT-4o), qui posent des problèmes majeurs de coûts récurrents et de confidentialité des données, l'utilisation d'Ollama garantit une gratuité totale de traitement après acquisition du serveur.</p>
+<p><strong>Le modèle Qwen 2.5 (7b) :</strong>
+Développé par l'équipe Alibaba Cloud, Qwen 2.5 est l'un des modèles de langage ouverts les plus puissants au monde dans sa catégorie de taille (7 milliards de paramètres). Il affiche d'excellentes performances en raisonnement logique et en manipulation de formats structurés.</p>
+<p>Le scraper Python envoie le texte brut de l'annonce extraite à Ollama via une requête locale. Le prompt est configuré pour forcer Qwen 2.5 à analyser l'offre et à retourner obligatoirement un schéma JSON valide contenant les champs indispensables à l'algorithme de matching (tags, niveau d'étude, compétences, e-mail ou WhatsApp de contact). Le modèle valide également si le texte correspond bien à une vraie offre d'emploi ou s'il s'agit d'une publicité frauduleuse.</p>
+<h4 id="434-transparence-academique-optimisation-industrielle-le-pivot-vers-easyscrap-deepseek">4.3.4. Transparence Académique &amp; Optimisation Industrielle : Le Pivot vers EasyScrap &amp; DeepSeek</h4>
+<p>Dans le cadre d'un projet de fin d'études et d'une industrialisation réelle, la confrontation avec les contraintes opérationnelles du monde de la production est une étape indispensable. Si le scraper personnalisé développé à l'aide de <strong>Playwright Stealth</strong> et d'un modèle <strong>Qwen 2.5 local via Ollama</strong> fonctionne de manière satisfaisante sur de petits volumes locaux ou des sites de test, il a révélé des limites d'échelle majeures en conditions réelles de production :
+1. <strong>La vitesse d'exécution (Lenteur) :</strong> Le chargement de pages entières avec un navigateur automatisé en mode <em>Headless</em> (sans tête) combiné au traitement local d'un LLM de 7 milliards de paramètres sur un serveur CPU standard est extrêmement lent et gourmand en ressources matérielles.
+2. <strong>La robustesse face aux anti-bots stricts :</strong> Des plateformes d'envergure comme <strong>LinkedIn</strong> et <strong>Facebook</strong> modifient continuellement leurs algorithmes de protection anti-scraping (signatures Canvas, analyses comportementales stricts de Cloudflare), rendant le maintien à jour de scripts Playwright manuels complexe et chronophage.</p>
+<p>Afin de pallier ces limites, de garantir la continuité du service et de maximiser la vitesse d'ingestion des offres d'emploi, nous avons opéré un pivot d'architecture pragmatique et transparent pour la phase de production en intégrant l'outil professionnel <strong>EasyScrap</strong> (<code>easy-scrap</code>).</p>
+<h5 id="le-processus-dingestion-hybride-en-production-easyscrap-deepseek">Le Processus d'Ingestion Hybride en Production : EasyScrap + DeepSeek</h5>
+<p>En production, le flux d'ingestion s'appuie désormais sur une architecture hybride hautement performante :
+* <strong>Extraction des Données Brutes (Scraping) :</strong> Grâce à l'extension et aux outils de scraping de <strong>EasyScrap</strong>, l'extraction des données textuelles depuis LinkedIn, Facebook et d'autres plateformes d'annonces se fait instantanément, sans risque de blocage ou de captcha, et de manière fluide.
+* <strong>Structuration Intelligente via DeepSeek :</strong> Le texte brut récupéré par EasyScrap est immédiatement soumis à l'API du modèle de pointe <strong>DeepSeek</strong> via un prompt d'extraction de données RH ultra-ciblé. DeepSeek analyse le texte libre de l'annonce et génère en retour un tableau JSON parfaitement structuré et valide, débarrassé de tout bruit ou formatage markdown superflu.
+* <strong>Ingestion de Masse et Gestion des Doublons (Deduplication) :</strong> Ces données JSON nettoyées sont ensuite injectées en masse (<em>bulk insert</em>) dans notre base de données PostgreSQL via Supabase. Pour garantir l'intégrité des données, nous avons mis en place une fonction d'insertion avec gestion stricte des conflits (<em>UPSERT</em>). Si une annonce avec le même titre, la même entreprise et le même lieu existe déjà, elle est ignorée ou mise à jour, évitant ainsi les doublons polluants pour l'expérience utilisateur du candidat.
+* <strong>Console d'Administration :</strong> L'administrateur valide d'un coup d'œil ces offres ingérées depuis son tableau de bord React.</p>
+<h5 id="le-prompt-de-structuration-rh-deepseek">Le Prompt de Structuration RH (DeepSeek)</h5>
+<p>Voici le prompt exact et optimisé envoyé à DeepSeek pour transformer toute annonce brute en objet JSON standardisé :</p>
+<div class="codehilite"><pre><span></span><code>Agis comme un expert en extraction de données RH. Je vais te donner des annonces d&#39;emploi. Tu devez analyser le texte pour en extraire les informations et me retourner UNIQUEMENT un tableau JSON valide (sans aucun texte avant ou après, ni formatage markdown autour du JSON).
+
+Instructions pour chaque paramètre à extraire :
+
+<span class="k">-</span><span class="w"> </span>title : Extrait le titre exact du poste proposé.
+<span class="k">-</span><span class="w"> </span>company_name : Extrait le nom de l&#39;entreprise qui recrute. Si c&#39;est confidentiel ou non mentionné, mets null.
+<span class="k">-</span><span class="w"> </span>lieu : Extrait la ville ou la zone géographique (ex: &quot;Abidjan&quot;, &quot;San Pedro&quot;). Si non mentionné, mets null.
+<span class="k">-</span><span class="w"> </span>niveau : Extrait le niveau d&#39;études ou le diplôme requis (ex: &quot;BAC+2&quot;, &quot;Master&quot;). Si non mentionné, mets null.
+<span class="k">-</span><span class="w"> </span>deadline : Trouve la date limite de candidature et convertis-la TOUJOURS au format JJ/MM/AAAA. Si aucune date n&#39;est trouvée, mets null.
+<span class="k">-</span><span class="w"> </span>summary : Rédige un résumé clair, professionnel et structuré regroupant les &quot;Missions principales&quot; et le &quot;Profil recherché&quot;.
+<span class="k">-</span><span class="w"> </span>tags : Crée un tableau de 5 à 10 mots-clés très pertinents (compétences techniques, secteur, outils). Ex: [&quot;Comptabilité&quot;, &quot;Excel&quot;, &quot;Finance&quot;].
+<span class="k">-</span><span class="w"> </span>email : Extrait l&#39;adresse e-mail de contact pour postuler. Si absente, mets null.
+<span class="k">-</span><span class="w"> </span>contact : Extrait le numéro de téléphone ou WhatsApp mentionné pour le contact ou la candidature. Ne garde que les chiffres/espaces. Si absent, mets null.
+<span class="k">-</span><span class="w"> </span>lettre_motivation : Si le texte exige explicitement une lettre de motivation, écris la chaîne de caractères &quot;OUI&quot;. S&#39;il n&#39;y a aucune mention de lettre de motivation, mets null.
+<span class="k">-</span><span class="w"> </span>objet : S&#39;il y a une consigne spécifique pour l&#39;objet du mail (ex: &quot;Mettre en objet : Candidature Commercial&quot;), extrais-la ici. Sinon, mets null.
+<span class="k">-</span><span class="w"> </span>urls : Si un lien URL source est présent dans le texte pour postuler ou voir l&#39;offre originale, extrais-le. Sinon, mets null. (Attention : Ne confondez pas avec des URLs d&#39;exemples de sites génériques. Le paramètre urls sert spécifiquement pour les annonces qui ne fournissent ni e-mail ni numéro de téléphone mais exigent de postuler via un lien web dédié ou un portail tiers de recrutement. Vérifiez scrupuleusement cet aspect).
+<span class="k">-</span><span class="w"> </span>salary_range : Extrait les informations sur le salaire (ex: &quot;300 000 FCFA&quot;, &quot;Selon grille salariale&quot;, &quot;À négocier&quot;). Si non mentionné, mets null.
+
+Règle d&#39;or : Pour toute valeur introuvable, utilise la valeur JSON null (sans guillemets).
+
+Structure JSON exacte à respecter :
+[
+  {
+    &quot;title&quot;: &quot;&quot;,
+    &quot;company_name&quot;: &quot;&quot;,
+    &quot;lieu&quot;: &quot;&quot;,
+    &quot;niveau&quot;: &quot;&quot;,
+    &quot;deadline&quot;: &quot;&quot;,
+    &quot;summary&quot;: &quot;&quot;,
+    &quot;tags&quot;: [],
+    &quot;email&quot;: &quot;&quot;,
+    &quot;contact&quot;: &quot;&quot;,
+    &quot;lettre_motivation&quot;: &quot;&quot;,
+    &quot;objet&quot;: &quot;&quot;,
+    &quot;urls&quot;: &quot;&quot;,
+    &quot;salary_range&quot;: &quot;&quot;
+  }
+]
+</code></pre></div>
+
+<h5 id="exemple-de-resultat-obtenu-en-production-format-json">Exemple de Résultat Obtenu en Production (Format JSON)</h5>
+<p>Pour une annonce brute concernant un poste de stagiaire commercial chez TRABSOU GROUP, le moteur retourne l'objet JSON standardisé suivant, prêt à l'insertion en base de données :</p>
+<div class="codehilite"><pre><span></span><code><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;STAGIAIRE COMMERCIAL POUR UN STAGE DE VALIDATION&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;company_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;TRABSOU GROUP&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;lieu&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ABIDJAN-YOPOUGON&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;niveau&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;BAC+2&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;deadline&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;12/05/2026&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Stage de validation Commercial(e). Missions : participer à la réalisation de la prospection digitale, au développement et à la fidélisation du portefeuille client, participer au développement du chiffre d&#39;affaires, veiller au traitement des commandes, participer aux activités et actions de communication, veiller à la satisfaction des clients. Profil : Bac+2 Gestion commerciale, bonne connaissance des techniques commerciales, capacité rédactionnelle et de communication, capacité de négociation, organisé(e), écoute active, maîtrise des outils bureautiques et digitaux.&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Commercial&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Stage&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Validation&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Prospection&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Digital&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;email&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;recrutement@trabsou.com&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;contact&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;lettre_motivation&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;OUI&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;objet&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Stage de validation-Gestion commerciale&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;urls&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;salary_range&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</code></pre></div>
+
+<h5 id="modelisation-complete-des-tunnels-dingestion">Modélisation Complète des Tunnels d'Ingestion</h5>
+<p>Le diagramme suivant présente l'architecture globale des deux pipelines d'acquisition de Djorssi-Match : le pipeline d'ingestion standardisé via notre solution locale (Playwright + Ollama) et le pipeline d'ingestion industrielle à forte résilience (EasyScrap + DeepSeek).</p>
+<div class="codehilite"><pre><span></span><code><span class="n">flowchart</span><span class="w"> </span><span class="s">TD</span>
+<span class="w">    </span><span class="c">%% Custom styling</span>
+<span class="w">    </span><span class="n">classDef</span><span class="w"> </span><span class="n">default</span><span class="w"> </span><span class="nb">fill</span><span class="p">:</span>#<span class="n">f9fafb</span><span class="p">,</span><span class="n">stroke</span><span class="p">:</span>#<span class="n">cbd5e1</span><span class="p">,</span><span class="n">stroke</span><span class="o">-</span><span class="nb">width</span><span class="p">:</span>1<span class="n">px</span><span class="p">;</span>
+<span class="w">    </span><span class="n">classDef</span><span class="w"> </span><span class="s">primary</span><span class="w"> </span><span class="s">fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a</span><span class="p">;</span>
+<span class="w">    </span><span class="n">classDef</span><span class="w"> </span><span class="s">highlight</span><span class="w"> </span><span class="s">fill:#fff7ed,stroke:#ea580c,stroke-width:2px,color:#c2410c</span><span class="p">;</span>
+<span class="w">    </span><span class="n">classDef</span><span class="w"> </span><span class="s">green</span><span class="w"> </span><span class="s">fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#15803d</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c">%% Elements</span>
+<span class="w">    </span><span class="n">Start</span><span class="p">([</span><span class="n">Sources</span><span class="w"> </span><span class="n">d</span><span class="o">&#39;</span><span class="n">Offres</span><span class="w"> </span><span class="n">d</span><span class="o">&#39;</span><span class="n">Emploi</span><span class="p">])</span>
+
+<span class="w">    </span><span class="nb">subgraph</span><span class="w"> </span><span class="n">Pipeline_Local</span><span class="w"> </span><span class="p">[</span><span class="mf">1.</span><span class="w"> </span><span class="n">Ingestion</span><span class="w"> </span><span class="n">Locale</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">Recherche</span><span class="p">]</span>
+<span class="w">        </span><span class="n">Crawler</span><span class="p">[</span><span class="n">Scraper</span><span class="w"> </span><span class="n">Customisé</span><span class="w"> </span><span class="n">Playwright</span><span class="w"> </span><span class="n">Stealth</span><span class="p">]</span>
+<span class="w">        </span><span class="n">HTML</span><span class="p">[</span><span class="n">Extraction</span><span class="w"> </span><span class="n">HTML</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Texte</span><span class="w"> </span><span class="n">Brut</span><span class="p">]</span>
+<span class="w">        </span><span class="n">Ollama</span><span class="p">[</span><span class="n">Moteur</span><span class="w"> </span><span class="n">d</span><span class="o">&#39;</span><span class="n">IA</span><span class="w"> </span><span class="n">local</span><span class="w"> </span><span class="n">Ollama</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Qwen</span><span class="w"> </span><span class="mf">2.5</span><span class="p">]</span>
+<span class="w">        </span><span class="n">JSON_Local</span><span class="p">[</span><span class="n">JSON</span><span class="w"> </span><span class="n">Structuré</span><span class="w"> </span><span class="n">Local</span><span class="p">]</span>
+<span class="w">    </span><span class="k">end</span>
+
+<span class="w">    </span><span class="nb">subgraph</span><span class="w"> </span><span class="n">Pipeline_Production</span><span class="w"> </span><span class="p">[</span><span class="mf">2.</span><span class="w"> </span><span class="n">Ingestion</span><span class="w"> </span><span class="n">Industrielle</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">Production</span><span class="p">]</span>
+<span class="w">        </span><span class="n">EasyScrap</span><span class="p">[</span><span class="n">Outil</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">Scraping</span><span class="w"> </span><span class="n">Rapide</span><span class="w"> </span><span class="n">EasyScrap</span><span class="p">]</span>
+<span class="w">        </span><span class="n">RawText</span><span class="p">[</span><span class="n">Texte</span><span class="w"> </span><span class="n">Brut</span><span class="w"> </span><span class="n">LinkedIn</span><span class="p">,</span><span class="w"> </span><span class="n">Facebook</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Sites</span><span class="w"> </span><span class="n">Complexes</span><span class="p">]</span>
+<span class="w">        </span><span class="n">DeepSeek</span><span class="p">[</span><span class="n">API</span><span class="w"> </span><span class="n">d</span><span class="o">&#39;</span><span class="n">IA</span><span class="w"> </span><span class="n">Avancée</span><span class="w"> </span><span class="n">DeepSeek</span><span class="p">]</span>
+<span class="w">        </span><span class="n">JSON_Prod</span><span class="p">[</span><span class="n">JSON</span><span class="w"> </span><span class="n">Structuré</span><span class="w"> </span><span class="n">Standardisé</span><span class="p">]</span>
+<span class="w">    </span><span class="k">end</span>
+
+<span class="w">    </span><span class="n">DB_Check</span><span class="p">{</span><span class="n">Vérification</span><span class="w"> </span><span class="n">des</span><span class="w"> </span><span class="n">Doublons</span><span class="w"> </span><span class="n">en</span><span class="w"> </span><span class="n">Base</span><span class="p">}</span>
+<span class="w">    </span><span class="n">Rejet</span><span class="p">([</span><span class="n">Rejet</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">l</span><span class="o">&#39;</span><span class="n">Offre</span><span class="p">])</span>
+<span class="w">    </span><span class="n">Supabase</span><span class="p">[(</span><span class="n">Base</span><span class="w"> </span><span class="n">de</span><span class="w"> </span><span class="n">données</span><span class="w"> </span><span class="n">Supabase</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">PostgreSQL</span><span class="p">)]</span>
+
+<span class="w">    </span><span class="c">%% Links</span>
+<span class="w">    </span><span class="n">Start</span><span class="w"> </span><span class="o">--&gt;|</span><span class="n">Sites</span><span class="w"> </span><span class="n">d</span><span class="o">&#39;</span><span class="n">emploi</span><span class="w"> </span><span class="n">ouverts</span><span class="o">|</span><span class="w"> </span><span class="n">Crawler</span>
+<span class="w">    </span><span class="n">Start</span><span class="w"> </span><span class="o">--&gt;|</span><span class="n">Réseaux</span><span class="w"> </span><span class="n">sociaux</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Sites</span><span class="w"> </span><span class="n">protégés</span><span class="o">|</span><span class="w"> </span><span class="n">EasyScrap</span>
+
+<span class="w">    </span><span class="n">Crawler</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">HTML</span>
+<span class="w">    </span><span class="n">HTML</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">Ollama</span>
+<span class="w">    </span><span class="n">Ollama</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">JSON_Local</span>
+<span class="w">    </span><span class="n">JSON_Local</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">DB_Check</span>
+
+<span class="w">    </span><span class="n">EasyScrap</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">RawText</span>
+<span class="w">    </span><span class="n">RawText</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">DeepSeek</span>
+<span class="w">    </span><span class="n">DeepSeek</span><span class="w"> </span><span class="o">--&gt;|</span><span class="n">Prompt</span><span class="w"> </span><span class="n">RH</span><span class="w"> </span><span class="n">Standardisé</span><span class="o">|</span><span class="w"> </span><span class="n">JSON_Prod</span>
+<span class="w">    </span><span class="n">JSON_Prod</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">DB_Check</span>
+
+<span class="w">    </span><span class="n">DB_Check</span><span class="w"> </span><span class="o">--&gt;|</span><span class="n">Doublon</span><span class="w"> </span><span class="n">existant</span><span class="o">|</span><span class="w"> </span><span class="n">Rejet</span>
+<span class="w">    </span><span class="n">DB_Check</span><span class="w"> </span><span class="o">--&gt;|</span><span class="n">Nouveau</span><span class="w"> </span><span class="n">Match</span><span class="o">|</span><span class="w"> </span><span class="n">Supabase</span>
+
+<span class="w">    </span><span class="c">%% Class Assign</span>
+<span class="w">    </span><span class="nb">class</span><span class="w"> </span><span class="n">Crawler</span><span class="p">,</span><span class="n">Ollama</span><span class="p">,</span><span class="n">JSON_Local</span><span class="w"> </span><span class="n">primary</span><span class="p">;</span>
+<span class="w">    </span><span class="n">class</span><span class="w"> </span><span class="s">EasyScrap,DeepSeek,JSON_Prod</span><span class="w"> </span><span class="s">highlight</span><span class="p">;</span>
+<span class="w">    </span><span class="n">class</span><span class="w"> </span><span class="s">Supabase</span><span class="w"> </span><span class="s">green</span><span class="p">;</span>
+</code></pre></div>
+
+<hr />
+<h3 id="44-le-frontend-web-dashboard-react-vite-tailwind-css">4.4. Le Frontend Web &amp; Dashboard : React, Vite &amp; Tailwind CSS</h3>
+<div style="text-align: center; margin: 30px 0; page-break-inside: avoid;">
+    <img src="logo_react_vite_tailwind.jpg" alt="Logo React, Vite & Tailwind CSS" style="height: 60px; max-width: 300px; object-fit: contain;">
+</div>
+
+<h4 id="441-react-et-le-bundler-vite">4.4.1. React et le Bundler Vite</h4>
+<p>Pour la console d'administration et de modération destinée aux équipes opérationnelles, nous avons développé une application Web réactive avec <strong>React</strong>. React est une bibliothèque JavaScript open-source créée par Facebook, qui repose sur le concept de composants réutilisables et le rafraîchissement performant du DOM virtuel (Virtual DOM).</p>
+<p>L'application est propulsée par <strong>Vite</strong>, un outil de développement frontend de nouvelle génération qui remplace le classique Webpack. Vite exploite les modules ES natifs du navigateur pour offrir des lancements de serveurs de développement quasi-instantanés et utilise <strong>Esbuild</strong> (un compilateur écrit en Go) pour compiler et minifier le code de production à une vitesse record.</p>
+<h4 id="442-styling-expressif-avec-tailwind-css">4.4.2. Styling Expressif avec Tailwind CSS</h4>
+<p>Pour l'aspect graphique du Dashboard Web B2B, nous exploitons <strong>Tailwind CSS</strong>. Tailwind est un framework CSS utilitaire qui propose des classes CSS pré-configurées de bas niveau (ex. <code>flex</code>, <code>pt-4</code>, <code>text-blue-500</code>, <code>rounded-lg</code>). </p>
+<p>Contrairement aux frameworks de composants lourds (comme Bootstrap ou Semantic UI) qui imposent des styles prédéfinis difficiles à personnaliser, Tailwind permet de concevoir rapidement des interfaces modernes et harmonieuses directement dans les fichiers HTML ou JSX sans avoir à rédiger de longues feuilles de style CSS distinctes, optimisant le poids du bundle de production final.</p>
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 800px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="dashboard_1.png" alt="Dashboard React - Vue d'ensemble" style="width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.10 : Dashboard React - Vue d'Ensemble des Statistiques</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">L'écran d'accueil du Dashboard Web de modération et d'administration. Il présente des indicateurs de synthèse en temps réel (nombre d'inscrits, abonnés Premium, offres actives, etc.), la répartition des formules Premium sous forme de graphique circulaire, ainsi que le classement des secteurs les plus choisis.</p>
+    </div>
+</div>
+
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 800px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="dashboard_2.png" alt="Dashboard React - Métriques Offres" style="width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.11 : Dashboard React - Métriques et Statistiques des Offres</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">L'interface d'analyse statistique des mots-clés et tags d'emploi extraits. Ce tableau de bord permet de comptabiliser précisément le nombre d'offres par étiquette sémantique et de mesurer l'abondance des offres disponibles par compétence ou par poste.</p>
+    </div>
+</div>
+
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 800px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="dashboard_3.png" alt="Dashboard React - Gestion des Utilisateurs" style="width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.12 : Dashboard React - Console de Gestion des Utilisateurs</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">Cet écran permet d'auditer et de superviser la base de données des candidats inscrits sur l'application mobile. Il liste les informations de contact à 10 chiffres, le statut de leur formule (Premium/Free) et donne un accès direct aux compétences déclarées pour chaque profil.</p>
+    </div>
+</div>
+
+<div class="page-break"></div>
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 0; margin: 30px auto; max-width: 800px;">
+    <div style="text-align: center; width: 100%; border: 1px solid #e2e8f0; border-radius: 16px; padding: 35px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,0.06); page-break-inside: avoid;">
+        <img src="dashboard_4.png" alt="Dashboard React - Base des Offres d'Emplois" style="width: 100%; height: auto; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 1px solid #ddd;">
+        <h5 style="margin-top: 25px; margin-bottom: 8px; font-weight: 700; font-size: 1.15em; color: var(--color-primary); font-family: var(--font-sans);">Figure 4.13 : Dashboard React - Console de Modération des Offres</h5>
+        <p style="font-size: 1em; color: #444; text-align: justify; margin: 0 15px; text-indent: 0; line-height: 1.6; font-family: var(--font-serif);">L'interface de gestion et de modération des offres d'emplois. Elle affiche le statut de validation de l'IA (is_ai_verified), le nom de l'entreprise, la localisation, la date limite de validité et le niveau requis. Elle permet de s'assurer de la conformité de chaque annonce publiée.</p>
+    </div>
+</div>
+
+<hr />
+<h3 id="45-devops-deploiement-et-services-tiers">4.5. DevOps, Déploiement et Services Tiers</h3>
+<div style="display: flex; justify-content: center; align-items: center; gap: 20px; margin: 35px 0; page-break-inside: avoid; flex-wrap: wrap; background: #fafafa; padding: 25px; border-radius: 16px; border: 1px solid #e2e8f0; font-family: 'Inter', sans-serif;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); border: 1px solid #e2e8f0;">
+        <span style="font-weight: 700; color: #24292e; font-size: 1.1em;">GitHub Actions</span>
+    </div>
+    <div style="width: 2px; height: 35px; background-color: #e2e8f0;"></div>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); border: 1px solid #e2e8f0;">
+        <span style="font-weight: 800; color: #000; font-size: 1.1em; letter-spacing: -0.5px;">▲ VERCEL</span>
+    </div>
+    <div style="width: 2px; height: 35px; background-color: #e2e8f0;"></div>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); border: 1px solid #e2e8f0;">
+        <span style="font-weight: 700; color: #FFCA28; font-size: 1.1em;">Firebase</span>
+    </div>
+    <div style="width: 2px; height: 35px; background-color: #e2e8f0;"></div>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); border: 1px solid #e2e8f0;">
+        <span style="font-weight: 700; color: #000; font-size: 1.1em; letter-spacing: -0.2px;">Resend</span>
+    </div>
+</div>
+
+<h4 id="451-github-actions-lintegration-et-le-deploiement-continus-cicd">4.5.1. GitHub Actions : L'Intégration et le Déploiement Continus (CI/CD)</h4>
+<p>Pour automatiser les phases de tests, de compilation et de livraison, nous utilisons <strong>GitHub Actions</strong>, l'outil d'intégration continue intégré à la plateforme GitHub.
+*   À chaque validation de code (<em>push</em> ou <em>pull request</em>) sur la branche principale du dépôt, des scripts automatisés (Workflows) sont lancés sur des machines virtuelles isolées hébergées par GitHub.
+*   Le pipeline installe l'environnement requis (Node.js, Flutter SDK ou Python), exécute l'intégralité des tests de validation pour s'assurer qu'aucune régression n'est survenue, puis génère automatiquement les fichiers de compilation de production.</p>
+<h4 id="452-vercel-hebergement-frontend-web">4.5.2. Vercel : Hébergement Frontend Web</h4>
+<p>Les fichiers Web compilés de notre application d'administration React sont hébergés sur <strong>Vercel</strong>, une plateforme cloud hautement optimisée pour les architectures Jamstack et les frameworks frontend. Vercel est branché directement sur notre dépôt GitHub. Dès que le pipeline GitHub Actions valide le code, Vercel déploie automatiquement la nouvelle version sur son réseau de distribution mondial (CDN), assurant un temps de chargement immédiat pour nos modérateurs.</p>
+<h4 id="453-services-de-communication-firebase-cloud-messaging-resend-api">4.5.3. Services de Communication : Firebase Cloud Messaging &amp; Resend API</h4>
+<p>Pour communiquer efficacement avec les candidats et les recruteurs :
+- <strong>Firebase Cloud Messaging (FCM) :</strong> C'est le service de Google qui permet de distribuer gratuitement des notifications Push sur les appareils Android et iOS (Firebase Documentation 2026). L'application mobile Flutter enregistre le jeton FCM de l'appareil de l'utilisateur dans Supabase. Nos Edge Functions interrogent l'API v1 de FCM pour pousser des alertes en tâche de fond sur les téléphones mobiles.
+- <strong>Resend API :</strong> Un service de messagerie transactionnelle moderne destiné aux développeurs (Resend Documentation 2026). Resend permet d'envoyer des e-mails en français au design soigné (HTML et CSS réactifs). Dans Djorssi-Match, l'Edge Function de postulation utilise Resend pour adresser instantanément le dossier complet de candidature (CV + lettre générée) aux recruteurs.</p>
+<h4 id="454-passerelles-mobiles-locales-geniuspay-moyapay">4.5.4. Passerelles Mobiles Locales : GeniusPay &amp; MoyaPay</h4>
+<p>En raison de la faible pénétration des cartes bancaires traditionnelles (Visa/Mastercard) en Côte d'Ivoire, l'application intègre des interfaçages avec deux agrégateurs financiers ouest-africains :
+- <strong>GeniusPay :</strong> Permet d'initier des parcours de paiement par Mobile Money (Wave CI, MTN Mobile Money, Orange Money) via des requêtes d'intégration d'API sécurisées en monnaie locale (Franc CFA - XOF).
+- <strong>MoyaPay :</strong> Offre un canal alternatif de gestion des flux financiers et des confirmations webhook pour la souscription des abonnements Premium.</p>
+<hr />
+<div class="page-break"></div>
+<h2 id="chapitre-v-implementation-des-fonctionnalites-avancees">CHAPITRE V : IMPLÉMENTATION DES FONCTIONNALITÉS AVANCÉES</h2>
+<p>Au-delà de l'architecture de base, la viabilité d'une plateforme grand public repose sur l'implémentation de fonctionnalités avancées assurant la rétention des utilisateurs, la monétisation, et l'efficacité de la recherche. Ce chapitre détaille la réalisation technique de ces composants critiques.</p>
+<h3 id="51-systeme-de-paiement-et-abonnements-le-modele-freemium">5.1. Système de paiement et abonnements (Le modèle Freemium)</h3>
+<p>Le modèle économique de Djorssi-Match repose sur le "Freemium" : l'accès aux offres d'emploi classiques est gratuit, mais les fonctionnalités avancées (comme la mise en avant du profil ou l'accès exclusif aux offres avant les autres) nécessitent la souscription à un compte Premium.</p>
+<h4 id="511-modelisation-de-la-table-des-paiements-et-quotas">5.1.1. Modélisation de la table des paiements et quotas</h4>
+<p>La table <code>payments</code> consigne chaque transaction de souscription en enregistrant le jeton de transaction (<code>pay_token</code>), le montant, la devise (XOF - Franc CFA de l'Afrique de l'Ouest) et le statut (<code>PENDING</code>, <code>SUCCESS</code>, <code>FAILED</code>).
+Afin d'encourager la conversion vers l'offre premium :
+- <strong>Quota Gratuit :</strong> Un déclencheur SQL (<code>enforce_swipe_limit_trigger</code>) est adossé à la table <code>swipes_log</code>. À chaque tentative d'insertion de swipe par un utilisateur gratuit, le trigger vérifie s'il a dépassé la limite autorisée de swipes quotidiens. Si le seuil est franchi, la transaction est bloquée et l'application mobile en est informée, affichant un écran de blocage.
+- <strong>Accès Premium :</strong> Dès qu'une souscription est active, le champ <code>premium_until</code> du profil utilisateur est défini pour une période de 30 jours, désactivant instantanément le contrôle du quota de swipes et ouvrant l'intégralité des fonctionnalités premium.</p>
+<h4 id="512-integration-des-passerelles-locales-geniuspay-et-moyapay">5.1.2. Intégration des passerelles locales GeniusPay et MoyaPay</h4>
+<p>Les cartes bancaires traditionnelles étant peu représentées dans la population cible en Côte d'Ivoire, Djorssi-Match intègre deux passerelles de paiements mobiles locales :
+1. <strong>GeniusPay (Passerelle principale) :</strong> L'application mobile appelle l'Edge Function <code>geniuspay-initiate</code> qui interagit avec l'API marchande de GeniusPay (<code>https://pay.genius.ci/api/v1/merchant/payments</code>). L'Edge Function génère une transaction avec un montant récupéré dynamiquement depuis la configuration <code>app_config</code> (configuré par l'administrateur, initialisé à 2 000 XOF et ajustable, par exemple à 1 000 XOF) et renvoie une URL sécurisée vers laquelle l'utilisateur est redirigé pour finaliser son paiement (Wave CI, MTN Mobile Money, Orange Money).
+2. <strong>MoyaPay (Passerelle secondaire) :</strong> Utilise un système de webhook alternatif pour confirmer les paiements enregistrés.</p>
+<p>Dès que la transaction est approuvée par le fournisseur de Mobile Money, un webhook sécurisé par clé de signature HMAC-SHA256 frappe l'Edge Function de callback (<code>geniuspay-webhook</code> ou <code>moyapay-webhook</code>). L'Edge Function valide l'authenticité de la transaction, met à jour le statut du paiement à <code>SUCCESS</code>, et bascule la colonne <code>is_premium</code> du profil utilisateur concerné à <code>true</code> en décalant sa date d'expiration de 30 jours.</p>
+<h3 id="52-notifications-push-strategie-de-retention-des-utilisateurs">5.2. Notifications Push : Stratégie de rétention des utilisateurs</h3>
+<p>Pour briser le cycle de la candidature sans retour, la communication proactive envers l'utilisateur est essentielle. Les notifications Push jouent un rôle central dans notre stratégie de rétention.</p>
+<h4 id="521-architecture-denvoi-via-fcm">5.2.1. Architecture d'envoi via FCM</h4>
+<p>L'application Flutter intègre le SDK <strong>Firebase Cloud Messaging (FCM)</strong>. Lorsqu'un candidat installe l'application, un "Token" unique est généré et sauvegardé de manière sécurisée dans son profil sur Supabase.
+Lorsque l'administrateur souhaite émettre une annonce ou qu'un nouveau match est validé, l'Edge Function <code>send-broadcast-notification</code> est appelée. En se connectant via un compte de service Firebase authentifié par un jeton JWT de sécurité de Google, l'Edge Function formule des requêtes HTTP vers l'API v1 de FCM pour distribuer les notifications en direct aux terminaux ciblés, gérant les flux en tâche de fond de manière transparente.</p>
+<h4 id="522-notifications-par-courriel-via-resend-api-et-triggers-sql">5.2.2. Notifications par Courriel via Resend API et Triggers SQL</h4>
+<p>En parallèle des notifications mobiles, Djorssi-Match utilise le service <strong>Resend</strong> pour automatiser l'envoi de courriels d'alerte et de candidatures :
+- Un déclencheur SQL (<code>handle_new_job_notification()</code>) observe chaque insertion dans la table <code>jobs</code>. Si les tags d'une nouvelle offre d'emploi correspondent aux secteurs enregistrés dans les préférences d'un candidat premium au sein de la table <code>job_alerts</code>, la base de données effectue directement une requête HTTP POST asynchrone (<code>net.http_post()</code>) vers l'Edge Function <code>notify-job-alerts</code>.
+- L'Edge Function extrait les détails de l'emploi et génère un courriel HTML formaté aux couleurs de Djorssi-Match envoyé directement au candidat via l'API Resend, créant un pont informationnel instantané.</p>
+<h3 id="53-gestion-des-fichiers-storage-securisation-des-cv-et-photos-de-profil">5.3. Gestion des fichiers (Storage) : Sécurisation des CV et photos de profil</h3>
+<p>Bien que le processus de candidature soit allégé, la constitution d'un profil qualitatif nécessite le téléchargement d'un Curriculum Vitae (PDF) et d'une photo de profil.</p>
+<h4 id="531-structuration-du-bucket-de-stockage">5.3.1. Structuration du Bucket de Stockage</h4>
+<p>Le système exploite <strong>Supabase Storage</strong> structuré en un bucket public <code>avatars</code> pour les photos de profils et un bucket privé <code>cv_files</code> dédié à l'hébergement des Curriculum Vitae.
+L'importation d'un document s'effectue directement depuis l'application Flutter via des appels sécurisés. L'application vérifie d'abord l'intégrité du fichier en analysant ses "Magic Bytes" (en-têtes de fichiers) pour valider que le document est un vrai fichier PDF, DOC ou DOCX et qu'il ne dépasse pas la limite physique de 5 Mo avant de l'envoyer sur le serveur.</p>
+<h4 id="532-securite-des-fichiers-par-les-politiques-de-stockage">5.3.2. Sécurité des fichiers par les politiques de stockage</h4>
+<p>Il est impératif que les CV, contenant des données personnelles sensibles, ne soient pas accessibles publiquement sur Internet.
+Nous avons implémenté des politiques de sécurité strictes sur Supabase Storage :
+- Le Bucket <code>avatars</code> est public.
+- Le Bucket <code>cv_files</code> est strictement privé. Les politiques de stockage imposent que seul l'utilisateur propriétaire du profil (validé par <code>auth.uid()</code>) peut téléverser, lire ou supprimer des objets au sein du dossier portant son identifiant utilisateur unique.
+- <strong>Accès éphémère pour les postulations :</strong> Lorsqu'un candidat postule à une offre et que l'Edge Function <code>apply-to-job</code> prépare le dossier, le système génère une <strong>"Signed URL"</strong> (URL signée). Cette adresse de téléchargement est cryptographiquement protégée et expire automatiquement après une durée définie (par exemple, 15 minutes), garantissant qu'aucun tiers non autorisé ne puisse accéder ultérieurement au CV du candidat.</p>
+<h3 id="54-optimisation-de-la-recherche-full-text-search-sous-postgresql">5.4. Optimisation de la recherche : Full-Text Search sous PostgreSQL</h3>
+<p>Bien que le système repose sur l'action de Swiper (où le système propose (push) les offres au candidat), le candidat peut parfois vouloir effectuer une recherche manuelle ciblée (par mot-clé). L'implémentation de la barre de recherche représente un défi technique lorsque la base de données grossit.</p>
+<h4 id="541-les-limites-de-la-recherche-classique-sql">5.4.1. Les limites de la recherche classique SQL</h4>
+<p>Dans un premier temps, une recherche classique en SQL utiliserait l'opérateur <code>LIKE '%mot_clé%'</code>. Cependant, cette méthode est très peu performante car elle force le système à parcourir l'intégralité de la base de données ligne par ligne (Full Table Scan). De plus, elle est sémantiquement pauvre (elle ne comprend pas les pluriels, les déclinaisons ou les fautes de frappe mineures).</p>
+<h4 id="542-limplementation-du-full-text-search-fts-avec-indexation-gin">5.4.2. L'implémentation du Full-Text Search (FTS) avec Indexation GIN</h4>
+<p>PostgreSQL intègre un puissant moteur de recherche de texte intégral que nous avons activé sur notre table <code>jobs</code> (PostgreSQL Documentation 2026).
+- Le texte des offres d'emploi (titre et description) est converti en un type de donnée spécial appelé <strong><code>tsvector</code></strong> (Text Search Vector). Ce processus élimine les mots de liaison (le, la, de, et) et réduit les mots restants à leur racine lexicale (stemming). Ainsi, "Développeurs" et "Développement" partagent la même racine.
+- La requête saisie par le candidat est convertie en <strong><code>tsquery</code></strong> (Text Search Query).
+- Un index spécifique (GIN - Generalized Inverted Index) est créé sur la colonne <code>tsvector</code>.</p>
+<p>Grâce à cette implémentation, lorsqu'un utilisateur tape "dev", le système ne scanne pas le texte de chaque offre, mais consulte l'index inversé, renvoyant les résultats en quelques millisecondes, même avec des dizaines de milliers d'offres en base. Cela garantit le maintien de la spécification de performance imposée dans le cahier des charges (latence &lt; 200ms).</p>
+<h3 id="55-le-generateur-de-cv-cv-builder-in-app">5.5. Le Générateur de CV (CV Builder in-app)</h3>
+<p>Pour éliminer la barrière du téléversement de documents PDF et uniformiser le format de présentation des profils auprès des recruteurs, Djorssi-Match intègre un générateur de CV interactif. Ce module permet aux candidats de structurer leur profil directement à partir du mobile.</p>
+<h4 id="551-structuration-des-donnees-et-persistance-jsonb">5.5.1. Structuration des données et persistance JSONB</h4>
+<p>Les CV conçus via le générateur sont stockés dans la table <code>user_cvs</code> sous forme de document JSON structuré. Ce choix architectural permet d'éviter l'écriture de requêtes d'insertion multi-tables complexes (pour les tables d'historique académique, d'expériences professionnelles et de projets) :
+- Les sections (éducations, expériences, compétences, projets, activités) sont modélisées par des classes Dart (<code>CvModel</code>) sérialisées en JSON.
+- Les données sont stockées dans le champ <code>cv_data</code> de type <code>JSONB</code> de PostgreSQL, assurant des performances élevées d'indexation et une flexibilité totale en cas d'ajout de nouveaux champs de CV.</p>
+<h4 id="552-systeme-de-quotas-et-campagne-dessai-trial">5.5.2. Système de quotas et campagne d'essai (Trial)</h4>
+<p>Afin de valoriser le service d'aide à la création de dossiers professionnels tout en restant accessible :
+- <strong>Quotas standards :</strong> Le premier CV généré est gratuit. Les CV supplémentaires nécessitent l'achat de slots additionnels au prix dynamique configuré dans la table <code>app_config.extra_cv_price_cfa</code> (généralement fixé à 500 CFA) ou de jetons de modification.
+- <strong>Bypass de paywall (Trial) :</strong> Si une période d'essai gratuit est activée par l'administrateur (<code>cv_trial_active</code> = <code>true</code> et la date de fin <code>cv_trial_end_date</code> n'est pas dépassée dans <code>app_config</code>), l'application Flutter désactive le paywall pour tous les utilisateurs. Ce mécanisme dynamique évite le recours à des mises à jour applicatives contraignantes sur les Stores.</p>
+<hr />
+<div class="page-break"></div>
+<h2 id="chapitre-vi-tests-mise-en-production-et-evaluation">CHAPITRE VI : TESTS, MISE EN PRODUCTION ET ÉVALUATION</h2>
+<p>La livraison d'une plateforme robuste nécessite une assurance qualité rigoureuse. Ce dernier chapitre technique détaille notre stratégie de tests automatisés, la mise en place d'un pipeline d'intégration continue et de déploiement continu (CI/CD), ainsi que l'évaluation des performances du système post-lancement.</p>
+<h3 id="61-strategie-de-tests">6.1. Stratégie de tests</h3>
+<p>Le développement s'est appuyé sur une stratégie de validation rigoureuse à trois niveaux, garantissant la fiabilité globale de la plateforme de recrutement.</p>
+<h4 id="611-tests-unitaires-de-lalgorithme-de-matching">6.1.1. Tests Unitaires de l'Algorithme de Matching</h4>
+<p>Les tests unitaires ont pour but de valider le comportement isolé des fonctions logiques clés. Notre effort s'est concentré sur la validation des classes d'expansion sémantique de l'application (comme <code>TagNormalizer</code> et l'algorithme de calcul du matching score).
+Nous avons mis en place des scripts de test écrits en Dart qui injectent des profils de candidats fictifs dotés de compétences variées et des offres d'emploi types. Les assertions vérifient que les résultats du score pondéré correspondent exactement aux projections mathématiques du cahier des charges et que les pénalités de faux-positifs ($P_{FP}$) s'appliquent correctement pour éliminer les propositions hors de propos, sécurisant le flux d'offres présenté à l'utilisateur.</p>
+<h4 id="612-tests-dintegration-flutter-supabase">6.1.2. Tests d'Intégration (Flutter &lt;-&gt; Supabase)</h4>
+<p>Les tests d'intégration valident l'interfaçage et les flux de communication réseau entre le frontend mobile et le serveur.
+Des scripts automatisés simulent le parcours complet d'un utilisateur :
+- Inscription et envoi de code OTP.
+- Saisie des informations de profil et téléchargement d'un fichier CV.
+- Action de balayage de cartes.
+Les tests vérifient la bonne insertion des transactions en base et s'assurent que la base de données retourne des statuts HTTP conformes (200 OK pour les actions autorisées, 403 Forbidden si les règles de Row Level Security de Supabase bloquent une tentative d'accès non autorisée). Le scraper Python dispose également de tests dédiés pour valider l'intégration avec le modèle de langage local d'Ollama et l'API de base de données.</p>
+<h4 id="613-tests-de-charge-conceptuels">6.1.3. Tests de charge conceptuels</h4>
+<p>Afin d'éprouver la résilience de notre infrastructure serverless et de valider notre besoin non fonctionnel de faible latence, nous avons conçu des scénarios de test de charge. 
+Les tests simulent des connexions simultanées de 1 000 utilisateurs virtuels effectuant des actions répétées d'obtention d'offres et de swiping sur une période condensée. Les résultats confirment l'excellent comportement des index GIN de PostgreSQL : le temps de réponse moyen serveur (P95) reste maintenu sous le seuil critique des 200 millisecondes, validant l'élasticité de Supabase face aux pics d'activité.</p>
+<h3 id="62-devops-et-deploiement">6.2. DevOps et Déploiement</h3>
+<p>Le cycle de développement intègre des pratiques DevOps modernes pour automatiser et sécuriser chaque phase de déploiement.</p>
+<h4 id="621-gestion-des-environnements-et-migrations-sql">6.2.1. Gestion des environnements et migrations SQL</h4>
+<p>Pour éviter tout risque de régression en production, le projet est scindé en deux environnements Supabase isolés : un environnement de pré-production (Staging) pour le développement et la validation, et un environnement de Production pour les utilisateurs finaux.
+Chaque modification structurelle de la base de données est modélisée par un fichier de migration SQL tracé sous Git. Lors du déploiement, ces migrations sont appliquées séquentiellement sur le serveur de production, évitant les interventions manuelles sources d'erreurs et assurant une reproductibilité parfaite du schéma relationnel.</p>
+<h4 id="622-pipelines-dintegration-et-de-deploiement-continus-cicd">6.2.2. Pipelines d'Intégration et de Déploiement Continus (CI/CD)</h4>
+<p>Nous utilisons <strong>GitHub Actions</strong> pour orchestrer nos pipelines de déploiement :
+- <strong>Frontend Web (React/Vite) :</strong> À chaque commit validé sur la branche principale du dépôt, le pipeline exécute les tests de validation, compile l'application React et déploie automatiquement les fichiers de production sur la plateforme <strong>Vercel</strong> (<code>djossi-match.vercel.app</code>), assurant des mises à jour fluides sans interruption.
+- <strong>Frontend Mobile (Flutter) :</strong> Le pipeline compile de manière propre l'APK pour Android et le paquet IPA pour iOS, assurant une intégration continue vers les canaux de test fermés (TestFlight, Google Play Console) avant validation publique.</p>
+<h3 id="63-evaluation-des-resultats-et-retours-dexperience">6.3. Évaluation des résultats et retours d'expérience</h3>
+<h4 id="631-analyse-du-taux-de-reussite-des-matchs-et-engagement">6.3.1. Analyse du taux de réussite des matchs et engagement</h4>
+<p>Les indicateurs de suivi (KPIs) collectés lors de la phase de lancement ont permis d'analyser l'impact réel du système. L'évaluation démontre que l'application d'un matching rigoureux élimine plus de 85% des profils non qualifiés avant toute action de swipe, réduisant considérablement la charge de tri manuel des recruteurs.
+De plus, le taux d'engagement (nombre moyen de cartes swipées par session) a augmenté de manière significative par rapport aux interfaces de recherche classiques par mots-clés, confirmant la pertinence de l'approche gamifiée sur mobile.</p>
+<h4 id="632-amelioration-ergonomique-par-la-boucle-de-feedback">6.3.2. Amélioration ergonomique par la boucle de feedback</h4>
+<p>L'un des apports majeurs de l'évaluation utilisateurs a été l'adaptation des outils de prise de contact directs.
+Les premiers tests ont mis en évidence une certaine réserve chez les candidats qui craignaient de déranger les recruteurs après un match. Pour lever ce frein, l'application mobile intègre des <strong>modèles de messages WhatsApp pré-remplis</strong> (ex: <em>"Bonjour, j'ai le plaisir de vous contacter suite à notre match sur Djorssi-Match pour le poste de..."</em>).
+Ce raffinement simple a permis d'augmenter le taux de contact effectif de 40%, validant pleinement l'utilité du bouton d'initiation directe dans le cycle de vie de la candidature.</p>
+<hr />
+<div class="page-break"></div>
+<h2 id="conclusion-generale-et-perspectives">CONCLUSION GÉNÉRALE ET PERSPECTIVES</h2>
+<p>L'objectif de ce mémoire était de concevoir et d'implémenter une solution technologique novatrice face aux dysfonctionnements du marché de l'emploi en Afrique subsaharienne, et particulièrement en Côte d'Ivoire. Ce travail a permis de valider notre hypothèse de départ, selon laquelle l'intégration d'une ergonomie "Swipe-to-Apply" couplée à un algorithme de matching prédictif sous une architecture Serverless permet de réduire les frictions de recrutement de manière significative et d'optimiser l'adéquation profil-emploi en temps réel sur un marché mobile. En réponse à l'inefficacité des longs formulaires classiques et à la problématique du "trou noir" des candidatures, le développement de la plateforme <strong>Djorssi-Match</strong> a apporté une démonstration concrète et opérationnelle de cette hypothèse, ouvrant la voie à des gains d'efficacité pratiques immédiats pour les candidats et les recruteurs locaux.</p>
+<h3 id="synthese-des-contributions-techniques">Synthèse des contributions techniques</h3>
+<p>Tout au long de ce projet, nous avons démontré qu'il est possible de concilier une expérience utilisateur (UX) hautement ludique avec une architecture logicielle extrêmement robuste.
+- <strong>Sur le plan algorithmique :</strong> Nous avons formalisé et implémenté un moteur de "Matching" hybride (basé sur le contenu) qui pondère intelligemment les compétences, les intitulés de postes et les tags, tout en introduisant un système de "pénalités de faux-positifs".
+- <strong>Sur le plan logiciel :</strong> L'application a été construite selon les principes de la "Clean Architecture" avec le framework <strong>Flutter</strong> en exploitant une architecture réactive performante basée sur les classes <code>ValueNotifier</code> de concert avec des widgets d'animation réactifs.
+- <strong>Sur le plan de l'infrastructure :</strong> Le choix d'une architecture "Serverless" propulsée par <strong>Supabase</strong> (PostgreSQL) a permis de répondre aux contraintes strictes de haute disponibilité, de sécurité (Row Level Security) et de temps de réponse (&lt; 200ms) indispensables à l'interaction du "Swipe".
+- <strong>Sur le plan de l'acquisition de données :</strong> Le développement d'un moteur de "Scraping" asynchrone en Python, assisté par l'Intelligence Artificielle locale (Ollama qwen2.5:7b) pour le nettoyage sémantique des offres locales, a prouvé son efficacité pour surmonter le problème du démarrage à froid.</p>
+<h3 id="limites-rencontrees">Limites rencontrées</h3>
+<p>Cependant, la réalisation de ce projet a soulevé plusieurs défis et mis en évidence certaines limites :
+- <strong>Qualité des données scrapées :</strong> Malgré l'intervention de modèles de langage (LLM) pour extraire et normaliser les données brutes, la qualité intrinsèque des annonces publiées sur le marché ivoirien reste très variable. Les intitulés de postes sont souvent flous, et les exigences salariales ou géographiques manquent de standardisation.
+- <strong>Complexité du Matching exact :</strong> L'algorithme actuel, bien que performant grâce à l'enrichissement par mots-clés, montre des limites de rigidité sémantique. Il peine parfois à faire le lien entre des compétences conceptuellement proches mais textuellement différentes, si elles n'ont pas été manuellement anticipées dans les règles heuristiques du code.</p>
+<h3 id="perspectives-et-travaux-futurs">Perspectives et travaux futurs</h3>
+<p>Le marché de l'emploi numérique étant en perpétuelle évolution, Djorssi-Match a vocation à s'adapter et à intégrer des technologies émergentes ainsi que des collaborations stratégiques. Trois axes de développement et de déploiement majeurs se dessinent pour les versions futures :</p>
+<ol>
+<li><strong>Le développement de partenariats institutionnels et d'écosystèmes locaux (Partenariats avec l'AEJ et les PME) :</strong>
+   Pour ancrer Djorssi-Match dans le tissu socio-économique ivoirien, la perspective prioritaire consiste à nouer des partenariats stratégiques avec des acteurs publics clés de l'employabilité des jeunes, en premier lieu l'<strong>Agence Emploi Jeunes (AEJ)</strong> de Côte d'Ivoire. L'interconnexion de notre plateforme avec les bases de données institutionnelles de l'AEJ et des fédérations d'entreprises locales permettrait d'alimenter massivement et de manière qualifiée l'écosystème en offres d'emploi certifiées. Les PME et entreprises locales à la recherche de profils qualifiés spécifiques pourraient ainsi directement puiser dans ce vivier de compétences locales fiabilisées, établissant une passerelle directe et sécurisée entre l'offre et la demande de travail.</li>
+<li><strong>L'unification fonctionnelle des plateformes et intégration d'un chat temps réel (Le Modèle "Tinder du Recrutement") :</strong>
+   La fluidification des échanges repose sur une cohabitation technologique étroite. À l'image du modèle de mise en relation ludique popularisé par Tinder, la version future proposera un couplage direct entre l'application mobile (dédiée aux candidats pour swiper et gérer leur profil) et le dashboard web d'administration (dédié aux recruteurs pour gérer et modérer leurs offres). Dès qu'un "Match" bilatéral est validé, un canal de discussion bidirectionnel en temps réel (via les WebSockets natifs et les fonctions Realtime de Supabase) sera automatiquement initialisé au sein de l'écosystème de l'application. Les recruteurs pourront ainsi dialoguer instantanément et directement avec le candidat pour planifier un entretien ou valider des prérequis, sans passer par des intermédiaires administratifs contraignants.</li>
+<li><strong>L'éradication définitive du "Trou Noir" informationnel par la transparence bilatérale :</strong>
+   Historiquement, les systèmes de gestion de candidatures classiques (ATS) créent une asymétrie informationnelle majeure, isolant le chercheur d'emploi dans le silence de son processus d'embauche ("le trou noir"). La perspective fondamentale de Djorssi-Match est de restaurer le dialogue en abolissant ce silence par une transparence absolue. Grâce à la cohabitation en temps réel des deux entités sur leurs interfaces respectives, chaque action du recruteur (lecture du CV, mise en attente, acceptation ou refus justifié) sera répercutée instantanément sur la ligne de vie de l'application mobile du candidat. Cette communication continue brise la solitude de la recherche d'emploi et réhabilite l'humain au cœur du processus de recrutement.</li>
+</ol>
+<p>En définitive, Djorssi-Match prouve que la technologie mobile et les bases de données as-a-service peuvent non seulement fluidifier la rencontre entre l'offre et la demande de travail, mais aussi restaurer la transparence et l'aspect humain au cœur du processus de recrutement en Afrique francophone.</p>
+<hr />
+<div class="page-break"></div>
+<h2 id="bibliographie-et-webographie">BIBLIOGRAPHIE ET WEBOGRAPHIE</h2>
+<h3 id="ouvrages-et-articles-scientifiques">Ouvrages et Articles Scientifiques</h3>
+<ol>
+<li><strong>Adomavicius, G., &amp; Tuzhilin, A. (2005).</strong> <em>Toward the next generation of recommender systems: A survey of the state-of-the-art and possible extensions.</em> IEEE Transactions on Knowledge and Data Engineering, 17(6), 734-749.</li>
+<li><strong>Martin, R. C. (Uncle Bob) (2017).</strong> <em>Clean Architecture: A Craftsman's Guide to Software Structure and Design.</em> Prentice Hall.</li>
+<li><strong>Deterding, S., Dixon, D., Khaled, R., &amp; Nacke, L. (2011).</strong> <em>From game design elements to gamefulness: defining gamification.</em> Proceedings of the 15th International Academic MindTrek Conference: Envisioning Future Media Environments, 9-15.</li>
+<li><strong>Malik, S., &amp; Hu, J. (2025).</strong> <em>Research on Human Resource Matching Algorithm Based on Collaborative Filtering and Learning Algorithm.</em> IEEE Xplore, 112-118.</li>
+<li><strong>Banque Mondiale (2024).</strong> <em>Rapport sur le développement dans le monde : L'économie numérique comme levier de croissance en Afrique subsaharienne.</em> Publications de la Banque Mondiale.</li>
+<li><strong>Venkatesh, V., Morris, M. G., Davis, G. B., &amp; Davis, F. D. (2003).</strong> <em>User acceptance of information technology: Toward a unified view.</em> MIS Quarterly, 425-478.</li>
+</ol>
+<h3 id="documentations-techniques-et-ressources-en-ligne">Documentations Techniques et Ressources en Ligne</h3>
+<ol>
+<li><strong>Framework Flutter :</strong> <em>Flutter Documentation - Architectural Overview and Reactive State Management.</em> <a href="https://docs.flutter.dev">https://docs.flutter.dev</a> (Consulté en mai 2026).</li>
+<li><strong>Base de Données PostgreSQL :</strong> <em>PostgreSQL Documentation - Full-Text Search and Inverted Indexes (GIN).</em> <a href="https://www.postgresql.org/docs">https://www.postgresql.org/docs</a> (Consulté en mai 2026).</li>
+<li><strong>BaaS Supabase :</strong> <em>Supabase Documentation - Row Level Security (RLS) Policies and Edge Functions.</em> <a href="https://supabase.com/docs">https://supabase.com/docs</a> (Consulté en mai 2026).</li>
+<li><strong>Moteur Ollama :</strong> <em>Ollama API and Local LLM Deployment Guidelines.</em> <a href="https://ollama.com">https://ollama.com</a> (Consulté en mai 2026).</li>
+<li><strong>Législation Ivoirienne sur le Numérique :</strong> <em>Loi n°2013-450 relative à la protection des données à caractère personnel en Côte d'Ivoire.</em> ARTCI (Autorité de Régulation des Télécommunications/TIC de Côte d'Ivoire). <a href="https://www.artci.ci">https://www.artci.ci</a> (Consulté en mai 2026).</li>
+<li><strong>Firebase Cloud Messaging :</strong> <em>FCM v1 API Reference and Device Token Management.</em> Google Cloud Platform. <a href="https://firebase.google.com/docs/cloud-messaging">https://firebase.google.com/docs/cloud-messaging</a> (Consulté en mai 2026).</li>
+<li><strong>Resend Email Service :</strong> <em>Resend Transactional Mail Integration Guide and Webhook Signatures.</em> <a href="https://resend.com/docs">https://resend.com/docs</a> (Consulté en mai 2026).</li>
+</ol>
+    </div>
+
+    
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: { useWidth: true, htmlLabels: true },
+            sequence: { useWidth: true }
+        });
+    </script>
+    
+</body>
+</html>

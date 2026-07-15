@@ -5,12 +5,24 @@ import { JWT } from "https://esm.sh/google-auth-library@9.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY") || "");
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://djossi-match.vercel.app",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const allowedOrigins = [
+  "https://djossi-match.vercel.app",
+  "https://www.djorssi-match.com",
+  "https://djorssi-match.com",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+}
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -222,7 +234,7 @@ serve(async (req) => {
               from: `Djorssi-Match <${senderEmail}>`,
               to: [user.email],
               subject: `Nouvelle offre : ${job.job_title} chez ${job.company_name}`,
-              text: `Bonjour,\n\nUne nouvelle offre d'emploi correspondant à vos secteurs d'intérêt vient d'être publiée :\n\n- Poste: ${job.job_title}\n- Entreprise: ${job.company_name}\n- Lieu: ${job.location || 'Côte d\'Ivoire'}\n${job.salary_range ? `- Salaire: ${job.salary_range}\n` : ''}\nVoir l'offre sur Djorssi-Match : https://djorssi-match.vercel.app/jobs/${job.id}\n\nVous recevez cet email car vous avez activé les alertes emplois pour : ${alert.sectors.join(', ')}.`,
+              text: `Bonjour,\n\nUne nouvelle offre d'emploi correspondant à vos secteurs d'intérêt vient d'être publiée :\n\n- Poste: ${job.job_title}\n- Entreprise: ${job.company_name}\n- Lieu: ${job.location || 'Côte d\'Ivoire'}\n${job.salary_range ? `- Salaire: ${job.salary_range}\n` : ''}\nVoir l'offre sur Djorssi-Match : https://www.djorssi-match.com/jobs/${job.id}\n\nVous recevez cet email car vous avez activé les alertes emplois pour : ${alert.sectors.join(', ')}.`,
               html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
                   <h2 style="color: #f97316;">Nouveau Job Match !</h2>
@@ -234,7 +246,7 @@ serve(async (req) => {
                     <p><strong>Lieu:</strong> ${job.location || 'Côte d\'Ivoire'}</p>
                     ${job.salary_range ? `<p><strong>Salaire:</strong> ${job.salary_range}</p>` : ''}
                   </div>
-                  <a href="https://djorssi-match.vercel.app/jobs/${job.id}" style="display: inline-block; background-color: #f97316; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Voir l'offre sur Djorssi-Match</a>
+                  <a href="https://www.djorssi-match.com/jobs/${job.id}" style="display: inline-block; background-color: #f97316; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">Voir l'offre sur Djorssi-Match</a>
                   <p style="margin-top: 30px; font-size: 12px; color: #64748b;">
                     Vous recevez cet email car vous avez activé les alertes emplois pour : ${alert.sectors.join(', ')}. 
                     Vous pouvez désactiver ces alertes dans votre profil.

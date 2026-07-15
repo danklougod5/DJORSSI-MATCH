@@ -107,7 +107,8 @@ const UsersTab: React.FC<UsersTabProps> = ({
               {recentUsersList
                 .filter(user => {
                   const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                        user.phone.includes(searchTerm);
+                                        user.phone.includes(searchTerm) ||
+                                        user.id.toLowerCase().includes(searchTerm.toLowerCase());
                   const matchesFilter = statusFilter === 'all' || 
                                         (statusFilter === 'premium' && user.premium) || 
                                         (statusFilter === 'free' && !user.premium);

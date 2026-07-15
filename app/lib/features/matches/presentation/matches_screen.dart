@@ -27,9 +27,35 @@ class _MatchesScreenState extends State<MatchesScreen> {
   @override
   void initState() {
     super.initState();
+    _loadPremiumFromCache(); // Restaurer le statut premium immédiatement
     _loadMatches();
     MatchNotifier.stream.addListener(_onNewMatch);
     _setupRealtime();
+  }
+
+  /// Charge le statut premium depuis le cache du profil pour éviter
+  /// un flash de contenu verrouillé au démarrage.
+  Future<void> _loadPremiumFromCache() async {
+    try {
+      final cachedProfile = await LocalCache.load(LocalCache.profileKey);
+      if (cachedProfile != null && cachedProfile is Map<String, dynamic> && mounted) {
+        final isPremium = cachedProfile['is_premium'] ?? false;
+        final premiumUntilRaw = cachedProfile['premium_until'];
+        bool activePremium = isPremium;
+        if (isPremium && premiumUntilRaw != null) {
+          final premiumUntil = DateTime.parse(premiumUntilRaw.toString());
+          activePremium = premiumUntil.isAfter(DateTime.now());
+        }
+        if (!VersionService.showPremium) {
+          activePremium = true;
+        }
+        setState(() {
+          _isPremium = activePremium;
+        });
+      }
+    } catch (e) {
+      debugPrint('MatchesScreen: erreur lecture cache premium: $e');
+    }
   }
 
   void _setupRealtime() {
@@ -90,11 +116,14 @@ class _MatchesScreenState extends State<MatchesScreen> {
       debugPrint('Erreur lecture cache matches: $e');
     }
 
-    // 0.5 Si le cache est frais (TTL) et qu'on ne force pas le rafraîchissement, s'arrêter là
+    // 0.5 Si le cache est frais (TTL) et qu'on ne force pas le rafraîchissement,
+    // on saute le rechargement des matches MAIS on vérifie toujours le premium
     try {
       final isFresh = await LocalCache.isFresh(LocalCache.matchesKey, LocalCache.matchesTTL);
       if (isFresh && !forceRefresh) {
         debugPrint('*** [CACHE] Matches chargés depuis le cache frais (TTL) - Pas d\'appel réseau ***');
+        // TOUJOURS vérifier le statut premium même si le cache matches est frais
+        await _refreshPremiumStatus();
         return;
       }
     } catch (e) {
@@ -161,6 +190,38 @@ class _MatchesScreenState extends State<MatchesScreen> {
           );
         }
       }
+    }
+  }
+
+  /// Rafraîchit le statut premium depuis Supabase (appel léger, un seul champ).
+  Future<void> _refreshPremiumStatus() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final profileResponse = await _supabase
+          .from('profiles')
+          .select('is_premium, premium_until')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (profileResponse != null && mounted) {
+        final isPremium = profileResponse['is_premium'] ?? false;
+        final premiumUntilRaw = profileResponse['premium_until'];
+        bool activePremium = isPremium;
+        if (isPremium && premiumUntilRaw != null) {
+          final premiumUntil = DateTime.parse(premiumUntilRaw.toString());
+          activePremium = premiumUntil.isAfter(DateTime.now());
+        }
+        if (!VersionService.showPremium) {
+          activePremium = true;
+        }
+        setState(() {
+          _isPremium = activePremium;
+        });
+      }
+    } catch (e) {
+      debugPrint('MatchesScreen: erreur refresh premium: $e');
     }
   }
 

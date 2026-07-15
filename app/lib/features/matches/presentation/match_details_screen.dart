@@ -336,7 +336,11 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen> {
             .single();
 
         final String? cvUrl = profile['cv_url'];
-        if (cvUrl == null || cvUrl.isEmpty) {
+        final hasNoCv = cvUrl == null ||
+            cvUrl.trim().isEmpty ||
+            cvUrl.trim().toLowerCase() == 'null' ||
+            cvUrl.trim().toLowerCase() == 'undefined';
+        if (hasNoCv) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -397,11 +401,10 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen> {
         }
       }
     } else if (hasWhatsapp && whatsapp != null) {
-      final cleaned = whatsapp.replaceAll(RegExp(r'[\s\-\.\(\)]+'), '');
-      final matchNums = RegExp(r'\d+').allMatches(cleaned);
-      if (matchNums.isNotEmpty) {
-        String num = matchNums.first.group(0)!;
-        if (num.length <= 10) num = '225$num';
+      final List<String> numbers = _extractPhoneNumbers(whatsapp.toString());
+      if (numbers.isNotEmpty) {
+        final String firstNum = numbers.first;
+        final String num = firstNum.length <= 10 ? '225$firstNum' : firstNum;
         final Uri waAppUri = Uri.parse('whatsapp://send?phone=$num');
         final Uri waWebUri = Uri.parse('https://wa.me/$num');
 
@@ -635,5 +638,44 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen> {
         );
       },
     );
+  }
+
+  List<String> _extractPhoneNumbers(String raw) {
+    final List<String> numbers = [];
+    final String cleaned = raw.replaceAll(RegExp(r'[\s\-\.\(\)]+'), '');
+    final Iterable<Match> digitBlocks = RegExp(r'\d+').allMatches(cleaned);
+
+    for (final block in digitBlocks) {
+      final String digits = block.group(0)!;
+      String remaining = digits;
+
+      while (remaining.isNotEmpty) {
+        if (remaining.startsWith('225')) {
+          if (remaining.length >= 13) {
+            numbers.add(remaining.substring(0, 13));
+            remaining = remaining.substring(13);
+          } else if (remaining.length >= 11) {
+            numbers.add(remaining.substring(0, 11));
+            remaining = remaining.substring(11);
+          } else {
+            if (remaining.length >= 8) {
+              numbers.add(remaining);
+            }
+            remaining = '';
+          }
+        } else {
+          if (remaining.length >= 10) {
+            numbers.add(remaining.substring(0, 10));
+            remaining = remaining.substring(10);
+          } else if (remaining.length >= 8) {
+            numbers.add(remaining);
+            remaining = '';
+          } else {
+            remaining = '';
+          }
+        }
+      }
+    }
+    return numbers;
   }
 }

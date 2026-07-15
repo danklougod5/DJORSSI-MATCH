@@ -30,6 +30,11 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   onRevokeCampaignPremium,
   isCampaignLoading
 }) => {
+  const [isMounted, setIsMounted] = React.useState(false);
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   return (
     <div className="space-y-8">
       {/* Campaign Section */}
@@ -81,22 +86,24 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm min-w-0">
            <h3 className="text-lg mb-6">Répartition Premium</h3>
            <div className="h-64 w-full">
-              <ResponsiveContainer width="99%" height="100%" minWidth={0}>
-                <PieChart>
-                  <Pie
-                    data={userTypeData}
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {userTypeData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+              {isMounted && (
+                  <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0}>
+                    <PieChart>
+                      <Pie
+                        data={userTypeData}
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {userTypeData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+               )}
            </div>
            <div className="flex justify-center gap-6 mt-4">
               <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
@@ -133,14 +140,16 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm min-w-0">
            <h3 className="text-lg mb-6">Offres Recruteurs (7j)</h3>
            <div className="h-64 text-xs w-full">
-              <ResponsiveContainer width="99%" height="100%" minWidth={0}>
-                <BarChart data={dailyActivity}>
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#FF8200" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {isMounted && (
+                  <ResponsiveContainer width="99%" height="100%" minWidth={0} minHeight={0}>
+                    <BarChart data={dailyActivity}>
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#FF8200" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+               )}
            </div>
         </div>
       </div>

@@ -5,6 +5,8 @@ import AdminDashboard from './components/AdminDashboard'
 import AdminLogin from './components/AdminLogin'
 import { supabase } from './lib/supabase'
 import { TermsOfService, PrivacyPolicy } from './components/LegalPages'
+import StoreRedirect from './components/StoreRedirect'
+
 
 function App() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
@@ -121,8 +123,12 @@ function App() {
 
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/store" element={<StoreRedirect />} />
+        <Route path="/app" element={<StoreRedirect />} />
+        <Route path="/download" element={<StoreRedirect />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
+
       </Routes>
     </div>
   )

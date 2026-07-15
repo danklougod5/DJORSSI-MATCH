@@ -17,7 +17,7 @@ import {
   Megaphone,
   UserX
 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, fetchProfilesInBatches } from '../lib/supabase';
 
 import UserEditModal from './admin/UserEditModal';
 import JobEditModal from './admin/JobEditModal';
@@ -105,6 +105,16 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     return () => clearInterval(interval);
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+
+    const delayDebounceFn = setTimeout(() => {
+      fetchUsers(searchTerm, statusFilter);
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm, statusFilter, activeTab]);
+
   const fetchStats = async () => {
     try {
       const { count: usersCount } = await supabase.from('profiles').select('id', { count: 'exact', head: true });
@@ -133,24 +143,28 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         pendingApprovals: pendingJobsCount || 0
       }));
 
-      const { data: userData } = await supabase
-        .from('profiles')
-        .select('id, full_name, is_premium, premium_until, created_at, phone_number, skills, extra_cvs_purchased')
-        .order('is_premium', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(500);
+      let userData: any[] | null = null;
+      if (activeTab === 'overview') {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name, is_premium, premium_until, created_at, phone_number, skills, extra_cvs_purchased')
+          .order('is_premium', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(500);
+        userData = data;
 
-      if (userData) {
-        setRecentUsersList(userData.map((u: any) => ({
-          id: u.id,
-          name: u.full_name || 'Anonyme',
-          premium: u.is_premium,
-          premiumUntil: u.premium_until,
-          date: new Date(u.created_at).toLocaleDateString(),
-          phone: u.phone_number || '-',
-          sector: Array.isArray(u.skills) ? u.skills.join(', ') : (u.skills || '-'),
-          extraCvsPurchased: u.extra_cvs_purchased || 0
-        })));
+        if (userData) {
+          setRecentUsersList(userData.map((u: any) => ({
+            id: u.id,
+            name: u.full_name || 'Anonyme',
+            premium: u.is_premium,
+            premiumUntil: u.premium_until,
+            date: new Date(u.created_at).toLocaleDateString(),
+            phone: u.phone_number || '-',
+            sector: Array.isArray(u.skills) ? u.skills.join(', ') : (u.skills || '-'),
+            extraCvsPurchased: u.extra_cvs_purchased || 0
+          })));
+        }
       }
 
       const sevenDaysAgo = new Date();
@@ -200,6 +214,54 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       // OPTIMIZATION: Job metrics are now computed inside fetchJobs() to avoid a full table scan
     } catch (error) {
       console.error('Error fetching stats:', error);
+    }
+  };
+
+  const fetchUsers = async (search: string, filter: 'all' | 'premium' | 'free') => {
+    try {
+      let query = supabase
+        .from('profiles')
+        .select('id, full_name, is_premium, premium_until, created_at, phone_number, skills, extra_cvs_purchased');
+
+      if (filter === 'premium') {
+        query = query.eq('is_premium', true);
+      } else if (filter === 'free') {
+        query = query.eq('is_premium', false);
+      }
+
+      if (search.trim()) {
+        const cleanSearch = search.trim();
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanSearch);
+        
+        if (isUuid) {
+          query = query.or(`id.eq.${cleanSearch},full_name.ilike.%${cleanSearch}%,phone_number.ilike.%${cleanSearch}%`);
+        } else {
+          query = query.or(`full_name.ilike.%${cleanSearch}%,phone_number.ilike.%${cleanSearch}%`);
+        }
+      }
+
+      query = query
+        .order('is_premium', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      if (data) {
+        setRecentUsersList(data.map((u: any) => ({
+          id: u.id,
+          name: u.full_name || 'Anonyme',
+          premium: u.is_premium,
+          premiumUntil: u.premium_until,
+          date: new Date(u.created_at).toLocaleDateString(),
+          phone: u.phone_number || '-',
+          sector: Array.isArray(u.skills) ? u.skills.join(', ') : (u.skills || '-'),
+          extraCvsPurchased: u.extra_cvs_purchased || 0
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
     }
   };
 
@@ -391,14 +453,14 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         return;
       }
 
-      const userIds = Array.from(new Set(reportsData.map((r: any) => r.user_id).filter(Boolean)));
+      const userIds = Array.from(new Set(reportsData.map((r: any) => r.user_id).filter(Boolean))) as string[];
       const profilesMap: Record<string, string> = {};
 
       if (userIds.length > 0) {
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', userIds);
+        const { data: profilesData, error: profilesError } = await fetchProfilesInBatches(
+          userIds,
+          'id, full_name'
+        );
 
         if (!profilesError && profilesData) {
           profilesData.forEach((p: any) => {
@@ -746,6 +808,9 @@ reader.readAsText(file);
 
       // Force refresh stats after successful update
       fetchStats();
+      if (activeTab === 'users') {
+        fetchUsers(searchTerm, statusFilter);
+      }
     } catch (err) {
       console.error("Error toggling premium:", err);
     }
@@ -826,6 +891,9 @@ reader.readAsText(file);
       if (error) throw error;
       setSuccessMessage("Votre profil est maintenant Premium pour 24h !");
       fetchStats();
+      if (activeTab === 'users') {
+        fetchUsers(searchTerm, statusFilter);
+      }
     } catch (err: any) {
       setErrorMessage("Erreur: " + err.message);
     } finally {
@@ -858,6 +926,9 @@ reader.readAsText(file);
 
       setSuccessMessage("Campagne lancée : Tous les utilisateurs sont Premium et notifiés !");
       fetchStats();
+      if (activeTab === 'users') {
+        fetchUsers(searchTerm, statusFilter);
+      }
     } catch (err: any) {
       setErrorMessage("Erreur: " + err.message);
     } finally {
@@ -881,6 +952,9 @@ reader.readAsText(file);
       if (error) throw error;
       setSuccessMessage("Campagne annulée : le Premium a été retiré avec succès pour ces utilisateurs.");
       fetchStats();
+      if (activeTab === 'users') {
+        fetchUsers(searchTerm, statusFilter);
+      }
     } catch (err: any) {
       setErrorMessage("Erreur: " + err.message);
     } finally {

@@ -27,6 +27,25 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
 
+  /// Getter centralisé : vérifie `is_premium` ET `premium_until` pour
+  /// déterminer si l'utilisateur est réellement premium actif.
+  bool get _isActivePremium {
+    if (!VersionService.showPremium) return false; // Premium masqué globalement
+    final isPremium = _profileData?['is_premium'] ?? false;
+    if (!isPremium) return false;
+    final premiumUntilRaw = _profileData?['premium_until'];
+    if (premiumUntilRaw != null) {
+      try {
+        final premiumUntil = DateTime.parse(premiumUntilRaw.toString());
+        return premiumUntil.isAfter(DateTime.now());
+      } catch (e) {
+        debugPrint('ProfileScreen: Erreur parsing premium_until: $e');
+        return false;
+      }
+    }
+    return true; // is_premium=true sans date d'expiration → premium indéfini
+  }
+
   @override
   void initState() {
     super.initState();
@@ -590,7 +609,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       avatarIconColor = const Color(0xFF94A3B8); // slate-400
     }
 
-    final isPremiumUser = ((_profileData?['is_premium'] ?? false) && VersionService.showPremium);
+    final isPremiumUser = _isActivePremium;
     final Color bgToUse = isPremiumUser ? const Color(0xFFFFFBEB) : avatarBgColor;
     final Color iconColorToUse = isPremiumUser ? const Color(0xFFF59E0B) : avatarIconColor;
 
@@ -629,7 +648,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           shape: BoxShape.circle,
                           color: Colors.white,
                           border: Border.all(
-                            color: ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
+                            color: _isActivePremium
                                 ? const Color(0xFFF59E0B)
                                 : Colors.white,
                             width: 4,
@@ -688,7 +707,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           color: const Color(0xFF0F172A),
                         ),
                       ),
-                      if ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
+                      if (_isActivePremium)
                         Padding(
                           padding: EdgeInsets.only(left: 8.w),
                           child: Icon(
@@ -706,16 +725,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                       vertical: 6.h,
                     ),
                     decoration: BoxDecoration(
-                      gradient: ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
+                      gradient: _isActivePremium
                           ? const LinearGradient(
                               colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
                             )
                           : null,
-                      color: ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
+                      color: _isActivePremium
                           ? null
                           : Colors.grey.shade100,
                       borderRadius: BorderRadius.circular(20.r),
-                      boxShadow: ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
+                      boxShadow: _isActivePremium
                           ? [
                               BoxShadow(
                                 color: const Color(0xFFF59E0B).withOpacity(0.3),
@@ -728,7 +747,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
+                        if (_isActivePremium)
                           Padding(
                             padding: EdgeInsets.only(right: 6.w),
                             child: Icon(
@@ -739,7 +758,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         Text(
                           VersionService.showPremium
-                              ? ((_profileData?['is_premium'] ?? false)
+                              ? (_isActivePremium
                                   ? 'MEMBRE VIP'
                                   : 'Utilisateur Freemium')
                               : 'Candidat',
@@ -747,8 +766,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                             fontSize: 11.sp,
                             fontWeight: FontWeight.w900,
                             letterSpacing:
-                                ((_profileData?['is_premium'] ?? false) && VersionService.showPremium) ? 1 : 0,
-                            color: ((_profileData?['is_premium'] ?? false) && VersionService.showPremium)
+                                _isActivePremium ? 1 : 0,
+                            color: _isActivePremium
                                 ? Colors.white
                                 : Colors.grey.shade600,
                           ),
@@ -828,7 +847,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     icon: Icons.notifications_none_rounded,
                     title: 'Alertes Emplois',
                     subtitle: 'Gérer mes notifications',
-                    trailing: (VersionService.showPremium && !(_profileData?['is_premium'] ?? false))
+                    trailing: (VersionService.showPremium && !_isActivePremium)
                         ? Container(
                             padding: EdgeInsets.symmetric(
                               horizontal: 8.w,
@@ -940,7 +959,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       return const SizedBox.shrink();
     }
 
-    final isPremium = _profileData?['is_premium'] ?? false;
+    final isPremium = _isActivePremium;
     final premiumUntilRaw = _profileData?['premium_until'];
     String subtitle = 'Boostez votre profil et matchez plus vite !';
     if (isPremium) {

@@ -5,10 +5,20 @@ import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY") || "re_test_key");
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://djossi-match.vercel.app",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const allowedOrigins = [
+  "https://djossi-match.vercel.app",
+  "https://www.djorssi-match.com",
+  "https://djorssi-match.com",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
+}
 
 /**
  * Génère une lettre de motivation professionnelle en texte formaté
@@ -192,6 +202,8 @@ async function generateSimplePDF(text: string): Promise<Uint8Array> {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });

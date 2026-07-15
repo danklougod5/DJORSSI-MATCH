@@ -128,10 +128,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
       final List<String> sortedTags = uniqueTags.toList();
       sortedTags.sort((a, b) {
-        final countA = sectorCounts[a] ?? 0;
-        final countB = sectorCounts[b] ?? 0;
+        final countA = jobCounts[a] ?? 0;
+        final countB = jobCounts[b] ?? 0;
         if (countA != countB) {
-          return countB.compareTo(countA); // Descending count
+          return countB.compareTo(countA); // Descending count of jobs
         }
         return a.compareTo(b); // Alphabetical
       });
@@ -409,7 +409,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       showError('Veuillez attendre la fin de l\'envoi de votre CV.');
       return;
     }
-    if (_cvUrl == null) {
+    final hasNoCv = _cvUrl == null ||
+        _cvUrl!.trim().isEmpty ||
+        _cvUrl!.trim().toLowerCase() == 'null' ||
+        _cvUrl!.trim().toLowerCase() == 'undefined';
+    if (hasNoCv) {
       showError('Veuillez ajouter votre CV pour postuler aux offres.');
       return;
     }
@@ -791,7 +795,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                                 )
                                 .take(30)
                                 .map((tag) {
-                                  final count = _sectorCounts[tag] ?? 0;
+                                  final count = _jobTagCounts[tag] ?? 0;
                                   return count > 0
                                       ? _buildPopularChip(tag)
                                       : _buildSectorChip(tag, false);
@@ -832,7 +836,6 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   );
 
   Widget _buildOpportunityChip(String tag) {
-    final count = _jobTagCounts[tag] ?? 0;
     final isSelected = _selectedTags.contains(tag);
     return GestureDetector(
       onTap: () => setState(
@@ -889,33 +892,13 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            SizedBox(width: 6.w),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.white.withValues(alpha: 0.25)
-                    : const Color(0xFF0EA5E9).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8.r),
-              ),
-              child: Text(
-                '$count jobs',
-                style: TextStyle(
-                  fontSize: 10.sp,
-                  fontWeight: FontWeight.w900,
-                  color: isSelected ? Colors.white : const Color(0xFF0369A1),
-                ),
-              ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  /// Chip pour les tags populaires — design accentué avec compteur
   Widget _buildPopularChip(String tag) {
-    final count = _sectorCounts[tag] ?? 0;
     final isSelected = _selectedTags.contains(tag);
     return GestureDetector(
       onTap: () => setState(
@@ -970,24 +953,6 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   fontSize: 13.sp,
                 ),
                 overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            SizedBox(width: 6.w),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.white.withValues(alpha: 0.25)
-                    : const Color(0xFFF97316).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8.r),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 10.sp,
-                  fontWeight: FontWeight.w900,
-                  color: isSelected ? Colors.white : const Color(0xFFF97316),
-                ),
               ),
             ),
           ],

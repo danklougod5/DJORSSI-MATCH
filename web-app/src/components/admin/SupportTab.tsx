@@ -10,7 +10,7 @@ import {
   Filter,
   Trash2
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase, fetchProfilesInBatches } from '../../lib/supabase';
 
 interface SupportMessage {
   id: string;
@@ -60,11 +60,11 @@ const SupportTab: React.FC = () => {
       }
 
       // Fetch profile info for each user
-      const userIds = Array.from(new Set(data.map((m: any) => m.user_id)));
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, full_name, phone_number')
-        .in('id', userIds);
+      const userIds = Array.from(new Set(data.map((m: any) => m.user_id))) as string[];
+      const { data: profiles, error: profilesError } = await fetchProfilesInBatches(
+        userIds,
+        'id, full_name, phone_number'
+      );
 
       if (profilesError) throw profilesError;
 

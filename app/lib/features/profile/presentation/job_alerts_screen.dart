@@ -21,7 +21,6 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
   bool _alertsEnabled = true;
   final Set<String> _selectedSectors = {};
   Map<String, int> _sectorCounts = {};
-  Map<String, int> _jobTagCounts = {};
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
@@ -92,19 +91,13 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                   throw Exception('Délai d\'attente dépassé (secteurs)'),
             );
         final List<String> rawTags = [];
-        final Map<String, int> jobCounts = {};
         for (var row in tagsResponse as List) {
           if (row['tags'] != null) {
             final tags = List<String>.from(row['tags']);
             rawTags.addAll(tags);
-            for (var tag in tags) {
-              final normalized = TagNormalizer.normalizeDisplay(tag);
-              jobCounts[normalized] = (jobCounts[normalized] ?? 0) + 1;
-            }
           }
         }
         final uniqueTags = TagNormalizer.deduplicateTags(rawTags).toSet();
-        _jobTagCounts = jobCounts;
         
         final profilesResponse = await _supabase
             .from('profiles')
@@ -253,13 +246,6 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
         .toList();
   }
 
-  /// Top secteurs populaires (count > 0, max 10)
-  List<String> get _popularSectors {
-    return _availableSectors
-        .where((tag) => (_sectorCounts[tag] ?? 0) > 0)
-        .take(10)
-        .toList();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -736,89 +722,6 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
     );
   }
 
-  Widget _buildOpportunityChip(String tag) {
-    final count = _jobTagCounts[tag] ?? 0;
-    final isSelected = _selectedSectors.contains(tag);
-    return GestureDetector(
-      onTap: (_isPremium || !VersionService.showPremium) && _alertsEnabled
-          ? () => setState(
-                () => isSelected ? _selectedSectors.remove(tag) : _selectedSectors.add(tag),
-              )
-          : null,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(
-                  colors: [
-                    const Color(0xFF0EA5E9),
-                    const Color(0xFF0EA5E9).withValues(alpha: 0.8),
-                  ],
-                )
-              : const LinearGradient(
-                  colors: [Color(0xFFF0F9FF), Color(0xFFE0F2FE)],
-                ),
-          borderRadius: BorderRadius.circular(100.r),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF0EA5E9)
-                : const Color(0xFF0EA5E9).withValues(alpha: 0.4),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0EA5E9).withValues(alpha: isSelected ? 0.25 : 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isSelected)
-              Padding(
-                padding: EdgeInsets.only(right: 6.w),
-                child: Icon(
-                  Icons.check_circle_rounded,
-                  color: Colors.white,
-                  size: 16.r,
-                ),
-              ),
-            Flexible(
-              child: Text(
-                tag,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF0369A1),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13.sp,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            SizedBox(width: 6.w),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.white.withValues(alpha: 0.25)
-                    : const Color(0xFF0EA5E9).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8.r),
-              ),
-              child: Text(
-                '$count jobs',
-                style: TextStyle(
-                  fontSize: 10.sp,
-                  fontWeight: FontWeight.w900,
-                  color: isSelected ? Colors.white : const Color(0xFF0369A1),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildPremiumLocker() {
     return Container(
@@ -983,7 +886,6 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
   }
 
   Widget _buildPopularChip(String tag) {
-    final count = _sectorCounts[tag] ?? 0;
     final isSelected = _selectedSectors.contains(tag);
     return GestureDetector(
       onTap: (_isPremium && _alertsEnabled)
@@ -1046,24 +948,6 @@ class _JobAlertsScreenState extends State<JobAlertsScreen> {
                   fontSize: 13.sp,
                 ),
                 overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            SizedBox(width: 6.w),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.white.withValues(alpha: 0.25)
-                    : const Color(0xFFF97316).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8.r),
-              ),
-              child: Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 10.sp,
-                  fontWeight: FontWeight.w900,
-                  color: isSelected ? Colors.white : const Color(0xFFF97316),
-                ),
               ),
             ),
           ],

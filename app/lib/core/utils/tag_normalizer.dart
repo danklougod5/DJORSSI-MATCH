@@ -36,10 +36,6 @@ class TagNormalizer {
     'nouveau',
     'premium',
     'fodese',
-    'bilingue',
-    'anglais',
-    'français',
-    'allemand',
   };
 
   // ─── Types d'emploi (contrats) ──────────────────────────────────────

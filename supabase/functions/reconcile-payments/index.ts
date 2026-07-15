@@ -110,7 +110,21 @@ serve(async (req) => {
 
           const payType = payment.metadata?.type;
 
-          if (payType === "premium" || (payment.amount >= 2000 && payType !== "extra_cv" && payType !== "modification")) {
+          // Fetch dynamic pricing config from app_config (id = 1)
+          const { data: config, error: configError } = await supabase
+            .from("app_config")
+            .select("premium_price_cfa, extra_cv_price_cfa")
+            .eq("id", 1)
+            .single();
+
+          if (configError) {
+            console.error("Error fetching app_config pricing for reconciliation:", configError);
+          }
+
+          const premiumPrice = config?.premium_price_cfa ?? 2000;
+          const extraCvPrice = config?.extra_cv_price_cfa ?? 500;
+
+          if (payType === "premium" || (payment.amount >= premiumPrice && payType !== "extra_cv" && payType !== "modification")) {
             const premiumUntil = new Date();
             premiumUntil.setDate(premiumUntil.getDate() + 30);
 
@@ -128,7 +142,7 @@ serve(async (req) => {
               amount: payment.amount,
               action: "premium_activated",
             });
-          } else if (payType === "extra_cv" || (payment.amount === 500 && payType !== "modification")) {
+          } else if (payType === "extra_cv" || (payment.amount === extraCvPrice && payType !== "modification")) {
             const { data: profile } = await supabase
               .from("profiles")
               .select("extra_cvs_purchased")

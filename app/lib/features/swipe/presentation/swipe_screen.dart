@@ -60,6 +60,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
   Set<String> _cachedSwipedIds = {};
 
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
+  int _currentLoadSessionId = 0;
 
   @override
   void initState() {
@@ -217,11 +218,14 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   Future<void> _loadData({bool forceRefresh = false}) async {
+    final sessionId = ++_currentLoadSessionId;
+
     // 0a. Charger les skills du cache SEULEMENT si pas déjà définis (par le realtime)
     if (_userSkills.isEmpty) {
       try {
         final cachedSkills = await LocalCache.load(LocalCache.skillsKey);
         if (cachedSkills != null && cachedSkills is List) {
+          if (sessionId != _currentLoadSessionId) return;
           _userSkills = List<String>.from(cachedSkills);
         }
       } catch (e) {
@@ -229,13 +233,35 @@ class _SwipeScreenState extends State<SwipeScreen> {
       }
     }
 
-    // 0b. Utiliser le cache frais si disponible et qu'on ne force pas le rafraîchissement
+    // 0b. Toujours charger les swiped IDs depuis le cache local pour filtrer correctement
+    try {
+      final cachedSwipedData = await LocalCache.load(LocalCache.swipedIdsKey);
+      if (cachedSwipedData != null && cachedSwipedData is List) {
+        if (sessionId != _currentLoadSessionId) return;
+        _cachedSwipedIds = Set<String>.from(cachedSwipedData.map((e) => e.toString()));
+        debugPrint('*** [CACHE] Swiped IDs chargés depuis le cache local (${_cachedSwipedIds.length} IDs) ***');
+      }
+    } catch (e) {
+      debugPrint('Erreur lecture cache swiped IDs: $e');
+    }
+
+    // 0c. Utiliser le cache frais si disponible et qu'on ne force pas le rafraîchissement
     try {
       final isFresh = await LocalCache.isFresh(LocalCache.jobsKey, LocalCache.jobsTTL);
       if (isFresh && !forceRefresh) {
         final cachedJobs = await LocalCache.load(LocalCache.jobsKey);
         if (cachedJobs != null && cachedJobs is List && mounted) {
+          if (sessionId != _currentLoadSessionId) return;
           var cachedList = List<Map<String, dynamic>>.from(cachedJobs);
+          // BUGFIX: Filtrer les offres déjà swipées depuis le cache
+          if (_cachedSwipedIds.isNotEmpty) {
+            final beforeCount = cachedList.length;
+            cachedList = cachedList.where((job) {
+              final jobId = job['id']?.toString() ?? '';
+              return !_cachedSwipedIds.contains(jobId);
+            }).toList();
+            debugPrint('*** [CACHE] Filtrage swiped IDs: $beforeCount → ${cachedList.length} offres (${beforeCount - cachedList.length} déjà swipées retirées) ***');
+          }
           if (_sectorSkills.isNotEmpty) {
             cachedList = cachedList.where((job) {
               return _calculateMatchScore(job) > 0;
@@ -246,6 +272,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
               return scoreB.compareTo(scoreA);
             });
           }
+          if (sessionId != _currentLoadSessionId) return;
           setState(() {
             _jobs = cachedList;
             _isLoading = false;
@@ -262,7 +289,15 @@ class _SwipeScreenState extends State<SwipeScreen> {
     try {
       final cachedJobs = await LocalCache.load(LocalCache.jobsKey);
       if (cachedJobs != null && cachedJobs is List && mounted && _jobs.isEmpty) {
+        if (sessionId != _currentLoadSessionId) return;
         var cachedList = List<Map<String, dynamic>>.from(cachedJobs);
+        // BUGFIX: Filtrer les offres déjà swipées depuis le cache fallback aussi
+        if (_cachedSwipedIds.isNotEmpty) {
+          cachedList = cachedList.where((job) {
+            final jobId = job['id']?.toString() ?? '';
+            return !_cachedSwipedIds.contains(jobId);
+          }).toList();
+        }
         if (_sectorSkills.isNotEmpty) {
           cachedList = cachedList.where((job) {
             return _calculateMatchScore(job) > 0;
@@ -273,6 +308,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
             return scoreB.compareTo(scoreA);
           });
         }
+        if (sessionId != _currentLoadSessionId) return;
         setState(() {
           _jobs = cachedList;
           _isLoading = false;
@@ -292,6 +328,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
           .select('skills, is_premium, premium_until, full_name, cv_url, sexe, daily_swipe_count, last_swipe_date')
           .eq('id', userId)
           .maybeSingle();
+
+      if (sessionId != _currentLoadSessionId) return;
 
       if (profileResponse != null) {
         final isPremium = profileResponse['is_premium'] ?? false;
@@ -319,6 +357,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       // 2. Récupérer les IDs des jobs déjà swipés — DEPUIS LE CACHE si possible
       Set<String> swipedJobIds;
       final cachedSwipedIds = await LocalCache.loadIfFresh(LocalCache.swipedIdsKey, LocalCache.swipedIdsTTL);
+      if (sessionId != _currentLoadSessionId) return;
       if (cachedSwipedIds != null && cachedSwipedIds is List && !forceRefresh) {
         swipedJobIds = Set<String>.from(cachedSwipedIds);
         debugPrint('*** [CACHE] Swiped IDs chargés depuis le cache (${swipedJobIds.length} IDs) ***');
@@ -329,6 +368,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
             .select('job_id')
             .eq('user_id', userId);
 
+        if (sessionId != _currentLoadSessionId) return;
         swipedJobIds = (swipedResponse as List)
             .where((s) => s['job_id'] != null)
             .map((s) => s['job_id'].toString())
@@ -345,6 +385,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       try {
         final cachedDate = await LocalCache.load(LocalCache.swipeCountDateKey);
         final cachedCount = await LocalCache.load(LocalCache.swipeCountKey);
+        if (sessionId != _currentLoadSessionId) return;
         if (cachedDate == today && cachedCount != null) {
           _swipeCount = cachedCount as int;
           debugPrint('*** [CACHE] Compteur swipes du jour: $_swipeCount ***');
@@ -374,6 +415,25 @@ class _SwipeScreenState extends State<SwipeScreen> {
           .select('id, job_title, company_name, salary_range, location, required_level, experience, contact_email, whatsapp_number, description, is_ai_verified, tags, deadline, application_link, requires_cover_letter, cover_letter_instructions, created_at')
           .eq('is_approved', true);
 
+      debugPrint('*** [DB-QUERY] _userSkills = $_userSkills ***');
+      debugPrint('*** [DB-QUERY] _sectorSkills = $_sectorSkills ***');
+      // Filtrage serveur par secteurs/compétences de l'utilisateur
+      if (_sectorSkills.isNotEmpty) {
+        final orConditions = <String>[];
+        for (final skill in _sectorSkills) {
+          final escapedSkill = skill.replaceAll("'", "''");
+          orConditions.add('tags.cs.{"$escapedSkill"}');
+          orConditions.add('job_title.ilike.%$escapedSkill%');
+        }
+        if (orConditions.isNotEmpty) {
+          final condString = orConditions.join(',');
+          debugPrint('*** [DB-QUERY] Adding OR filter: $condString ***');
+          jobsQuery = jobsQuery.or(condString);
+        }
+      } else {
+        debugPrint('*** [DB-QUERY] No OR filter added because _sectorSkills is empty ***');
+      }
+
       // Filtrage serveur : exclure les jobs déjà swipés (si pas trop d'IDs)
       if (swipedIdsList.isNotEmpty && swipedIdsList.length <= 500) {
         jobsQuery = jobsQuery.not('id', 'in', '(${swipedIdsList.join(",")})');
@@ -382,6 +442,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
       final jobsResponse = await jobsQuery
           .order('created_at', ascending: false)
           .limit(50);
+
+      if (sessionId != _currentLoadSessionId) return;
 
       var allJobs = List<Map<String, dynamic>>.from(jobsResponse);
       // Fallback client-side filter si trop d'IDs pour le filtre serveur
@@ -397,6 +459,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
               .select('id, job_title, company_name, salary_range, location, required_level, experience, contact_email, whatsapp_number, description, is_ai_verified, tags, deadline, application_link, requires_cover_letter, cover_letter_instructions, created_at')
               .eq('id', widget.jobId!)
               .maybeSingle();
+
+          if (sessionId != _currentLoadSessionId) return;
 
           if (targetJobResponse != null) {
             // Retirer le job de la liste s'il s'y trouve déjà (pour éviter les doublons)
@@ -422,6 +486,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
         debugPrint(
           '*** [MATCHING] Nombre total de jobs avant filtrage: ${allJobs.length} ***',
         );
+        for (final job in allJobs) {
+          debugPrint('  - ID: ${job['id']} | Title: ${job['job_title']} | Tags: ${job['tags']}');
+        }
 
         // Pré-calculer les scores de matching
         _matchScoreCache.clear();
@@ -474,6 +541,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
         }
       }
 
+      if (sessionId != _currentLoadSessionId) return;
+
       // 5. Sauvegarder dans le cache pour la prochaine fois
       await LocalCache.save(LocalCache.jobsKey, allJobs);
 
@@ -499,6 +568,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
       }
     } catch (e) {
       debugPrint('Erreur lors du chargement réseau: $e');
+      if (sessionId != _currentLoadSessionId) return;
       // Si on a déjà des données (du cache), on ne masque pas tout
       if (mounted) {
         setState(() => _isLoading = false);
@@ -532,6 +602,25 @@ class _SwipeScreenState extends State<SwipeScreen> {
           .from('jobs')
           .select('id, job_title, company_name, salary_range, location, required_level, experience, contact_email, whatsapp_number, description, is_ai_verified, tags, deadline, application_link, requires_cover_letter, cover_letter_instructions, created_at')
           .eq('is_approved', true);
+
+      debugPrint('*** [DB-QUERY-PAGINATION] _userSkills = $_userSkills ***');
+      debugPrint('*** [DB-QUERY-PAGINATION] _sectorSkills = $_sectorSkills ***');
+      // Filtrage serveur par secteurs/compétences de l'utilisateur
+      if (_sectorSkills.isNotEmpty) {
+        final orConditions = <String>[];
+        for (final skill in _sectorSkills) {
+          final escapedSkill = skill.replaceAll("'", "''");
+          orConditions.add('tags.cs.{"$escapedSkill"}');
+          orConditions.add('job_title.ilike.%$escapedSkill%');
+        }
+        if (orConditions.isNotEmpty) {
+          final condString = orConditions.join(',');
+          debugPrint('*** [DB-QUERY-PAGINATION] Adding OR filter: $condString ***');
+          jobsQuery = jobsQuery.or(condString);
+        }
+      } else {
+        debugPrint('*** [DB-QUERY-PAGINATION] No OR filter added because _sectorSkills is empty ***');
+      }
 
       // Filtrage serveur : exclure les jobs déjà swipés + déjà affichés
       final excludeIds = <String>{..._cachedSwipedIds};
@@ -749,6 +838,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
     return textLower.contains(wordLower);
   }
 
+  bool get _hasCv {
+    if (_cvUrl == null) return false;
+    final cleanUrl = _cvUrl!.trim().toLowerCase();
+    return cleanUrl.isNotEmpty && cleanUrl != 'null' && cleanUrl != 'undefined';
+  }
+
   bool _onSwipe(
     int previousIndex,
     int? currentIndex,
@@ -768,7 +863,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
     if (direction == CardSwiperDirection.right) {
       // Bloquer le Swipe Droite si l'utilisateur n'a pas mis de CV
-      if (_cvUrl == null || _cvUrl!.isEmpty) {
+      if (!_hasCv) {
         _showMissingCvDialog();
         return false; // Renvoie la carte au centre
       }
@@ -1239,39 +1334,31 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
     for (final block in digitBlocks) {
       final String digits = block.group(0)!;
+      String remaining = digits;
 
-      if (digits.length <= 10 && digits.length >= 8) {
-        numbers.add(digits);
-      } else if (digits.length > 10) {
-        // Numéros collés — découper en blocs de 10 chiffres (format CI)
-        String remaining = digits;
-
-        if (remaining.startsWith('225') && remaining.length > 13) {
-          while (remaining.isNotEmpty) {
-            if (remaining.startsWith('225') && remaining.length >= 13) {
-              numbers.add(remaining.substring(0, 13));
-              remaining = remaining.substring(13);
-            } else if (remaining.length >= 10) {
-              numbers.add(remaining.substring(0, 10));
-              remaining = remaining.substring(10);
-            } else if (remaining.length >= 8) {
+      while (remaining.isNotEmpty) {
+        if (remaining.startsWith('225')) {
+          if (remaining.length >= 13) {
+            numbers.add(remaining.substring(0, 13));
+            remaining = remaining.substring(13);
+          } else if (remaining.length >= 11) {
+            numbers.add(remaining.substring(0, 11));
+            remaining = remaining.substring(11);
+          } else {
+            if (remaining.length >= 8) {
               numbers.add(remaining);
-              remaining = '';
-            } else {
-              remaining = '';
             }
+            remaining = '';
           }
         } else {
-          while (remaining.isNotEmpty) {
-            if (remaining.length >= 10) {
-              numbers.add(remaining.substring(0, 10));
-              remaining = remaining.substring(10);
-            } else if (remaining.length >= 8) {
-              numbers.add(remaining);
-              remaining = '';
-            } else {
-              remaining = '';
-            }
+          if (remaining.length >= 10) {
+            numbers.add(remaining.substring(0, 10));
+            remaining = remaining.substring(10);
+          } else if (remaining.length >= 8) {
+            numbers.add(remaining);
+            remaining = '';
+          } else {
+            remaining = '';
           }
         }
       }
@@ -1935,6 +2022,10 @@ class _SwipeScreenState extends State<SwipeScreen> {
               () {
                 if (!_isPremium && _swipeCount >= VersionService.swipeLimit) {
                   _showPremiumLimitDialog();
+                  return;
+                }
+                if (!_hasCv) {
+                  _showMissingCvDialog();
                   return;
                 }
                 _controller.swipe(CardSwiperDirection.right);
