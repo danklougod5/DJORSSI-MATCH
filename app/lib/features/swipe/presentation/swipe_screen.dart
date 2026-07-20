@@ -26,6 +26,7 @@ import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:djossimatch/core/services/announcement_service.dart';
+import 'package:share_plus/share_plus.dart';
 
 class SwipeScreen extends StatefulWidget {
   final String? jobId;
@@ -1893,6 +1894,39 @@ class _SwipeScreenState extends State<SwipeScreen> {
                                                       matchScore,
                                                     ),
                                                   ),
+                                                Positioned(
+                                                  top: 20.h,
+                                                  left: 20.w,
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white.withOpacity(0.2),
+                                                      shape: BoxShape.circle,
+                                                      border: Border.all(color: Colors.white30),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: Colors.black.withOpacity(0.1),
+                                                          blurRadius: 4,
+                                                          offset: const Offset(0, 2),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: Material(
+                                                      color: Colors.transparent,
+                                                      child: InkWell(
+                                                        borderRadius: BorderRadius.circular(100.r),
+                                                        onTap: () => _shareJob(job),
+                                                        child: Padding(
+                                                          padding: EdgeInsets.all(8.r),
+                                                          child: Icon(
+                                                            Icons.share_rounded,
+                                                            color: Colors.white,
+                                                            size: 20.r,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
                                               ],
                                             );
                                           },
@@ -2063,6 +2097,33 @@ class _SwipeScreenState extends State<SwipeScreen> {
     } catch (e) {
       debugPrint('Erreur undo DB: $e');
     }
+  }
+
+  void _shareJob(Map<String, dynamic> job) {
+    final String title = job['job_title'] ?? 'Inconnu';
+    final String company = job['company_name'] ?? 'Non précisé';
+    final String location = job['location'] ?? 'Abidjan';
+    final String salary = job['salary_range'] ?? 'À négocier';
+    final String? requiredLevel = job['required_level'];
+    final String? description = job['description'];
+
+    final String shareText = '''
+📢 Offre d'emploi : $title chez $company
+
+📍 Lieu : $location
+💰 Salaire : $salary
+🎓 Niveau requis : ${requiredLevel ?? 'Non spécifié'}
+
+📝 Description du poste :
+${description ?? 'Aucune description fournie.'}
+
+🔗 Retrouvez plus d'offres et postulez sur Djorssi-Match !
+''';
+
+    Share.share(
+      shareText,
+      subject: 'Offre d\'emploi : $title',
+    );
   }
 
   Widget _buildActionButtons() {
