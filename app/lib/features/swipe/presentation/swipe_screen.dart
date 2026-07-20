@@ -81,8 +81,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
     _listenToProfileChanges();
     _checkUnreadNotifications();
     
-    // Initialiser l'écouteur d'annonces de l'app sur l'écran des Swipes
-    AnnouncementService.instance.initialize();
+    // Initialiser l'écouteur d'annonces de l'app sur l'écran des Swipes après le rendu du premier frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AnnouncementService.instance.initialize();
+      }
+    });
   }
 
   Future<void> _checkUnreadNotifications() async {
