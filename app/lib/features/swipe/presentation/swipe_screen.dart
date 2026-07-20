@@ -1894,39 +1894,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
                                                       matchScore,
                                                     ),
                                                   ),
-                                                Positioned(
-                                                  top: 20.h,
-                                                  left: 20.w,
-                                                  child: Container(
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.white.withOpacity(0.2),
-                                                      shape: BoxShape.circle,
-                                                      border: Border.all(color: Colors.white30),
-                                                      boxShadow: [
-                                                        BoxShadow(
-                                                          color: Colors.black.withOpacity(0.1),
-                                                          blurRadius: 4,
-                                                          offset: const Offset(0, 2),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    child: Material(
-                                                      color: Colors.transparent,
-                                                      child: InkWell(
-                                                        borderRadius: BorderRadius.circular(100.r),
-                                                        onTap: () => _shareJob(job),
-                                                        child: Padding(
-                                                          padding: EdgeInsets.all(8.r),
-                                                          child: Icon(
-                                                            Icons.share_rounded,
-                                                            color: Colors.white,
-                                                            size: 20.r,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
                                               ],
                                             );
                                           },
