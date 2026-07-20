@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Pencil, RefreshCw } from 'lucide-react';
+import { formatToIsoDate } from '../../lib/dateUtils';
 
 interface JobEditModalProps {
   editingJob: any;
@@ -69,10 +70,9 @@ const JobEditModal: React.FC<JobEditModalProps> = ({
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Date Limite</label>
               <input 
-                type="text" 
-                value={editingJob.deadline || ''} 
+                type="date" 
+                value={formatToIsoDate(editingJob.deadline) || ''} 
                 onChange={e => setEditingJob({...editingJob, deadline: e.target.value})}
-                placeholder="JJ/MM/AAAA"
                 className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-primary outline-none transition-all font-bold text-slate-700"
               />
             </div>
@@ -145,7 +145,11 @@ const JobEditModal: React.FC<JobEditModalProps> = ({
               <input 
                 type="text" 
                 value={editingJob.salary_range || ''} 
-                onChange={e => setEditingJob({...editingJob, salary_range: e.target.value})}
+                onChange={e => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setEditingJob({...editingJob, salary_range: val});
+                }}
+                placeholder="Ex: 150000"
                 className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-primary outline-none transition-all font-bold text-slate-700"
               />
             </div>

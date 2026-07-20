@@ -86,6 +86,13 @@ class VersionService {
   static DateTime? cvTrialEndDate;
   static final ValueNotifier<bool> cvTrialNotifier = ValueNotifier<bool>(false);
 
+  // --- Période d'essai gratuite de l'adaptation IA de CV ---
+  static bool aiAdaptTrialActive = true; // Actif par défaut pour le lancement
+  static DateTime? aiAdaptTrialEndDate;
+  static int aiAdaptFreeLimit = 10; // Limite mensuelle pour les utilisateurs gratuits après le trial
+  static int aiAdaptPrice = 500; // Prix par adaptation pour les non-abonnés
+  static final ValueNotifier<bool> aiAdaptTrialNotifier = ValueNotifier<bool>(true);
+
   // --- Tarification Premium et CV ---
   static int premiumPriceCfa = 2000;
   static int extraCvPriceCfa = 500;
@@ -97,6 +104,13 @@ class VersionService {
     if (!cvTrialActive) return false;
     if (cvTrialEndDate == null) return true; // Pas de date → actif indéfiniment
     return DateTime.now().isBefore(cvTrialEndDate!);
+  }
+
+  /// Retourne true si le trial d'adaptation IA est actif ET que la date de fin n'est pas dépassée.
+  static bool get isAiAdaptTrialRunning {
+    if (!aiAdaptTrialActive) return false;
+    if (aiAdaptTrialEndDate == null) return true; // Pas de date → actif indéfiniment
+    return DateTime.now().isBefore(aiAdaptTrialEndDate!);
   }
 
   /// Applique la configuration du trial CV depuis une ligne app_config.
@@ -113,6 +127,40 @@ class VersionService {
       }
     }
     cvTrialNotifier.value = isCvTrialRunning;
+  }
+
+  /// Applique la configuration du trial d'adaptation IA depuis une ligne app_config.
+  static void _applyAiAdaptTrialConfig(Map<String, dynamic> data) {
+    if (data.containsKey('ai_adapt_trial_active')) {
+      aiAdaptTrialActive = data['ai_adapt_trial_active'] == true;
+    }
+    if (data.containsKey('ai_adapt_trial_end_date')) {
+      final raw = data['ai_adapt_trial_end_date'];
+      if (raw == null) {
+        aiAdaptTrialEndDate = null;
+      } else {
+        aiAdaptTrialEndDate = DateTime.tryParse(raw.toString());
+      }
+    }
+    if (data.containsKey('ai_adapt_free_limit')) {
+      final rawLimit = data['ai_adapt_free_limit'];
+      if (rawLimit != null) {
+        final parsed = rawLimit is int ? rawLimit : int.tryParse(rawLimit.toString());
+        if (parsed != null && parsed >= 0) {
+          aiAdaptFreeLimit = parsed;
+        }
+      }
+    }
+    if (data.containsKey('ai_adapt_price')) {
+      final rawPrice = data['ai_adapt_price'];
+      if (rawPrice != null) {
+        final parsed = rawPrice is int ? rawPrice : int.tryParse(rawPrice.toString());
+        if (parsed != null && parsed >= 0) {
+          aiAdaptPrice = parsed;
+        }
+      }
+    }
+    aiAdaptTrialNotifier.value = isAiAdaptTrialRunning;
   }
 
   /// Applique la configuration de tarification depuis une ligne app_config.
@@ -196,6 +244,7 @@ class VersionService {
           callback: (payload) {
             debugPrint('VersionService [REALTIME PAYLOAD]: ${payload.toString()}');
             final data = payload.newRecord;
+            if (data == null || data.isEmpty) return;
             if (data.containsKey('show_premium')) {
               final newValue = data['show_premium'] == true;
               if (_showPremiumBase != newValue) {
@@ -210,6 +259,9 @@ class VersionService {
             // Synchronise le trial CV en temps réel
             _applyCvTrialConfig(data);
             debugPrint('VersionService [REALTIME]: cv_trial_active → $cvTrialActive');
+            // Synchronise le trial adaptation IA en temps réel
+            _applyAiAdaptTrialConfig(data);
+            debugPrint('VersionService [REALTIME]: ai_adapt_trial_active → $aiAdaptTrialActive');
             // Synchronise la tarification en temps réel
             _applyPricingConfig(data);
             debugPrint('VersionService [REALTIME]: premiumPriceCfa → $premiumPriceCfa, extraCvPriceCfa → $extraCvPriceCfa');
@@ -248,9 +300,10 @@ class VersionService {
       await updateUserOverride(); // Charge l'override utilisateur
       _applySwipeConfig(Map<String, dynamic>.from(response));
       _applyCvTrialConfig(Map<String, dynamic>.from(response));
+      _applyAiAdaptTrialConfig(Map<String, dynamic>.from(response));
       _applyPricingConfig(Map<String, dynamic>.from(response));
       debugPrint(
-        'VersionService: Initialisation terminée. showPremium: $showPremium, swipeLimit: $swipeLimit, premiumPrice: $premiumPriceCfa, extraCvPrice: $extraCvPriceCfa',
+        'VersionService: Initialisation terminée. showPremium: $showPremium, swipeLimit: $swipeLimit, premiumPrice: $premiumPriceCfa, extraCvPrice: $extraCvPriceCfa, aiAdaptTrial: $aiAdaptTrialActive',
       );
 
       final minVersion = response['min_version'] as String?;

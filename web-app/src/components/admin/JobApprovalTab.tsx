@@ -16,6 +16,7 @@ import {
   Pencil,
   Building
 } from 'lucide-react';
+import { formatLongDate } from '../../lib/dateUtils';
 
 interface JobApprovalTabProps {
   jobsList: any[];
@@ -347,7 +348,7 @@ const JobApprovalTab: React.FC<JobApprovalTabProps> = ({
                         <span>Lieu : <strong>{job.location || 'Abidjan'}</strong></span>
                         {job.deadline && (
                           <span className="ml-auto flex items-center gap-1">
-                            <Calendar size={12} /> Expire : <strong>{job.deadline}</strong>
+                            <Calendar size={12} /> Expire : <strong>{formatLongDate(job.deadline)}</strong>
                           </span>
                         )}
                       </div>

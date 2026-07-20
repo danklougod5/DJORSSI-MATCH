@@ -28,6 +28,10 @@ class CvPaywallSheet extends StatefulWidget {
     if (VersionService.isCvTrialRunning && reason == PaymentReason.modification) {
       return true;
     }
+    // Pendant la période d'essai IA : adaptations gratuites
+    if (VersionService.isAiAdaptTrialRunning && reason == PaymentReason.aiAdaptation) {
+      return true;
+    }
 
     final result = await showModalBottomSheet<bool>(
       context: context,
@@ -75,6 +79,8 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
         return 'CV supplémentaire';
       case PaymentReason.modification:
         return 'Modification de CV';
+      case PaymentReason.aiAdaptation:
+        return 'Adaptation IA épuisée';
       default:
         return 'Paiement requis';
     }
@@ -87,6 +93,10 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
             'Débloquez un emplacement supplémentaire pour créer un nouveau CV.';
       case PaymentReason.modification:
         return 'La modification de vos CV existants nécessite un paiement unique de ${VersionService.extraCvPriceCfa} F CFA par modification.';
+      case PaymentReason.aiAdaptation:
+        return 'Vous avez utilisé vos ${VersionService.aiAdaptFreeLimit} adaptations IA gratuites ce mois-ci. '
+            'Chaque adaptation supplémentaire coûte ${VersionService.aiAdaptPrice} F CFA, '
+            'ou passez en Premium pour des adaptations illimitées !';
       default:
         return '';
     }
@@ -98,6 +108,8 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
         return Icons.add_circle_outline_rounded;
       case PaymentReason.modification:
         return Icons.edit_note_rounded;
+      case PaymentReason.aiAdaptation:
+        return Icons.auto_awesome_rounded;
       default:
         return Icons.lock_outline_rounded;
     }
@@ -130,10 +142,16 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
 
       final String description = widget.reason == PaymentReason.extraCv
           ? "Déblocage d'un CV supplémentaire"
-          : "Modification de CV existant";
+          : widget.reason == PaymentReason.aiAdaptation
+              ? "Adaptation IA de CV"
+              : "Modification de CV existant";
           
       final Map<String, dynamic> metadata = {
-        "type": widget.reason == PaymentReason.extraCv ? "extra_cv" : "modification"
+        "type": widget.reason == PaymentReason.extraCv 
+            ? "extra_cv" 
+            : widget.reason == PaymentReason.aiAdaptation
+                ? "ai_adaptation"
+                : "modification"
       };
 
       final initResult = await GeniusPayService.initiatePayment(

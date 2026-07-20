@@ -6,8 +6,10 @@ class CvStorageService {
   static final SupabaseClient _supabase = Supabase.instance.client;
   static const String _table = 'user_cvs';
 
-  /// Save a CV (insert if new, update if existing)
-  static Future<CvModel> saveCv(CvModel cv) async {
+  /// Save a CV (insert if new, update if existing).
+  /// [bypassQuota] — Set to true ONLY for automatic imports (e.g. PDF profile migration),
+  /// where the user has no existing structured CV. Never use for manual user-triggered creation.
+  static Future<CvModel> saveCv(CvModel cv, {bool bypassQuota = false}) async {
     final user = _supabase.auth.currentUser;
     if (user == null) throw Exception('Utilisateur non connecté');
 
@@ -22,7 +24,7 @@ class CvStorageService {
     };
 
     if (cv.id != null) {
-      // Update existing
+      // Update existing — no quota check needed
       await _supabase
           .from(_table)
           .update(data)
@@ -30,10 +32,12 @@ class CvStorageService {
           .eq('user_id', user.id);
       return cv;
     } else {
-      // Insert new
-      final quota = await CvQuotaService.canCreateCv();
-      if (!quota.allowed) {
-        throw Exception('Quota de création de CV atteint.');
+      // Insert new — check quota unless this is an auto-import bypass
+      if (!bypassQuota) {
+        final quota = await CvQuotaService.canCreateCv();
+        if (!quota.allowed) {
+          throw Exception('Quota de création de CV atteint.');
+        }
       }
 
       final response = await _supabase
@@ -41,6 +45,12 @@ class CvStorageService {
           .insert(data)
           .select('id')
           .single();
+
+      if (!bypassQuota) {
+        // Incrémenter le compteur serveur anti-bypass (ne descend jamais à la suppression)
+        await CvQuotaService.incrementSlotCount();
+      }
+
       return cv.copyWith(id: response['id'] as String);
     }
   }

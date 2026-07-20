@@ -16,6 +16,15 @@ import 'package:djossimatch/core/services/profile_notifier.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:in_app_review/in_app_review.dart';
 import 'package:djossimatch/core/utils/tag_normalizer.dart';
+import 'package:djossimatch/features/cv_generator/models/cv_model.dart';
+import 'package:djossimatch/features/cv_generator/services/cv_ai_import_service.dart';
+import 'package:djossimatch/features/cv_generator/services/cv_storage_service.dart';
+import 'package:djossimatch/features/cv_generator/utils/cv_pdf_generator.dart';
+import 'package:djossimatch/core/services/cv_quota_service.dart';
+import 'package:djossimatch/features/cv_generator/widgets/cv_paywall_sheet.dart';
+import 'package:http/http.dart' as http;
+import 'package:printing/printing.dart';
+import 'package:flutter/cupertino.dart';
 
 class SwipeScreen extends StatefulWidget {
   final String? jobId;
@@ -37,6 +46,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
   // Clé pour forcer la reconstruction du CardSwiper quand les secteurs changent
   int _swiperKey = 0;
+  int _currentCardIndex = 0;
 
   // Nouveaux états pour le Premium
   int _swipeCount = 0;
@@ -114,6 +124,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
           _isLoading = true;
           _jobs = [];
           _swiperKey++; // Force la reconstruction du CardSwiper
+          _currentCardIndex = 0;
         });
         _loadData(forceRefresh: true);
       }
@@ -198,6 +209,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
                 _isLoading = true;
                 _jobs = [];
                 _swiperKey++; // Force la reconstruction du CardSwiper
+                _currentCardIndex = 0;
               });
               // 4. Recharger les offres avec les nouveaux secteurs
               _loadData(forceRefresh: true);
@@ -554,6 +566,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
           _jobs = allJobs;
           _isLoading = false;
           _swiperKey++; // Force la reconstruction complète du swiper avec les nouvelles données
+          _currentCardIndex = 0;
         });
 
         // Afficher un petit message si aucune nouvelle offre n'a été trouvée
@@ -872,6 +885,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
     } else if (direction == CardSwiperDirection.left) {
       _handleSwipe(previousIndex, 'left');
     }
+
+    // Mise à jour de l'index de la carte uniquement si le swipe est validé
+    setState(() {
+      _currentCardIndex = currentIndex ?? 0;
+    });
     return true;
   }
 
@@ -1081,7 +1099,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
             'jobTitle': job['job_title'],
             'jobCompany': job['company_name'],
             'jobContactEmail': job['contact_email'],
-            'cvUrl': _cvUrl,
+            'cvUrl': job['adapted_cv_url'] ?? _cvUrl,
             'userName': _fullName,
             'userSexe': _sexe,
             'message': null,
@@ -1978,6 +1996,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
     setState(() {
       if (_swipeCount > 0) _swipeCount--;
+      if (_currentCardIndex > 0) _currentCardIndex--;
     });
 
     try {
@@ -2015,6 +2034,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
               _handleUndo,
               isMini: true,
               locked: false, // Cadenas retiré à la demande de l'utilisateur
+            ),
+            _buildActionButton(
+              Icons.auto_awesome,
+              const Color(0xFF8B5CF6), // Purple AI
+              _onAdaptCvPressed,
+              isMini: true,
             ),
             _buildActionButton(
               Icons.favorite_rounded,
@@ -2167,5 +2192,1134 @@ class _SwipeScreenState extends State<SwipeScreen> {
     } catch (e) {
       debugPrint('Erreur ouverture store: $e');
     }
+  }
+
+  Future<void> _onAdaptCvPressed() async {
+    if (_jobs.isEmpty || _currentCardIndex >= _jobs.length) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Aucune offre disponible à adapter."),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final job = _jobs[_currentCardIndex];
+
+    // ── Vérification du quota d'adaptation IA ──
+    final quotaResult = await CvQuotaService.canAdaptCv();
+    if (!quotaResult.allowed) {
+      if (mounted) {
+        final paid = await CvPaywallSheet.show(context, PaymentReason.aiAdaptation);
+        if (!paid) return; // L'utilisateur a annulé
+      }
+    }
+
+    // ── Premium animated loader ──
+    _showAiLoader(context, "Chargement de vos CVs...");
+
+    try {
+      final cvs = await CvStorageService.loadUserCvs();
+
+      if (cvs.isEmpty) {
+        // Si l'utilisateur n'a pas de CV structuré, mais a un CV PDF sur son profil, on l'importe automatiquement
+        if (_cvUrl != null && _cvUrl!.trim().isNotEmpty && _cvUrl != 'null' && _cvUrl != 'undefined') {
+          debugPrint('*** [AI IMPORT] CV PDF trouvé dans le profil. Importation automatique... ***');
+          
+          try {
+            final response = await http.get(Uri.parse(_cvUrl!)).timeout(const Duration(seconds: 15));
+            if (response.statusCode == 200) {
+              final pdfBytes = response.bodyBytes;
+              final rawText = CvAiImportService.extractTextFromPdf(pdfBytes);
+              
+              if (rawText.isNotEmpty) {
+                final parsedCv = await CvAiImportService.analyzeWithMistral(rawText);
+                final savedCv = await CvStorageService.saveCv(parsedCv, bypassQuota: true);
+                
+                if (mounted) {
+                  Navigator.pop(context); // Dismiss loading dialog
+                  _runCvAdaptation(savedCv, job);
+                }
+                return;
+              }
+            }
+          } catch (importErr) {
+            debugPrint('*** [AI IMPORT] Échec importation automatique: $importErr ***');
+          }
+        }
+
+        if (mounted) {
+          Navigator.pop(context); // Dismiss loading dialog
+          _showNoCvDialog();
+        }
+      } else {
+        if (mounted) {
+          Navigator.pop(context); // Dismiss loading dialog
+          _runCvAdaptation(cvs.first, job);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erreur de chargement ou d'importation : $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showNoCvDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Aucun CV trouvé", style: TextStyle(fontFamily: 'Outfit')),
+        content: const Text(
+          "Vous devez créer ou importer un CV dans l'onglet 'Mon CV' avant de pouvoir l'adapter à une offre d'emploi.",
+          style: TextStyle(fontFamily: 'Outfit'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Fermer", style: TextStyle(fontFamily: 'Outfit')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.go('/?tab=cv');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF97316),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Créer un CV", style: TextStyle(fontFamily: 'Outfit')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _runCvAdaptation(CvModel baseCv, Map<String, dynamic> job) async {
+    // Premium animated loader
+    _showAiLoader(context, "L'IA analyse l'offre et adapte votre CV...");
+
+    try {
+      final adaptedCv = await CvAiImportService.adaptCv(
+        sourceCv: baseCv,
+        jobTitle: job['job_title'] ?? '',
+        jobCompany: job['company_name'] ?? '',
+        jobDescription: job['description'] ?? '',
+      );
+
+      // Enregistrer l'adaptation dans le quota mensuel
+      await CvQuotaService.recordAdaptation();
+
+      if (mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+        _showCvReviewSheet(baseCv, adaptedCv, job);
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erreur d'adaptation : $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showCvReviewSheet(CvModel baseCv, CvModel adaptedCv, Map<String, dynamic> job) {
+    CvModel currentAdaptedCv = adaptedCv;
+    int selectedTab = 0; // 0 for Modifications, 1 for PDF Preview
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.88,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+              ),
+              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, MediaQuery.of(context).viewInsets.bottom + 16.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Drag handle
+                  Center(
+                    child: Container(
+                      width: 40.w,
+                      height: 5.h,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(100.r),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.auto_awesome, color: Color(0xFFF97316)),
+                      SizedBox(width: 8.w),
+                      Text(
+                        "Revoir les modifications",
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 18.sp,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF1E3A8A),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16.h),
+                  
+                  // Premium sliding segmented control
+                  Center(
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                      padding: EdgeInsets.all(2.r),
+                      child: CupertinoSlidingSegmentedControl<int>(
+                        groupValue: selectedTab,
+                        backgroundColor: Colors.transparent,
+                        thumbColor: Colors.white,
+                        children: {
+                          0: Container(
+                            padding: EdgeInsets.symmetric(vertical: 8.h),
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.compare_arrows_rounded,
+                                  size: 16.sp,
+                                  color: selectedTab == 0 ? const Color(0xFFF97316) : Colors.grey[600],
+                                ),
+                                SizedBox(width: 6.w),
+                                Text(
+                                  "Modifications",
+                                  style: TextStyle(
+                                    fontFamily: 'Outfit',
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.sp,
+                                    color: selectedTab == 0 ? const Color(0xFFF97316) : Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          1: Container(
+                            padding: EdgeInsets.symmetric(vertical: 8.h),
+                            alignment: Alignment.center,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.picture_as_pdf_rounded,
+                                  size: 16.sp,
+                                  color: selectedTab == 1 ? const Color(0xFFF97316) : Colors.grey[600],
+                                ),
+                                SizedBox(width: 6.w),
+                                Text(
+                                  "Aperçu du PDF",
+                                  style: TextStyle(
+                                    fontFamily: 'Outfit',
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13.sp,
+                                    color: selectedTab == 1 ? const Color(0xFFF97316) : Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        },
+                        onValueChanged: (val) {
+                          setModalState(() {
+                            selectedTab = val ?? 0;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  
+                  // Tab Content based on selectedTab
+                  Expanded(
+                    child: selectedTab == 0
+                        ? _buildDiffTab(baseCv, currentAdaptedCv)
+                        : Column(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: Colors.grey[300]!),
+                                    borderRadius: BorderRadius.circular(12.r),
+                                  ),
+                                  clipBehavior: Clip.hardEdge,
+                                  child: InteractiveViewer(
+                                    panEnabled: true,
+                                    minScale: 1.0,
+                                    maxScale: 4.0,
+                                    child: PdfPreview(
+                                      key: ValueKey('${currentAdaptedCv.templateId}_${currentAdaptedCv.primaryColor}_${currentAdaptedCv.secondaryColor}'),
+                                      build: (format) => CvPdfGenerator.generateCvPdf(currentAdaptedCv),
+                                      canChangeOrientation: false,
+                                      canChangePageFormat: false,
+                                      useActions: false,
+                                      allowPrinting: false,
+                                      allowSharing: false,
+                                      loadingWidget: const Center(
+                                        child: CircularProgressIndicator(color: Color(0xFFF97316)),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: 12.h),
+                              // Template selector
+                              _buildTemplateSelectorInsideSheet(currentAdaptedCv, (newCv) {
+                                setModalState(() {
+                                  currentAdaptedCv = newCv;
+                                });
+                              }),
+                            ],
+                          ),
+                  ),
+                  SizedBox(height: 16.h),
+                  
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context); // Close review sheet
+                            _runCvAdaptation(baseCv, job); // Regenerate!
+                          },
+                          icon: const Icon(Icons.refresh, color: Color(0xFFF97316)),
+                          label: Text(
+                            "Régénérer",
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFF97316),
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFFF97316)),
+                            padding: EdgeInsets.symmetric(vertical: 14.h),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        flex: 3,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(context); // Close review sheet
+                            _applyWithAdaptedCv(baseCv, currentAdaptedCv, job);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF97316),
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 14.h),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                          ),
+                          child: Text(
+                            "Postuler avec ce CV",
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8.h),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      "Annuler",
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDiffTab(CvModel baseCv, CvModel adaptedCv) {
+    final diffWidgets = <Widget>[];
+
+    // Profile Title
+    if (baseCv.personalInfo.jobTitle != adaptedCv.personalInfo.jobTitle) {
+      diffWidgets.add(
+        _buildDiffItem(
+          icon: Icons.work_outline,
+          title: "Titre du Profil",
+          original: baseCv.personalInfo.jobTitle,
+          adapted: adaptedCv.personalInfo.jobTitle,
+        ),
+      );
+    }
+
+    // Accroche
+    if (baseCv.personalInfo.summary != adaptedCv.personalInfo.summary) {
+      diffWidgets.add(
+        _buildDiffItem(
+          icon: Icons.description_outlined,
+          title: "Accroche / Résumé",
+          original: baseCv.personalInfo.summary,
+          adapted: adaptedCv.personalInfo.summary,
+        ),
+      );
+    }
+
+    // Compétences
+    if (baseCv.skills != adaptedCv.skills) {
+      diffWidgets.add(
+        _buildDiffItem(
+          icon: Icons.star_border_rounded,
+          title: "Compétences clés",
+          original: baseCv.skills,
+          adapted: adaptedCv.skills,
+        ),
+      );
+    }
+
+    // Expériences professionnelles (comparaison simplifiée)
+    if (baseCv.experiences.length == adaptedCv.experiences.length) {
+      for (int i = 0; i < baseCv.experiences.length; i++) {
+        final orig = baseCv.experiences[i];
+        final adapt = adaptedCv.experiences[i];
+        if (orig.description != adapt.description) {
+          diffWidgets.add(
+            _buildDiffItem(
+              icon: Icons.business_center_outlined,
+              title: "Expérience : ${orig.jobTitle} chez ${orig.company}",
+              original: orig.description,
+              adapted: adapt.description,
+            ),
+          );
+        }
+      }
+    }
+
+    // Projets (comparaison simplifiée)
+    if (baseCv.projects.length == adaptedCv.projects.length) {
+      for (int i = 0; i < baseCv.projects.length; i++) {
+        final orig = baseCv.projects[i];
+        final adapt = adaptedCv.projects[i];
+        if (orig.description != adapt.description) {
+          diffWidgets.add(
+            _buildDiffItem(
+              icon: Icons.folder_open_outlined,
+              title: "Projet : ${orig.name}",
+              original: orig.description,
+              adapted: adapt.description,
+            ),
+          );
+        }
+      }
+    }
+
+    if (diffWidgets.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.r),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle_outline, color: Colors.green, size: 48.sp),
+              SizedBox(height: 12.h),
+              Text(
+                "Votre CV est déjà parfaitement ciblé pour cette offre !",
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 14.sp,
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      itemCount: diffWidgets.length,
+      separatorBuilder: (context, index) => SizedBox(height: 16.h),
+      physics: const BouncingScrollPhysics(),
+      itemBuilder: (context, index) => diffWidgets[index],
+    );
+  }
+
+  Widget _buildDiffItem({
+    required IconData icon,
+    required String title,
+    required String original,
+    required String adapted,
+  }) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 4.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header of the card
+          Padding(
+            padding: EdgeInsets.all(16.r),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8.r),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF97316).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: const Color(0xFFF97316), size: 18.sp),
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF1E3A8A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+          
+          Padding(
+            padding: EdgeInsets.all(16.r),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (original.trim().isNotEmpty) ...[
+                  Text(
+                    "VERSION INITIALE",
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[500],
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  SizedBox(height: 6.h),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(12.r),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(10.r),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: Text(
+                      original,
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 12.sp,
+                        color: Colors.grey[600],
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                ],
+                
+                Row(
+                  children: [
+                    Text(
+                      "OPTIMISÉ PAR L'IA",
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFF97316),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF97316).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(100.r),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.auto_awesome, color: const Color(0xFFF97316), size: 10.sp),
+                          SizedBox(width: 4.w),
+                          Text(
+                            "Recommandé",
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 9.sp,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFF97316),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 6.h),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(12.r),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5), // Light emerald/green
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                  ),
+                  child: Text(
+                    adapted,
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 13.sp,
+                      color: const Color(0xFF065F46), // Deep emerald
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTemplateSelectorInsideSheet(CvModel cv, Function(CvModel) onCvUpdated) {
+    final templates = CvPdfGenerator.availableTemplates;
+    
+    // Parse the primary theme color of the CV
+    Color primaryThemeColor;
+    try {
+      primaryThemeColor = Color(int.parse(cv.primaryColor.replaceFirst('#', '0xff')));
+    } catch (_) {
+      primaryThemeColor = const Color(0xFFF97316); // Default orange
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 4.h),
+          child: Text(
+            "Choisir un modèle de CV :",
+            style: TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 13.sp,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF1E3A8A),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 60.h,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: templates.length,
+            itemBuilder: (context, index) {
+              final template = templates[index];
+              final isSelected = cv.templateId == template.id;
+
+              return GestureDetector(
+                onTap: () {
+                  onCvUpdated(cv.copyWith(templateId: template.id));
+                },
+                child: Container(
+                  width: 100.w,
+                  margin: EdgeInsets.only(right: 8.w, top: 4.h, bottom: 4.h),
+                  padding: EdgeInsets.all(6.r),
+                  decoration: BoxDecoration(
+                    color: isSelected ? primaryThemeColor.withOpacity(0.05) : Colors.white,
+                    border: Border.all(
+                      color: isSelected ? primaryThemeColor : Colors.grey[300]!,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.insert_drive_file_outlined,
+                        color: isSelected ? primaryThemeColor : Colors.grey[500],
+                        size: 18.sp,
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        template.name,
+                        style: TextStyle(
+                          fontFamily: 'Outfit',
+                          fontSize: 10.sp,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? primaryThemeColor : Colors.grey[700],
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _applyWithAdaptedCv(CvModel baseCv, CvModel adaptedCv, Map<String, dynamic> job) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(color: Color(0xFFF97316)),
+            SizedBox(width: 16),
+            Expanded(child: Text("Génération et enregistrement du nouveau CV...")),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final jobTitle = job['job_title'] ?? '';
+      final cvToSave = adaptedCv.copyWith(
+        id: null,
+        title: "${baseCv.displayTitle} - Adapté pour $jobTitle",
+      );
+
+      final savedCv = await CvStorageService.saveCv(cvToSave, bypassQuota: true);
+      final pdfBytes = await CvPdfGenerator.generateCvPdf(savedCv);
+
+      final user = _supabase.auth.currentUser;
+      if (user == null) throw Exception("Utilisateur non connecté");
+      
+      final fileName = '${user.id}_cv_${savedCv.id}.pdf';
+      final filePath = 'cvs/$fileName';
+
+      await _supabase.storage.from('cv_files').uploadBinary(
+        filePath,
+        pdfBytes,
+        fileOptions: const FileOptions(upsert: true),
+      );
+
+      final String publicUrl = _supabase.storage.from('cv_files').getPublicUrl(filePath);
+
+      if (mounted) {
+        setState(() {
+          job['adapted_cv_url'] = publicUrl;
+        });
+        
+        Navigator.pop(context); // Close loading dialog
+
+        // Swipe right programmatically
+        _controller.swipe(CardSwiperDirection.right);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('CV adapté enregistré et postulation envoyée pour $jobTitle !'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erreur lors de l'enregistrement ou de la postulation : $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Affiche un loader IA animé premium avec un design élégant
+  void _showAiLoader(BuildContext ctx, String message) {
+    showDialog(
+      context: ctx,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      builder: (context) => _AiLoaderDialog(message: message),
+    );
+  }
+}
+
+/// Widget de loader IA animé avec pulsation et gradient
+class _AiLoaderDialog extends StatefulWidget {
+  final String message;
+  const _AiLoaderDialog({required this.message});
+
+  @override
+  State<_AiLoaderDialog> createState() => _AiLoaderDialogState();
+}
+
+class _AiLoaderDialogState extends State<_AiLoaderDialog>
+    with TickerProviderStateMixin {
+  late AnimationController _scanController;
+  late AnimationController _pulseController;
+  late Animation<double> _scanAnimation;
+  late Animation<double> _pulseAnimation;
+
+  final List<String> _steps = [
+    "Analyse de l'offre d'emploi...",
+    "Optimisation du titre et de l'accroche...",
+    "Adaptation des compétences clés...",
+    "Personnalisation des expériences...",
+    "Finalisation de votre CV ciblé...",
+  ];
+  int _currentStep = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Scan line animation (up and down)
+    _scanController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+    
+    _scanAnimation = Tween<double>(begin: 0.05, end: 0.95).animate(
+      CurvedAnimation(parent: _scanController, curve: Curves.easeInOut),
+    );
+
+    // Subtle background pulse
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 0.9, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _cycleSteps();
+  }
+
+  void _cycleSteps() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _currentStep = (_currentStep + 1) % _steps.length;
+        });
+        _cycleSteps();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scanController.dispose();
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 40.w),
+        padding: EdgeInsets.symmetric(vertical: 36.h, horizontal: 24.w),
+        decoration: BoxDecoration(
+          // Dark premium gradient matching the project's Orange/Green branding
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0F172A), // Deep Slate
+              Color(0xFF042F1A), // Deep Forest Green
+            ],
+          ),
+          borderRadius: BorderRadius.circular(28.r),
+          border: Border.all(
+            color: const Color(0xFF10B981).withOpacity(0.3), // Emerald Green
+            width: 1.5.w,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withOpacity(0.2), // Soft Green Glow
+              blurRadius: 40,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // CV Scanner Animation
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Pulse background glow (Green)
+                AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, child) {
+                    return Container(
+                      width: 130.w,
+                      height: 130.w,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF10B981).withOpacity(0.12 * _pulseAnimation.value),
+                            blurRadius: 35,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                
+                // Stylized CV document container (White/Slate)
+                Container(
+                  width: 72.w,
+                  height: 96.h,
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: Colors.white24,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      // Fake lines representing CV layout
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Header line (avatar circle + name line)
+                          Row(
+                            children: [
+                              Container(
+                                width: 14.w,
+                                height: 14.w,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white30,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              SizedBox(width: 6.w),
+                              Container(
+                                width: 28.w,
+                                height: 5.h,
+                                decoration: BoxDecoration(
+                                  color: Colors.white30,
+                                  borderRadius: BorderRadius.circular(2.r),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 14.h),
+                          // Content lines (White/Grey)
+                          Container(
+                            width: 46.w,
+                            height: 4.h,
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(2.r),
+                            ),
+                          ),
+                          SizedBox(height: 6.h),
+                          Container(
+                            width: 38.w,
+                            height: 4.h,
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(2.r),
+                            ),
+                          ),
+                          SizedBox(height: 6.h),
+                          Container(
+                            width: 42.w,
+                            height: 4.h,
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(2.r),
+                            ),
+                          ),
+                          SizedBox(height: 6.h),
+                          Container(
+                            width: 22.w,
+                            height: 4.h,
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(2.r),
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      // Animated scanning laser line (Orange)
+                      AnimatedBuilder(
+                        animation: _scanAnimation,
+                        builder: (context, child) {
+                          return Positioned(
+                            top: _scanAnimation.value * 68.h,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              height: 3.h,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF97316), // Orange
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFF97316).withOpacity(0.8),
+                                    blurRadius: 8,
+                                    spreadRadius: 1.5,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Tiny sparkles overlay representing AI (Green)
+                Positioned(
+                  top: 8.h,
+                  right: 8.w,
+                  child: AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: const Icon(
+                          Icons.auto_awesome,
+                          color: Color(0xFF10B981), // Emerald Green
+                          size: 20,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 28.h),
+
+            // Title
+            Text(
+              "Intelligence Artificielle",
+              style: TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 18.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: 0.5,
+              ),
+            ),
+            SizedBox(height: 8.h),
+
+            // Animated step text
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: Text(
+                _steps[_currentStep],
+                key: ValueKey(_currentStep),
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 13.sp,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            SizedBox(height: 28.h),
+
+            // Premium progress indicator (Green)
+            SizedBox(
+              width: 180.w,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(100.r),
+                child: LinearProgressIndicator(
+                  minHeight: 4.h,
+                  backgroundColor: Colors.white10,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)), // Emerald Green
+                ),
+              ),
+            ),
+            SizedBox(height: 12.h),
+
+            Text(
+              "Veuillez patienter...",
+              style: TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 11.sp,
+                color: Colors.white38,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -153,6 +153,43 @@ const UserEditModal: React.FC<UserEditModalProps> = ({
             </div>
           </div>
 
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-500/10 text-green-600">
+                <Star size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">Adaptations IA Supplémentaires</p>
+                <p className="text-[10px] text-slate-500 font-medium">Adaptations IA additionnelles offertes</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                type="button"
+                onClick={() => setEditingUser({
+                  ...editingUser, 
+                  aiAdaptExtraPurchased: Math.max(0, (editingUser.aiAdaptExtraPurchased || 0) - 1)
+                })}
+                className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors text-slate-600 border border-slate-200 bg-white cursor-pointer"
+              >
+                <Minus size={14} />
+              </button>
+              <span className="w-8 text-center font-mono font-bold text-slate-800 text-sm">
+                {editingUser.aiAdaptExtraPurchased || 0}
+              </span>
+              <button 
+                type="button"
+                onClick={() => setEditingUser({
+                  ...editingUser, 
+                  aiAdaptExtraPurchased: (editingUser.aiAdaptExtraPurchased || 0) + 1
+                })}
+                className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors text-slate-600 border border-slate-200 bg-white cursor-pointer"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+
 
           <div className="pt-4 border-t border-slate-100 flex flex-col gap-4">
             <div className="flex gap-3">

@@ -72,7 +72,11 @@ const AddJobTab: React.FC<AddJobTabProps> = ({
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-black uppercase tracking-tight text-slate-500">Date Limite</label>
-                <input name="deadline" placeholder="JJ/MM/AAAA" className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none transition-all font-medium" />
+                <input 
+                  type="date"
+                  name="deadline" 
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none transition-all font-medium" 
+                />
               </div>
             </div>
 
@@ -110,7 +114,14 @@ const AddJobTab: React.FC<AddJobTabProps> = ({
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-black uppercase tracking-tight text-slate-500">Salaire</label>
-                <input name="salary_range" placeholder="Ex: 500k" className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none transition-all font-medium" />
+                <input 
+                  name="salary_range" 
+                  placeholder="Ex: 150000" 
+                  onChange={(e) => {
+                    e.target.value = e.target.value.replace(/\D/g, '');
+                  }}
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl focus:border-primary outline-none transition-all font-medium" 
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-black uppercase tracking-tight text-slate-500">Nom de l'Entreprise</label>

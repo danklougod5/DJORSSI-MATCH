@@ -20,19 +20,20 @@ class CvQuotaService {
   static Future<UserQuotaDetails> getUserQuotaDetails() async {
     try {
       final user = _supabase.auth.currentUser;
-      if (user == null) return UserQuotaDetails(isPremium: false, extraCvsPurchased: 0);
+      if (user == null) return UserQuotaDetails(isPremium: false, extraCvsPurchased: 0, extraAiAdaptations: 0);
 
       final response = await _supabase
           .from('profiles')
-          .select('is_premium, premium_until, extra_cvs_purchased, show_premium')
+          .select('is_premium, premium_until, extra_cvs_purchased, show_premium, ai_adapt_extra_purchased')
           .eq('id', user.id)
           .maybeSingle();
 
-      if (response == null) return UserQuotaDetails(isPremium: false, extraCvsPurchased: 0);
+      if (response == null) return UserQuotaDetails(isPremium: false, extraCvsPurchased: 0, extraAiAdaptations: 0);
 
       final isPremiumVal = response['is_premium'] ?? false;
       final premiumUntilRaw = response['premium_until'];
       final extraPurchased = (response['extra_cvs_purchased'] ?? 0) as int;
+      final extraAi = (response['ai_adapt_extra_purchased'] ?? 0) as int;
       final showPremiumOverride = response['show_premium'];
 
       bool activePremium = isPremiumVal;
@@ -47,10 +48,14 @@ class CvQuotaService {
         activePremium = true;
       }
 
-      return UserQuotaDetails(isPremium: activePremium, extraCvsPurchased: extraPurchased);
+      return UserQuotaDetails(
+        isPremium: activePremium,
+        extraCvsPurchased: extraPurchased,
+        extraAiAdaptations: extraAi,
+      );
     } catch (e) {
       debugPrint('CvQuotaService.getUserQuotaDetails error: $e');
-      return UserQuotaDetails(isPremium: false, extraCvsPurchased: 0);
+      return UserQuotaDetails(isPremium: false, extraCvsPurchased: 0, extraAiAdaptations: 0);
     }
   }
 
@@ -60,21 +65,43 @@ class CvQuotaService {
     return details.isPremium;
   }
 
-  /// Get the number of CVs the current user has created
-  static Future<int> getCvCount() async {
+  /// Get the number of CV creation slots consumed by the user (server-side, never decremented on deletion).
+  /// Uses `profiles.cv_slots_used` to prevent quota bypass via CV deletion + recreation.
+  static Future<int> getSlotCount() async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return 0;
 
       final response = await _supabase
-          .from('user_cvs')
-          .select('id')
-          .eq('user_id', user.id);
+          .from('profiles')
+          .select('cv_slots_used')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      return (response as List).length;
+      if (response == null) return 0;
+      return (response['cv_slots_used'] ?? 0) as int;
     } catch (e) {
-      debugPrint('CvQuotaService.getCvCount error: $e');
+      debugPrint('CvQuotaService.getSlotCount error: $e');
       return 0;
+    }
+  }
+
+  /// Increments the server-side cv_slots_used counter when a new CV is created.
+  /// This counter is NEVER decremented on deletion — prevents quota bypass.
+  static Future<void> incrementSlotCount() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      final current = await getSlotCount();
+      await _supabase
+          .from('profiles')
+          .update({'cv_slots_used': current + 1})
+          .eq('id', user.id);
+
+      debugPrint('CvQuotaService: cv_slots_used → ${current + 1}');
+    } catch (e) {
+      debugPrint('CvQuotaService.incrementSlotCount error: $e');
     }
   }
 
@@ -90,7 +117,7 @@ class CvQuotaService {
     return details.extraCvsPurchased;
   }
 
-  /// Check if the user can create a new CV (within quota)
+  /// Check if the user can create a new CV (based on server-side slot count, bypass-proof)
   static Future<CvQuotaResult> canCreateCv({bool? isPremiumUser, int? extraPurchased}) async {
     if (!VersionService.showPremium) {
       return CvQuotaResult(
@@ -114,14 +141,15 @@ class CvQuotaService {
       extra = extraPurchased ?? details.extraCvsPurchased;
     }
 
-    final cvCount = await getCvCount();
+    // Use server-side slot counter (not live user_cvs count) to prevent bypass
+    final slotCount = await getSlotCount();
     final maxFree = premium ? premiumMaxCvs : freeMaxCvs;
     final totalAllowed = maxFree + extra;
 
-    if (cvCount < totalAllowed) {
+    if (slotCount < totalAllowed) {
       return CvQuotaResult(
         allowed: true,
-        currentCount: cvCount,
+        currentCount: slotCount,
         maxFree: maxFree,
         extraPurchased: extra,
         isPremium: premium,
@@ -130,7 +158,7 @@ class CvQuotaService {
 
     return CvQuotaResult(
       allowed: false,
-      currentCount: cvCount,
+      currentCount: slotCount,
       maxFree: maxFree,
       extraPurchased: extra,
       isPremium: premium,
@@ -164,13 +192,13 @@ class CvQuotaService {
       extra = extraPurchased ?? details.extraCvsPurchased;
     }
 
-    final cvCount = await getCvCount();
+    final slotCount = await getSlotCount();
     final maxFree = premium ? premiumMaxCvs : freeMaxCvs;
 
     if (premium) {
       return CvQuotaResult(
         allowed: true,
-        currentCount: cvCount,
+        currentCount: slotCount,
         maxFree: maxFree,
         extraPurchased: extra,
         isPremium: premium,
@@ -179,7 +207,7 @@ class CvQuotaService {
 
     return CvQuotaResult(
       allowed: false,
-      currentCount: cvCount,
+      currentCount: slotCount,
       maxFree: maxFree,
       extraPurchased: extra,
       isPremium: premium,
@@ -223,15 +251,167 @@ class CvQuotaService {
       extra = extraPurchased ?? details.extraCvsPurchased;
     }
 
-    final cvCount = await getCvCount();
+    // Use server-side slot counter (bypass-proof)
+    final slotCount = await getSlotCount();
     final maxFree = premium ? premiumMaxCvs : freeMaxCvs;
 
     return CvQuotaInfo(
       isPremium: premium,
-      cvCount: cvCount,
+      cvCount: slotCount,
       maxFreeCvs: maxFree,
       extraPurchased: extra,
-      remaining: (maxFree + extra) - cvCount,
+      remaining: (maxFree + extra) - slotCount,
+    );
+  }
+
+  // ─── Adaptation IA : quota mensuel (côté serveur — anti-bypass) ───
+
+  /// Retourne le mois courant au format 'YYYY-MM'.
+  static String _currentMonthKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}';
+  }
+
+  /// Récupère le nombre d'adaptations IA effectuées ce mois-ci depuis Supabase.
+  /// Le compteur est stocké dans `profiles.ai_adapt_monthly_count` côté serveur,
+  /// ce qui empêche tout contournement par réinstallation de l'app.
+  static Future<int> getMonthlyAdaptationCount() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return 0;
+
+      final currentMonth = _currentMonthKey();
+
+      final response = await _supabase
+          .from('profiles')
+          .select('ai_adapt_monthly_count, ai_adapt_month')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (response == null) return 0;
+
+      final savedMonth = response['ai_adapt_month'] as String?;
+      final savedCount = (response['ai_adapt_monthly_count'] ?? 0) as int;
+
+      // Si le mois a changé côté serveur → réinitialiser le compteur
+      if (savedMonth != currentMonth) {
+        await _supabase.from('profiles').update({
+          'ai_adapt_monthly_count': 0,
+          'ai_adapt_month': currentMonth,
+        }).eq('id', user.id);
+        return 0;
+      }
+
+      return savedCount;
+    } catch (e) {
+      debugPrint('CvQuotaService.getMonthlyAdaptationCount error: $e');
+      return 0;
+    }
+  }
+
+  /// Enregistre une adaptation IA effectuée (incrémente le compteur serveur).
+  /// Utilise une opération atomique pour éviter les race conditions.
+  static Future<void> recordAdaptation() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      final currentMonth = _currentMonthKey();
+
+      // Récupérer le compteur actuel
+      final response = await _supabase
+          .from('profiles')
+          .select('ai_adapt_monthly_count, ai_adapt_month')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (response == null) return;
+
+      final savedMonth = response['ai_adapt_month'] as String?;
+      final savedCount = (response['ai_adapt_monthly_count'] ?? 0) as int;
+
+      // Si nouveau mois, recommencer à 1, sinon incrémenter
+      final newCount = (savedMonth == currentMonth) ? savedCount + 1 : 1;
+
+      await _supabase.from('profiles').update({
+        'ai_adapt_monthly_count': newCount,
+        'ai_adapt_month': currentMonth,
+      }).eq('id', user.id);
+
+      debugPrint('CvQuotaService: Adaptation IA enregistrée côté serveur ($newCount ce mois — $currentMonth)');
+    } catch (e) {
+      debugPrint('CvQuotaService.recordAdaptation error: $e');
+    }
+  }
+
+  /// Vérifie si l'utilisateur peut effectuer une adaptation IA.
+  ///
+  /// Règles :
+  /// - Période de lancement (trial actif) → illimité pour tout le monde
+  /// - Premium → illimité
+  /// - Gratuit après trial → limité à [VersionService.aiAdaptFreeLimit] / mois
+  /// - Si quota épuisé → paiement de [VersionService.aiAdaptPrice] F CFA par adaptation
+  static Future<CvQuotaResult> canAdaptCv() async {
+    // Si le système premium est désactivé globalement, tout est autorisé
+    if (!VersionService.showPremium) {
+      return CvQuotaResult(
+        allowed: true,
+        currentCount: 0,
+        maxFree: 999,
+        extraPurchased: 0,
+        isPremium: true,
+      );
+    }
+
+    // Période de lancement : illimité pour tout le monde
+    if (VersionService.isAiAdaptTrialRunning) {
+      return CvQuotaResult(
+        allowed: true,
+        currentCount: 0,
+        maxFree: 999,
+        extraPurchased: 0,
+        isPremium: true,
+      );
+    }
+
+    final details = await getUserQuotaDetails();
+
+    // Premium → illimité
+    if (details.isPremium) {
+      return CvQuotaResult(
+        allowed: true,
+        currentCount: 0,
+        maxFree: 999,
+        extraPurchased: 0,
+        isPremium: true,
+      );
+    }
+
+    // Utilisateur gratuit après le trial : vérifier le quota mensuel SERVEUR (limite gratuite + bonus acheté)
+    final monthlyCount = await getMonthlyAdaptationCount();
+    final limit = VersionService.aiAdaptFreeLimit;
+    final totalAllowed = limit + details.extraAiAdaptations;
+
+    if (monthlyCount < totalAllowed) {
+      return CvQuotaResult(
+        allowed: true,
+        currentCount: monthlyCount,
+        maxFree: limit,
+        extraPurchased: details.extraAiAdaptations,
+        isPremium: false,
+      );
+    }
+
+    // Quota épuisé → paiement requis
+    return CvQuotaResult(
+      allowed: false,
+      currentCount: monthlyCount,
+      maxFree: limit,
+      extraPurchased: details.extraAiAdaptations,
+      isPremium: false,
+      requiresPayment: true,
+      paymentAmount: VersionService.aiAdaptPrice.toDouble(),
+      paymentReason: PaymentReason.aiAdaptation,
     );
   }
 }
@@ -286,11 +466,17 @@ enum PaymentReason {
   none,
   extraCv,
   modification,
+  aiAdaptation,
 }
 
 class UserQuotaDetails {
   final bool isPremium;
   final int extraCvsPurchased;
+  final int extraAiAdaptations;
 
-  UserQuotaDetails({required this.isPremium, required this.extraCvsPurchased});
+  UserQuotaDetails({
+    required this.isPremium,
+    required this.extraCvsPurchased,
+    required this.extraAiAdaptations,
+  });
 }

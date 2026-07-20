@@ -499,14 +499,19 @@ class _CvPreviewScreenState extends State<CvPreviewScreen> {
         body: Column(
           children: [
             Expanded(
-              child: PdfPreview(
-                key: ValueKey('${_currentCv.templateId}_${_currentCv.primaryColor}_${_currentCv.secondaryColor}_${_currentCv.personalInfo.profileImageUrl}_${_currentCv.personalInfo.showAvatar}'),
-                build: (format) => CvPdfGenerator.generateCvPdf(_currentCv),
-                canChangeOrientation: false,
-                canChangePageFormat: false,
-                useActions: true,
-                allowPrinting: false,
-                allowSharing: false,
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 1.0,
+                maxScale: 4.0,
+                child: PdfPreview(
+                  key: ValueKey('${_currentCv.templateId}_${_currentCv.primaryColor}_${_currentCv.secondaryColor}_${_currentCv.personalInfo.profileImageUrl}_${_currentCv.personalInfo.showAvatar}'),
+                  build: (format) => CvPdfGenerator.generateCvPdf(_currentCv),
+                  canChangeOrientation: false,
+                  canChangePageFormat: false,
+                  useActions: true,
+                  allowPrinting: false,
+                  allowSharing: false,
+                ),
               ),
             ),
             if (_canEdit)

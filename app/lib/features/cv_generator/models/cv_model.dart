@@ -127,6 +127,9 @@ class CvModel {
     return 'Mon CV';
   }
 
+  /// Whether this is an AI-adapted CV
+  bool get isAdapted => title.contains(' - Adapté pour ') || title.contains('Adapté pour');
+
   Map<String, dynamic> toJson() {
     return {
       'personalInfo': personalInfo.toJson(),

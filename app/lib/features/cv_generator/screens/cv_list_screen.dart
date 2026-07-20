@@ -438,6 +438,17 @@ class _CvListScreenState extends State<CvListScreen> {
   }
 
   Future<void> _handleEditCv(CvModel cv) async {
+    if (cv.isAdapted) {
+      if (!mounted) return;
+      context.push<CvModel>('/cv_preview', extra: cv).then((result) async {
+        if (result != null && mounted) {
+          await CvStorageService.saveCv(result);
+          _loadCvs();
+        }
+      });
+      return;
+    }
+
     final result = await CvQuotaService.canModifyCv();
     if (result.allowed) {
       if (!mounted) return;
@@ -832,15 +843,22 @@ class _CvListScreenState extends State<CvListScreen> {
     if (!VersionService.showPremium) return const SizedBox.shrink();
     if (_quotaInfo == null) return const SizedBox.shrink();
     final info = _quotaInfo!;
+    
+    final int totalCvs = _cvs.length;
+    final int baseCvCount = _cvs.where((cv) => !cv.isAdapted).length;
+    final int adaptedCount = _cvs.where((cv) => cv.isAdapted).length;
+
     final remaining = info.remaining;
     final isAtLimit = remaining <= 0;
-    final int overLimit = isAtLimit ? (info.cvCount - info.totalAllowed) : 0;
+    
     final int includedSlots = info.maxFreeCvs;
     final int purchasedSlots = info.extraPurchased;
+    final int totalAllowedBase = includedSlots + purchasedSlots;
+    final int overLimit = isAtLimit ? (baseCvCount - totalAllowedBase).clamp(0, 999) : 0;
 
-    // Calculate progress ratio (0.0 to 1.0)
-    final double progress = info.totalAllowed > 0 
-        ? (info.cvCount / info.totalAllowed).clamp(0.0, 1.0)
+    // Calculate progress ratio (0.0 to 1.0) based on base CVs only
+    final double progress = totalAllowedBase > 0 
+        ? (baseCvCount / totalAllowedBase).clamp(0.0, 1.0)
         : 0.0;
 
     return Container(
@@ -902,7 +920,7 @@ class _CvListScreenState extends State<CvListScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '${info.cvCount} CV créé${info.cvCount > 1 ? "s" : ""}',
+                  '${totalCvs} CV créé${totalCvs > 1 ? "s" : ""}',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -937,6 +955,11 @@ class _CvListScreenState extends State<CvListScreen> {
                 color: const Color(0xFFF97316),
                 label: '$includedSlots inclus',
               ),
+              if (adaptedCount > 0)
+                _buildLegendItem(
+                  color: Colors.green.shade500,
+                  label: '$adaptedCount adapté${adaptedCount > 1 ? "s" : ""}',
+                ),
               if (purchasedSlots > 0)
                 _buildLegendItem(
                   color: const Color(0xFF3B82F6),
@@ -1113,6 +1136,35 @@ class _CvListScreenState extends State<CvListScreen> {
                       padding: const EdgeInsets.all(8.0),
                       child: _buildTemplateThumbnail(cv.templateId, primaryColor, secondaryColor),
                     ),
+                    if (cv.isAdapted)
+                      Positioned(
+                        top: 6,
+                        left: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFF97316), Color(0xFFEA580C)],
+                            ),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.auto_awesome, size: 9, color: Colors.white),
+                              SizedBox(width: 3),
+                              Text(
+                                'Adapté IA',
+                                style: TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     // Preview overlay button at top-right
                     Positioned(
                       top: 4,
@@ -1217,16 +1269,17 @@ class _CvListScreenState extends State<CvListScreen> {
                       }
                     },
                     itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_outlined, size: 16, color: Color(0xFF475569)),
-                            SizedBox(width: 8),
-                            Text('Modifier', style: TextStyle(fontSize: 13)),
-                          ],
+                      if (!cv.isAdapted)
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 16, color: Color(0xFF475569)),
+                              SizedBox(width: 8),
+                              Text('Modifier', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
                         ),
-                      ),
                       const PopupMenuItem(
                         value: 'rename',
                         child: Row(
@@ -1247,16 +1300,17 @@ class _CvListScreenState extends State<CvListScreen> {
                           ],
                         ),
                       ),
-                      const PopupMenuItem(
-                        value: 'duplicate',
-                        child: Row(
-                          children: [
-                            Icon(Icons.copy_outlined, size: 16, color: Color(0xFF475569)),
-                            SizedBox(width: 8),
-                            Text('Dupliquer', style: TextStyle(fontSize: 13)),
-                          ],
+                      if (!cv.isAdapted)
+                        const PopupMenuItem(
+                          value: 'duplicate',
+                          child: Row(
+                            children: [
+                              Icon(Icons.copy_outlined, size: 16, color: Color(0xFF475569)),
+                              SizedBox(width: 8),
+                              Text('Dupliquer', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
                         ),
-                      ),
                       const PopupMenuItem(
                         value: 'download',
                         child: Row(
@@ -1267,16 +1321,17 @@ class _CvListScreenState extends State<CvListScreen> {
                           ],
                         ),
                       ),
-                      const PopupMenuItem(
-                        value: 'set_profile',
-                        child: Row(
-                          children: [
-                            Icon(Icons.cloud_upload_outlined, size: 16, color: Color(0xFF475569)),
-                            SizedBox(width: 8),
-                            Text('Utiliser sur le profil', style: TextStyle(fontSize: 13)),
-                          ],
+                      if (!cv.isAdapted)
+                        const PopupMenuItem(
+                          value: 'set_profile',
+                          child: Row(
+                            children: [
+                              Icon(Icons.cloud_upload_outlined, size: 16, color: Color(0xFF475569)),
+                              SizedBox(width: 8),
+                              Text('Utiliser sur le profil', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
                         ),
-                      ),
                       const PopupMenuItem(
                         value: 'delete',
                         child: Row(
@@ -1300,15 +1355,16 @@ class _CvListScreenState extends State<CvListScreen> {
                 height: 28,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: primaryColor,
+                  color: cv.isAdapted ? Colors.grey.shade100 : primaryColor,
                   borderRadius: BorderRadius.circular(6),
+                  border: cv.isAdapted ? Border.all(color: Colors.grey.shade300) : null,
                 ),
-                child: const Text(
-                  'Modifier',
+                child: Text(
+                  cv.isAdapted ? 'Aperçu PDF' : 'Modifier',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: cv.isAdapted ? Colors.grey.shade700 : Colors.white,
                   ),
                 ),
               ),

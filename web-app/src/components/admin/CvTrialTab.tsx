@@ -70,6 +70,17 @@ const CvTrialTab: React.FC = () => {
   const [pricingError, setPricingError] = useState('');
   const [pricingSuccess, setPricingSuccess] = useState('');
 
+  // AI CV Adaptation State
+  const [aiConfig, setAiConfig] = useState({
+    ai_adapt_trial_active: true,
+    ai_adapt_trial_end_date: '',
+    ai_adapt_free_limit: 10,
+    ai_adapt_price: 500,
+  });
+  const [isSavingAi, setIsSavingAi] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [aiSuccess, setAiSuccess] = useState('');
+
   // CV Usage Metrics & Users State
   const [cvUsers, setCvUsers] = useState<CvUser[]>([]);
   const [metrics, setMetrics] = useState({
@@ -93,7 +104,7 @@ const CvTrialTab: React.FC = () => {
     try {
       const { data, error: fetchError } = await supabase
         .from('app_config')
-        .select('cv_trial_active, cv_trial_end_date, premium_price_cfa, extra_cv_price_cfa')
+        .select('cv_trial_active, cv_trial_end_date, premium_price_cfa, extra_cv_price_cfa, ai_adapt_trial_active, ai_adapt_trial_end_date, ai_adapt_free_limit, ai_adapt_price')
         .eq('id', 1)
         .maybeSingle();
 
@@ -109,6 +120,14 @@ const CvTrialTab: React.FC = () => {
         setPricingConfig({
           premium_price_cfa: data.premium_price_cfa ?? 2000,
           extra_cv_price_cfa: data.extra_cv_price_cfa ?? 500,
+        });
+        setAiConfig({
+          ai_adapt_trial_active: data.ai_adapt_trial_active ?? true,
+          ai_adapt_trial_end_date: data.ai_adapt_trial_end_date
+            ? new Date(data.ai_adapt_trial_end_date).toISOString().slice(0, 16)
+            : '',
+          ai_adapt_free_limit: data.ai_adapt_free_limit ?? 10,
+          ai_adapt_price: data.ai_adapt_price ?? 500,
         });
       }
     } catch (e: any) {
@@ -305,6 +324,49 @@ const CvTrialTab: React.FC = () => {
       setPricingError(e.message || "Erreur lors de l'enregistrement de la tarification.");
     } finally {
       setIsSavingPricing(false);
+    }
+  };
+
+  const handleSaveAi = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setAiError('');
+    setAiSuccess('');
+
+    const freeLimit = Number(aiConfig.ai_adapt_free_limit);
+    const price = Number(aiConfig.ai_adapt_price);
+
+    if (isNaN(freeLimit) || freeLimit < 0) {
+      setAiError('La limite gratuite doit être un nombre positif ou nul.');
+      return;
+    }
+    if (isNaN(price) || price < 0) {
+      setAiError('Le prix par adaptation doit être un nombre positif ou nul.');
+      return;
+    }
+
+    setIsSavingAi(true);
+    try {
+      const endDate = aiConfig.ai_adapt_trial_end_date
+        ? new Date(aiConfig.ai_adapt_trial_end_date).toISOString()
+        : null;
+
+      const { error: saveError } = await supabase
+        .from('app_config')
+        .update({
+          ai_adapt_trial_active: aiConfig.ai_adapt_trial_active,
+          ai_adapt_trial_end_date: endDate,
+          ai_adapt_free_limit: freeLimit,
+          ai_adapt_price: price,
+        })
+        .eq('id', 1);
+
+      if (saveError) throw saveError;
+
+      setAiSuccess('Configuration de monétisation IA enregistrée avec succès. Les modifications sont actives sur l\'application en temps réel.');
+    } catch (e: any) {
+      setAiError(e.message || "Erreur lors de l'enregistrement de la configuration IA.");
+    } finally {
+      setIsSavingAi(false);
     }
   };
 
@@ -541,6 +603,126 @@ const CvTrialTab: React.FC = () => {
                     </>
                   ) : (
                     'Enregistrer la tarification'
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Card 3: Monétisation Adaptation CV par IA */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <h2 className="text-lg font-heading mb-1 flex items-center gap-2 text-slate-900">
+                <Award className="text-primary" size={22} /> Monétisation de l'Adaptation IA
+              </h2>
+              <p className="text-xs text-slate-500 mb-5">
+                Gérez la période gratuite de lancement et les limites payantes pour l'adaptation de CV par l'IA.
+              </p>
+
+              <form onSubmit={handleSaveAi} className="space-y-5">
+                {/* Toggle Période Lancement Gratuit */}
+                <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Essai gratuit illimité</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {aiConfig.ai_adapt_trial_active
+                        ? 'Activé — adaptations illimitées gratuites'
+                        : 'Désactivé — quotas et tarifs appliqués'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAiConfig((c) => ({ ...c, ai_adapt_trial_active: !c.ai_adapt_trial_active }))
+                    }
+                    className="focus:outline-none transition-transform active:scale-95"
+                    aria-label="Activer/désactiver l'essai gratuit IA"
+                  >
+                    {aiConfig.ai_adapt_trial_active ? (
+                      <ToggleRight size={44} className="text-primary" />
+                    ) : (
+                      <ToggleLeft size={44} className="text-slate-300" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Date de fin de l'essai gratuit */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <CalendarDays size={14} />
+                    Date de fin de l'essai gratuit (optionnel)
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={aiConfig.ai_adapt_trial_end_date}
+                    onChange={(e) =>
+                      setAiConfig((c) => ({ ...c, ai_adapt_trial_end_date: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                  />
+                </div>
+
+                {/* Limite gratuite par mois */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Nombre d'adaptations gratuites par mois
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={aiConfig.ai_adapt_free_limit}
+                    onChange={(e) =>
+                      setAiConfig((c) => ({
+                        ...c,
+                        ai_adapt_free_limit: parseInt(e.target.value, 10) || 0,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                  />
+                </div>
+
+                {/* Tarif à l'unité */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Tarif à l'adaptation après épuisement du quota (F CFA)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={aiConfig.ai_adapt_price}
+                    onChange={(e) =>
+                      setAiConfig((c) => ({
+                        ...c,
+                        ai_adapt_price: parseInt(e.target.value, 10) || 0,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                  />
+                </div>
+
+                {aiError && (
+                  <div className="bg-red-50 text-red-600 px-3 py-2.5 rounded-xl flex items-center gap-2 text-xs">
+                    <AlertCircle size={14} /> {aiError}
+                  </div>
+                )}
+                {aiSuccess && (
+                  <div className="bg-green-50 text-green-600 px-3 py-2.5 rounded-xl flex items-center gap-2 text-xs animate-in zoom-in duration-300">
+                    <CheckCircle2 size={14} /> {aiSuccess}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSavingAi}
+                  className="w-full bg-primary text-white py-2.5 rounded-xl font-bold text-sm hover:shadow-lg hover:shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
+                >
+                  {isSavingAi ? (
+                    <>
+                      <RefreshCw className="animate-spin" size={16} />
+                      Enregistrement...
+                    </>
+                  ) : (
+                    'Enregistrer la configuration IA'
                   )}
                 </button>
               </form>

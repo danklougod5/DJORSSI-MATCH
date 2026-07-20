@@ -6,6 +6,7 @@ import AdminLogin from './components/AdminLogin'
 import { supabase } from './lib/supabase'
 import { TermsOfService, PrivacyPolicy } from './components/LegalPages'
 import StoreRedirect from './components/StoreRedirect'
+import RecruiterPage from './components/RecruiterPage'
 
 
 function App() {
@@ -109,6 +110,7 @@ function App() {
     <div className="App">
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/recruteur" element={<RecruiterPage />} />
         
         <Route 
           path="/admin" 

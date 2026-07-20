@@ -142,6 +142,11 @@ const UsersTab: React.FC<UsersTabProps> = ({
                             +{user.extraCvsPurchased} CV
                           </span>
                         )}
+                        {user.aiAdaptExtraPurchased > 0 && (
+                          <span className="px-2 py-1 bg-green-500/10 text-green-600 rounded-lg text-[10px] font-bold border border-green-500/20">
+                            +{user.aiAdaptExtraPurchased} IA
+                          </span>
+                        )}
                       </div>
                       {user.premium && (
                         <p className="text-[10px] text-slate-500 font-semibold mt-0.5">

@@ -221,7 +221,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     try {
       let query = supabase
         .from('profiles')
-        .select('id, full_name, is_premium, premium_until, created_at, phone_number, skills, extra_cvs_purchased');
+        .select('id, full_name, is_premium, premium_until, created_at, phone_number, skills, extra_cvs_purchased, ai_adapt_extra_purchased');
 
       if (filter === 'premium') {
         query = query.eq('is_premium', true);
@@ -257,7 +257,8 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           date: new Date(u.created_at).toLocaleDateString(),
           phone: u.phone_number || '-',
           sector: Array.isArray(u.skills) ? u.skills.join(', ') : (u.skills || '-'),
-          extraCvsPurchased: u.extra_cvs_purchased || 0
+          extraCvsPurchased: u.extra_cvs_purchased || 0,
+          aiAdaptExtraPurchased: u.ai_adapt_extra_purchased || 0
         })));
       }
     } catch (error) {
@@ -833,7 +834,8 @@ reader.readAsText(file);
           is_premium: editingUser.premium,
           premium_until: editingUser.premium ? editingUser.premiumUntil : null,
           skills: skillsArray,
-          extra_cvs_purchased: editingUser.extraCvsPurchased || 0
+          extra_cvs_purchased: editingUser.extraCvsPurchased || 0,
+          ai_adapt_extra_purchased: editingUser.aiAdaptExtraPurchased || 0
         })
         .eq('id', editingUser.id);
 

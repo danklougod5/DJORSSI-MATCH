@@ -254,12 +254,17 @@ class _CvTemplateSelectionScreenState extends State<CvTemplateSelectionScreen> {
                   ],
                 ),
                 Expanded(
-                  child: PdfPreview(
-                    build: (format) => CvPdfGenerator.generateCvPdf(previewCv),
-                    canChangeOrientation: false,
-                    canChangePageFormat: false,
-                    allowPrinting: false,
-                    allowSharing: false,
+                  child: InteractiveViewer(
+                    panEnabled: true,
+                    minScale: 1.0,
+                    maxScale: 4.0,
+                    child: PdfPreview(
+                      build: (format) => CvPdfGenerator.generateCvPdf(previewCv),
+                      canChangeOrientation: false,
+                      canChangePageFormat: false,
+                      allowPrinting: false,
+                      allowSharing: false,
+                    ),
                   ),
                 ),
                 Padding(

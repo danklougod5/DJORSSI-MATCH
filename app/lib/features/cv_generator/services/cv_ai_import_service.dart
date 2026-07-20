@@ -43,6 +43,45 @@ class CvAiImportService {
     return _jsonToCvModel(cvJson);
   }
 
+  /// Adapte un CV existant par rapport à une offre d'emploi avec l'IA
+  static Future<CvModel> adaptCv({
+    required CvModel sourceCv,
+    required String jobTitle,
+    required String jobCompany,
+    required String jobDescription,
+  }) async {
+    final supabase = Supabase.instance.client;
+
+    final response = await supabase.functions.invoke(
+      'cv-ai-assist',
+      body: {
+        'action': 'adapt_cv',
+        'cvData': sourceCv.toJson(),
+        'jobTitle': jobTitle,
+        'jobCompany': jobCompany,
+        'jobDescription': jobDescription,
+      },
+    );
+
+    if (response.status != 200) {
+      throw Exception('Erreur lors de l\'adaptation par l\'IA (${response.status}): ${response.data}');
+    }
+
+    final data = response.data;
+    if (data == null || data['success'] != true || data['data'] == null) {
+      throw Exception('Données d\'adaptation incorrectes reçues du serveur.');
+    }
+
+    final Map<String, dynamic> cvJson = data['data'];
+
+    // Convert to CvModel, preserving the template/colors of the source CV
+    return _jsonToCvModel(cvJson).copyWith(
+      templateId: sourceCv.templateId,
+      primaryColor: sourceCv.primaryColor,
+      secondaryColor: sourceCv.secondaryColor,
+    );
+  }
+
   /// Convertit le JSON structuré en CvModel
   static CvModel _jsonToCvModel(Map<String, dynamic> json) {
     // Contact fields

@@ -327,6 +327,133 @@ Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte, sans aucun
         data: JSON.parse(content),
       };
 
+    } else if (action === "adapt_cv") {
+      const { cvData, jobTitle, jobCompany, jobDescription } = body;
+      if (!cvData || !jobTitle) {
+        return new Response(JSON.stringify({ error: "Missing cvData or jobTitle" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+
+      console.log(`Adapting CV for user: ${user.id} targeting job: ${jobTitle} at ${jobCompany}`);
+
+      // Call Mistral API
+      const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${mistralApiKey}`,
+        },
+        body: JSON.stringify({
+          model: "mistral-small-latest",
+          messages: [
+            {
+              role: "system",
+              content: `Tu es un EXPERT SENIOR en recrutement, personal branding et ATS (Applicant Tracking Systems) avec 15 ans d'expérience.
+Ta mission est d'ADAPTER un CV existant (au format JSON) pour qu'il cible PARFAITEMENT une offre d'emploi spécifique.
+
+Tu devez rendre le candidat ultra-compétitif pour cette offre précise, tout en restant honnête et réaliste par rapport aux données d'origine (INTERDICTION d'inventer de fausses entreprises, de faux diplômes, de fausses dates ou de fausses certifications).
+
+Voici les règles d'adaptation à appliquer rigoureusement :
+
+1. TITRE DE POSTE CIBLE (jobTitle) :
+- Adapte le titre du poste cible du CV (personalInfo.jobTitle) pour qu'il corresponde exactement ou soit extrêmement proche du titre de l'offre (ex: si le CV indique "Développeur Mobile" et l'offre "Développeur Flutter", modifie-le en "Développeur Flutter").
+
+2. RÉSUMÉ PROFESSIONNEL (summary) :
+- Rédige un résumé accrocheur et personnalisé pour cette offre et cette entreprise (3 phrases max).
+- Ton naturel, humain, professionnel et simple. Évite la langue de bois et les formulations clichés d'IA.
+- Rédige TOUJOURS à la PREMIÈRE PERSONNE DU SINGULIER ("Je", "Mon").
+
+3. COMPÉTENCES (skills) :
+- Adapte la liste des compétences (skills) sous forme de liste plate de puces (une compétence par ligne précédée de "• ").
+- Réorganise et réécris-les pour mettre en valeur les hard skills et soft skills spécifiquement demandés dans l'offre d'emploi.
+
+4. EXPÉRIENCES (experiences) et PROJETS (projects) :
+- Dans les descriptions de chaque expérience et projet, adapte la formulation des bullet points (une puce par ligne précédée de "• " et séparée par des retours à la ligne "\\n").
+- Mets l'accent sur les tâches, technologies, projets et réalisations qui démontrent le mieux l'aptitude du candidat à remplir les missions de l'offre visée.
+- NE modifie JAMAIS les noms d'entreprises, les lieux de travail, les dates ou les intitulés des postes occupés.
+
+5. FORMATIONS (educations) et AUTRES :
+- Conserve les diplômes, écoles, dates et lieux inchangés. Adapte éventuellement la description de la formation si elle peut mettre en valeur un projet ou un cours en lien direct avec l'offre.
+
+6. DONNÉES INVARIANTES :
+- Conserve absolument inchangés le nom complet (fullName) et toutes les informations de contact (email, phone, location, linkedin).
+
+Retourne UNIQUEMENT un objet JSON valide avec cette structure exacte, sans aucun texte d'accompagnement, sans bloc de code markdown (pas de \`\`\`json), et sans commentaire :
+{
+  "fullName": "",
+  "jobTitle": "",
+  "summary": "",
+  "email": "",
+  "phone": "",
+  "location": "",
+  "linkedin": "",
+  "skills": "",
+  "experiences": [
+    {
+      "jobTitle": "",
+      "company": "",
+      "location": "",
+      "startDate": "",
+      "endDate": "",
+      "description": ""
+    }
+  ],
+  "educations": [
+    {
+      "degree": "",
+      "institution": "",
+      "location": "",
+      "startDate": "",
+      "endDate": "",
+      "description": ""
+    }
+  ],
+  "projects": [
+    {
+      "name": "",
+      "role": "",
+      "date": "",
+      "description": ""
+    }
+  ],
+  "activities": []
+}`
+            },
+            {
+              role: "user",
+              content: `Voici le CV d'origine en JSON :\n${JSON.stringify(cvData)}\n\nVoici l'offre d'emploi cible :\n- Titre du poste : ${jobTitle}\n- Entreprise : ${jobCompany}\n- Description du poste : ${jobDescription}`
+            }
+          ],
+          temperature: 0.25,
+          response_format: { type: "json_object" },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Mistral API error during adaptation:", response.status, errorText);
+        return new Response(
+          JSON.stringify({
+            error: `Mistral API error (${response.status})`,
+            details: errorText,
+          }),
+          {
+            status: response.status,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        );
+      }
+
+      const mistralData = await response.json();
+      const content = mistralData.choices[0].message.content.trim();
+
+      responseData = {
+        success: true,
+        data: JSON.parse(content),
+      };
+
     } else if (action === "polish_text") {
       const { text, systemContent } = body;
       if (!text || !systemContent) {

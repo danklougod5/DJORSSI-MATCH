@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, MessageSquare, PlayCircle, X, Menu, Heart, Zap, Quote } from 'lucide-react';
+import { Download, MessageSquare, PlayCircle, X, Menu, Heart, Zap, Quote, Briefcase } from 'lucide-react';
 import AppSimulator from './AppSimulator';
 
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.djossimatch.djossimatch';
@@ -65,6 +65,8 @@ const LandingPage: React.FC = () => {
 
 
 
+
+
   return (
     <div className="min-h-screen bg-background selection:bg-accent selection:text-black">
       {/* Navigation */}
@@ -81,6 +83,7 @@ const LandingPage: React.FC = () => {
 
           <div className="hidden md:flex items-center gap-6 font-black uppercase text-sm">
             <a href="#features" className="hover:text-primary transition-colors cursor-pointer">Comment ça marche</a>
+            <a href="#deposer-offre" className="hover:text-primary transition-colors cursor-pointer">Recruter</a>
             <a href="#temoignages" className="hover:text-primary transition-colors cursor-pointer">Témoignages</a>
             <a
               href={getSmartDownloadUrl()}
@@ -105,6 +108,7 @@ const LandingPage: React.FC = () => {
         {isMobileMenuOpen && (
           <div className="md:hidden border-t-4 border-black bg-white flex flex-col font-black uppercase text-sm divide-y-2 divide-black max-h-[calc(100vh-80px)] overflow-y-auto">
             <a href="#features" onClick={() => setIsMobileMenuOpen(false)} className="p-4 hover:bg-slate-100 transition-colors">Comment ça marche</a>
+            <a href="#deposer-offre" onClick={() => setIsMobileMenuOpen(false)} className="p-4 hover:bg-slate-100 transition-colors">Recruter</a>
             <a href="#temoignages" onClick={() => setIsMobileMenuOpen(false)} className="p-4 hover:bg-slate-100 transition-colors">Témoignages</a>
             <div className="p-4 bg-slate-50">
                <a
@@ -247,6 +251,53 @@ const LandingPage: React.FC = () => {
               <Download size={22} />
               Télécharger l'app
             </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Recruiter space call-to-action banner */}
+      <section id="deposer-offre" className="py-20 md:py-32 bg-[#FEF08A] border-b-4 border-black px-4 md:px-6 relative">
+        <div className="absolute inset-0 bg-pattern opacity-10"></div>
+        <div className="max-w-4xl mx-auto relative z-10 text-center">
+          <div className="border-4 border-black bg-white p-8 md:p-12 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] rounded-2xl space-y-8">
+            <div className="inline-block neo-brutal-tag !bg-secondary !text-white mb-2 text-sm uppercase">
+              RECRUTEZ FACILEMENT
+            </div>
+            <h2 className="text-4xl md:text-5xl lg:text-7xl font-heading font-black uppercase leading-none">
+              TROUVEZ VOS TALENTS <br/>
+              <span className="text-[#10B981] not-italic">SUR DJORSSI-MATCH</span>
+            </h2>
+            <p className="font-bold text-slate-700 max-w-2xl mx-auto text-lg leading-relaxed">
+              Publiez vos offres d'emploi sur notre plateforme dédiée et entrez en contact direct avec les candidats qualifiés d'Abidjan par WhatsApp et e-mail. Simple, rapide et sans intermédiaire.
+            </p>
+            
+            <div className="grid md:grid-cols-3 gap-6 text-left max-w-3xl mx-auto pt-4">
+              <div className="p-4 border-2 border-black rounded-xl bg-slate-50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                <p className="font-black uppercase text-xs tracking-wider text-slate-400 mb-1">ÉTAPE 1</p>
+                <p className="font-black text-sm text-black mb-1">Renseignez le poste</p>
+                <p className="text-xs font-bold text-slate-500">Ajoutez le titre, le lieu, le contrat (CDI, CDD, Stage...) et vos exigences.</p>
+              </div>
+              <div className="p-4 border-2 border-black rounded-xl bg-slate-50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                <p className="font-black uppercase text-xs tracking-wider text-slate-400 mb-1">ÉTAPE 2</p>
+                <p className="font-black text-sm text-black mb-1">Ciblez les profils</p>
+                <p className="text-xs font-bold text-slate-500">Sélectionnez les secteurs et compétences clés. Exigez ou non une lettre de motivation.</p>
+              </div>
+              <div className="p-4 border-2 border-black rounded-xl bg-slate-50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                <p className="font-black uppercase text-xs tracking-wider text-slate-400 mb-1">ÉTAPE 3</p>
+                <p className="font-black text-sm text-black mb-1">Matchez en direct</p>
+                <p className="text-xs font-bold text-slate-500">Les candidats swipent votre offre. Entrez en contact direct avec eux sur WhatsApp.</p>
+              </div>
+            </div>
+
+            <div className="pt-6">
+              <Link
+                to="/recruteur"
+                className="neo-brutal-btn inline-flex items-center gap-3 text-xl font-black uppercase px-8 py-5 justify-center no-underline"
+              >
+                <Briefcase size={22} />
+                Accéder à l'Espace Recruteurs
+              </Link>
+            </div>
           </div>
         </div>
       </section>

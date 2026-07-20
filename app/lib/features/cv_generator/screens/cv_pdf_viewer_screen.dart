@@ -108,14 +108,19 @@ class _CvPdfViewerScreenState extends State<CvPdfViewerScreen> {
                     ),
                   ),
                 )
-              : PdfPreview(
-                  build: (format) => _pdfBytes!,
-                  canChangeOrientation: false,
-                  canChangePageFormat: false,
-                  useActions: true,
-                  allowPrinting: true,
-                  allowSharing: true,
-                  pdfFileName: 'CV.pdf',
+              : InteractiveViewer(
+                  panEnabled: true,
+                  minScale: 1.0,
+                  maxScale: 4.0,
+                  child: PdfPreview(
+                    build: (format) => _pdfBytes!,
+                    canChangeOrientation: false,
+                    canChangePageFormat: false,
+                    useActions: true,
+                    allowPrinting: true,
+                    allowSharing: true,
+                    pdfFileName: 'CV.pdf',
+                  ),
                 ),
     );
   }

@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Zap
 } from 'lucide-react';
+import { formatLongDate } from '../../lib/dateUtils';
 
 interface JobsTabProps {
   jobsList: any[];
@@ -466,7 +467,7 @@ const JobsTab: React.FC<JobsTabProps> = ({
                     <td className="px-6 py-5">
                       <div className="flex flex-col">
                         <span className={`text-xs font-black px-2 py-0.5 rounded-md w-fit bg-slate-100 ${isExpired ? 'text-red-500 bg-red-50' : 'text-slate-500'}`}>
-                          {job.deadline || 'Aucune'}
+                          {job.deadline ? formatLongDate(job.deadline) : 'Aucune'}
                         </span>
                         {isExpired && <span className="text-[8px] font-black text-red-400 uppercase tracking-tighter mt-1 px-1">Expiré</span>}
                       </div>
