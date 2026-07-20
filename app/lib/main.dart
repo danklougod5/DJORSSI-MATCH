@@ -13,7 +13,6 @@ import 'package:djossimatch/features/cv_generator/screens/cv_list_screen.dart';
 import 'package:djossimatch/core/routing/app_router.dart';
 import 'package:djossimatch/core/services/version_service.dart';
 import 'package:djossimatch/core/services/notification_service.dart';
-import 'package:djossimatch/core/services/announcement_service.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:upgrader/upgrader.dart';
@@ -67,9 +66,6 @@ class _DjorssiMatchAppState extends State<DjorssiMatchApp> {
   @override
   void initState() {
     super.initState();
-    // Initialisation du service d'annonces
-    AnnouncementService.instance.initialize();
-
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       data,
     ) {
@@ -77,16 +73,11 @@ class _DjorssiMatchAppState extends State<DjorssiMatchApp> {
       if (event == AuthChangeEvent.passwordRecovery) {
         AppRouter.router.go('/reset-password');
       }
-      // Re-vérifier les annonces à la connexion de l'utilisateur
-      if (event == AuthChangeEvent.signedIn) {
-        AnnouncementService.instance.checkAndShowAnnouncement();
-      }
     });
   }
 
   @override
   void dispose() {
-    AnnouncementService.instance.dispose();
     _authSubscription.cancel();
     super.dispose();
   }

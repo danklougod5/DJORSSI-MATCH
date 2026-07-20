@@ -25,6 +25,7 @@ import 'package:djossimatch/features/cv_generator/widgets/cv_paywall_sheet.dart'
 import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:djossimatch/core/services/announcement_service.dart';
 
 class SwipeScreen extends StatefulWidget {
   final String? jobId;
@@ -79,6 +80,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
     _setupRealtime();
     _listenToProfileChanges();
     _checkUnreadNotifications();
+    
+    // Initialiser l'écouteur d'annonces de l'app sur l'écran des Swipes
+    AnnouncementService.instance.initialize();
   }
 
   Future<void> _checkUnreadNotifications() async {
@@ -133,6 +137,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
   @override
   void dispose() {
+    AnnouncementService.instance.dispose();
     _profileSubscription?.cancel();
     _controller.dispose();
     _saveFinalSwipeCount();
