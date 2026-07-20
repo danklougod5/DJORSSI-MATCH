@@ -71,6 +71,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
   Set<String> _cachedSwipedIds = {};
 
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
+  RealtimeChannel? _jobsRealtimeChannel;
   int _currentLoadSessionId = 0;
 
   @override
@@ -78,6 +79,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
     super.initState();
     _loadData();
     _setupRealtime();
+    _setupJobsRealtime();
     _listenToProfileChanges();
     _checkUnreadNotifications();
     
@@ -142,6 +144,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
   @override
   void dispose() {
     AnnouncementService.instance.dispose();
+    _jobsRealtimeChannel?.unsubscribe();
     _profileSubscription?.cancel();
     _controller.dispose();
     _saveFinalSwipeCount();
@@ -225,6 +228,50 @@ class _SwipeScreenState extends State<SwipeScreen> {
             }
           }
         });
+  }
+
+  void _setupJobsRealtime() {
+    _jobsRealtimeChannel = _supabase
+        .channel('public:jobs')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'jobs',
+          callback: (payload) {
+            final newJob = payload.newRecord;
+            final isApproved = newJob['is_approved'] == true;
+            debugPrint('*** [REALTIME JOBS] Nouvelle offre insérée: ${newJob['job_title']} | Approuvée: $isApproved ***');
+            if (isApproved && mounted) {
+              // Debounce pour éviter les rechargements multiples
+              final now = DateTime.now();
+              if (now.difference(_lastFullReload).inSeconds < _reloadDebounceSeconds) {
+                debugPrint('*** [REALTIME JOBS] Rechargement ignoré (debounce) ***');
+                return;
+              }
+              _lastFullReload = now;
+              _loadData(forceRefresh: true);
+            }
+          },
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'jobs',
+          callback: (payload) {
+            final updatedJob = payload.newRecord;
+            final isApproved = updatedJob['is_approved'] == true;
+            final oldApproved = payload.oldRecord['is_approved'] == true;
+            // Recharger seulement si le job vient d'être approuvé
+            if (isApproved && !oldApproved && mounted) {
+              debugPrint('*** [REALTIME JOBS] Offre approuvée: ${updatedJob['job_title']} ***');
+              final now = DateTime.now();
+              if (now.difference(_lastFullReload).inSeconds < _reloadDebounceSeconds) return;
+              _lastFullReload = now;
+              _loadData(forceRefresh: true);
+            }
+          },
+        );
+    _jobsRealtimeChannel?.subscribe();
   }
 
   /// Compare deux listes indépendamment de l'ordre
