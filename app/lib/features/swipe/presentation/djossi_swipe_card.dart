@@ -139,7 +139,7 @@ ${description ?? 'Aucune description fournie.'}
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(100r),
+                    borderRadius: BorderRadius.circular(100.r),
                     onTap: () => _shareJob(context),
                     child: Padding(
                       padding: EdgeInsets.all(8.r),
