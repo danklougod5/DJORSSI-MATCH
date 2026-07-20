@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 
 class DjossiSwipeCard extends StatelessWidget {
   final String title;
@@ -41,6 +42,26 @@ class DjossiSwipeCard extends StatelessWidget {
     this.requiresCoverLetter = false,
     this.coverLetterInstructions,
   });
+
+  void _shareJob(BuildContext context) {
+    final String shareText = '''
+📢 Offre d'emploi : $title chez $company
+
+📍 Lieu : $location
+💰 Salaire : $salary
+🎓 Niveau requis : ${requiredLevel ?? 'Non spécifié'}
+
+📝 Description du poste :
+${description ?? 'Aucune description fournie.'}
+
+🔗 Retrouvez plus d'offres et postulez sur Djorssi-Match !
+''';
+
+    Share.share(
+      shareText,
+      subject: 'Offre d\'emploi : $title',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +116,41 @@ class DjossiSwipeCard extends StatelessWidget {
                 Icons.work_outline,
                 size: 250.r,
                 color: Colors.white.withOpacity(0.05),
+              ),
+            ),
+
+            // Share Button
+            Positioned(
+              top: 12.h,
+              left: 12.w,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(100r),
+                    onTap: () => _shareJob(context),
+                    child: Padding(
+                      padding: EdgeInsets.all(8.r),
+                      child: Icon(
+                        Icons.share_rounded,
+                        color: Colors.white,
+                        size: 20.r,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
 

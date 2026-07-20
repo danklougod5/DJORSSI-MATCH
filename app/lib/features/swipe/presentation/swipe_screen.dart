@@ -26,7 +26,6 @@ import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:djossimatch/core/services/announcement_service.dart';
-import 'package:share_plus/share_plus.dart';
 
 class SwipeScreen extends StatefulWidget {
   final String? jobId;
@@ -2066,32 +2065,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
     }
   }
 
-  /// Partager l'offre en cours via le partage natif
-  void _shareCurrentJob() {
-    if (_jobs.isEmpty || _currentCardIndex >= _jobs.length) return;
-    final job = _jobs[_currentCardIndex];
-    final jobTitle = job['job_title'] ?? 'Offre d\'emploi';
-    final company = job['company_name'] ?? '';
-    final location = job['location'] ?? '';
-    final salary = job['salary_range'] ?? '';
-    final applicationLink = job['application_link'] as String?;
-
-    final StringBuffer text = StringBuffer();
-    text.writeln('🎯 *$jobTitle*');
-    if (company.isNotEmpty) text.writeln('🏢 $company');
-    if (location.isNotEmpty) text.writeln('📍 $location');
-    if (salary.isNotEmpty) text.writeln('💰 $salary');
-    text.writeln('');
-    if (applicationLink != null && applicationLink.isNotEmpty) {
-      text.writeln('🔗 Postuler : $applicationLink');
-      text.writeln('');
-    }
-    text.writeln('Trouvé sur Djorssi-Match 🇨🇮');
-    text.write('Télécharger : https://djorssi.com');
-
-    SharePlus.instance.share(ShareParams(text: text.toString()));
-  }
-
   Widget _buildActionButtons() {
     return Center(
       child: ConstrainedBox(
@@ -2122,12 +2095,6 @@ class _SwipeScreenState extends State<SwipeScreen> {
               Icons.auto_awesome,
               const Color(0xFF8B5CF6), // Purple AI
               _onAdaptCvPressed,
-              isMini: true,
-            ),
-            _buildActionButton(
-              Icons.ios_share_rounded,
-              const Color(0xFF0EA5E9), // Bleu partage
-              _shareCurrentJob,
               isMini: true,
             ),
             _buildActionButton(
