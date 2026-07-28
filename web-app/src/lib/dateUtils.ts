@@ -29,6 +29,72 @@ export const formatLongDate = (dateStr: string | null | undefined): string => {
   return dateStr;
 };
 
+export const parseFlexibleDate = (
+  dateStr: string | null | undefined,
+): Date | null => {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+
+  const trimmed = dateStr.trim();
+  if (!trimmed) return null;
+
+  const slashParts = trimmed.split('/');
+  if (slashParts.length === 3) {
+    const day = parseInt(slashParts[0], 10);
+    const month = parseInt(slashParts[1], 10) - 1;
+    const year = parseInt(slashParts[2], 10);
+    const parsed = new Date(year, month, day);
+
+    if (!isNaN(parsed.getTime())) {
+      parsed.setHours(23, 59, 59, 999);
+      return parsed;
+    }
+  }
+
+  const parsed = new Date(trimmed);
+  if (isNaN(parsed.getTime())) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    parsed.setHours(23, 59, 59, 999);
+  }
+
+  return parsed;
+};
+
+export const getEffectiveJobExpiryDate = (job: {
+  deadline?: string | null;
+  created_at?: string | null;
+}): Date | null => {
+  const explicitDeadline = parseFlexibleDate(job.deadline);
+  if (explicitDeadline) return explicitDeadline;
+
+  const createdAt = parseFlexibleDate(job.created_at);
+  if (!createdAt) return null;
+
+  const fallback = new Date(createdAt);
+  fallback.setDate(fallback.getDate() + 21);
+  fallback.setHours(23, 59, 59, 999);
+  return fallback;
+};
+
+export const isJobExpired = (
+  job: {
+    deadline?: string | null;
+    created_at?: string | null;
+  },
+  now: Date = new Date(),
+): boolean => {
+  const expiryDate = getEffectiveJobExpiryDate(job);
+  return expiryDate ? expiryDate.getTime() < now.getTime() : false;
+};
+
+export const formatEffectiveJobDeadline = (job: {
+  deadline?: string | null;
+  created_at?: string | null;
+}): string => {
+  const expiryDate = getEffectiveJobExpiryDate(job);
+  return expiryDate ? formatDateToLongFrench(expiryDate) : '';
+};
+
 const formatDateToLongFrench = (date: Date): string => {
   try {
     const formatted = date.toLocaleDateString('fr-FR', {

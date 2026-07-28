@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, CreditCard, Briefcase, ChevronRight, Smartphone, CheckSquare } from 'lucide-react';
+import { Users, CreditCard, Briefcase, ChevronRight, Smartphone, CheckSquare, Sparkles, Eye } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import StatCard from './StatCard';
 
@@ -11,6 +11,7 @@ interface OverviewTabProps {
   topSectors: any[];
   COLORS: string[];
   setActiveTab: (tab: any) => void;
+  onNavigateToDashboardSection: (tab: any, section?: "ai-adapt-stats" | "visible-recruiters") => void;
   onMakeMePremium: () => void;
   onMakeAllPremium: () => void;
   onRevokeCampaignPremium: () => void;
@@ -25,6 +26,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   topSectors,
   COLORS,
   setActiveTab,
+  onNavigateToDashboardSection,
   onMakeMePremium,
   onMakeAllPremium,
   onRevokeCampaignPremium,
@@ -72,13 +74,79 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Utilisateurs" value={stats.totalUsers.toLocaleString()} icon={<Users />} color="bg-primary" trend="+12% cette semaine" />
-        <StatCard title="Abonnés Premium" value={stats.premiumUsers.toLocaleString()} icon={<CreditCard />} color="bg-secondary" trend="+5% cette semaine" />
+        <StatCard
+          title="Utilisateurs"
+          value={stats.totalUsers.toLocaleString()}
+          icon={<Users />}
+          color="bg-primary"
+          trend="+12% cette semaine"
+          onClick={() => onNavigateToDashboardSection('users')}
+          hint="Ouvrir la base des utilisateurs"
+        />
+        <StatCard
+          title="Abonnés Premium"
+          value={stats.premiumUsers.toLocaleString()}
+          icon={<CreditCard />}
+          color="bg-secondary"
+          trend="+5% cette semaine"
+          onClick={() => onNavigateToDashboardSection('users')}
+          hint="Ouvrir les utilisateurs Premium"
+        />
+        <StatCard
+          title="Adaptateur CV (IA)"
+          value={(stats.cvAdapterUsers || 0).toLocaleString()}
+          icon={<Sparkles />}
+          color="bg-purple-600"
+          trend={`${stats.adaptedCvsCount || 0} CVs générés`}
+          onClick={() => onNavigateToDashboardSection('cv-trial', 'ai-adapt-stats')}
+          hint="Ouvrir les statistiques d'adaptation CV par IA"
+        />
+        <StatCard
+          title="Visibles aux Recruteurs"
+          value={(stats.visibleRecruiters || 0).toLocaleString()}
+          icon={<Eye />}
+          color="bg-emerald-600"
+          trend="Visibilité active"
+          onClick={() => onNavigateToDashboardSection('users', 'visible-recruiters')}
+          hint="Ouvrir les candidats visibles aux recruteurs"
+        />
         <StatCard title="Attente iOS" value={stats.iosWaitlist.toLocaleString()} icon={<Smartphone />} color="bg-black" trend="Demandes iPhone" />
-        <StatCard title="Approbations" value={stats.pendingApprovals.toLocaleString()} icon={<CheckSquare />} color="bg-primary" trend="Offres en attente" />
-        <StatCard title="Hommes" value={stats.maleUsers.toLocaleString()} icon={<Users />} color="bg-[#3B82F6]" trend="Sexe masculin" />
-        <StatCard title="Femmes" value={stats.femaleUsers.toLocaleString()} icon={<Users />} color="bg-[#EC4899]" trend="Sexe féminin" />
-        <StatCard title="Offres Actives" value={stats.activeJobs.toLocaleString()} icon={<Briefcase />} color="bg-secondary" trend="+24 ajoutées" />
+        <StatCard
+          title="Approbations"
+          value={stats.pendingApprovals.toLocaleString()}
+          icon={<CheckSquare />}
+          color="bg-primary"
+          trend="Offres en attente"
+          onClick={() => onNavigateToDashboardSection('job-approval')}
+          hint="Ouvrir les offres en attente d'approbation"
+        />
+        <StatCard
+          title="Hommes"
+          value={stats.maleUsers.toLocaleString()}
+          icon={<Users />}
+          color="bg-[#3B82F6]"
+          trend="Sexe masculin"
+          onClick={() => onNavigateToDashboardSection('users')}
+          hint="Ouvrir la liste des utilisateurs"
+        />
+        <StatCard
+          title="Femmes"
+          value={stats.femaleUsers.toLocaleString()}
+          icon={<Users />}
+          color="bg-[#EC4899]"
+          trend="Sexe féminin"
+          onClick={() => onNavigateToDashboardSection('users')}
+          hint="Ouvrir la liste des utilisateurs"
+        />
+        <StatCard
+          title="Offres Actives"
+          value={stats.activeJobs.toLocaleString()}
+          icon={<Briefcase />}
+          color="bg-secondary"
+          trend="+24 ajoutées"
+          onClick={() => onNavigateToDashboardSection('all-jobs')}
+          hint="Ouvrir la base des offres"
+        />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">

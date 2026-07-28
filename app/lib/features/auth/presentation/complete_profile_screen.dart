@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
+import 'dart:typed_data';
 import '../../../core/services/profile_notifier.dart';
 import '../../../core/utils/error_translator.dart';
 import '../../../core/utils/tag_normalizer.dart';
@@ -272,30 +273,42 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'doc', 'docx'],
+        withData: true,
       );
 
-      if (result != null) {
+      if (result != null && result.files.isNotEmpty) {
         setState(() => _isUploadingCV = true);
-        final path = result.files.single.path;
-        if (path == null) return;
-
         final user = Supabase.instance.client.auth.currentUser;
         if (user == null) return;
 
-        // Security checking for path traversal
-        if (path.contains('..')) {
-          setState(() => _isUploadingCV = false);
-          return;
+        final pickedFile = result.files.single;
+        Uint8List? fileBytes = pickedFile.bytes;
+        if (fileBytes == null && pickedFile.path != null) {
+          fileBytes = await File(pickedFile.path!).readAsBytes();
         }
-        final file = File(path);
 
-        // 1. Validation de la taille (max 5 Mo)
-        final size = await file.length();
-        if (size > 5 * 1024 * 1024) {
+        if (fileBytes == null || fileBytes.isEmpty) {
           setState(() => _isUploadingCV = false);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Erreur: Le fichier est trop volumineux (Maximum 5 Mo).')),
+              const SnackBar(
+                content: Text('Impossible d\'accéder au fichier sur cet appareil.'),
+              ),
+            );
+          }
+          return;
+        }
+
+        // 1. Validation de la taille (max 5 Mo)
+        if (fileBytes.length > 5 * 1024 * 1024) {
+          setState(() => _isUploadingCV = false);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Erreur: Le fichier est trop volumineux (Maximum 5 Mo).',
+                ),
+              ),
             );
           }
           return;
@@ -303,43 +316,49 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
         // 2. Validation de la signature du fichier (Magic Bytes)
         bool isValidFormat = false;
-        try {
-          final bytes = await file.openRead(0, 8).first;
-          // Check PDF: %PDF (25 50 44 46)
-          if (bytes.length >= 4 && bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46) {
-             isValidFormat = true;
-          }
-          // Check DOCX: PK\x03\x04 (50 4B 03 04)
-          else if (bytes.length >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04) {
-             isValidFormat = true;
-          }
-          // Check DOC: D0 CF 11 E0 A1 B1 1A E1
-          else if (bytes.length >= 8 && bytes[0] == 0xD0 && bytes[1] == 0xCF && bytes[2] == 0x11 && bytes[3] == 0xE0) {
-             isValidFormat = true;
-          }
-        } catch (e) {
-          debugPrint('Erreur lors de la lecture des magic bytes: $e');
+        if (fileBytes.length >= 4 &&
+            fileBytes[0] == 0x25 &&
+            fileBytes[1] == 0x50 &&
+            fileBytes[2] == 0x44 &&
+            fileBytes[3] == 0x46) {
+          isValidFormat = true; // PDF
+        } else if (fileBytes.length >= 4 &&
+            fileBytes[0] == 0x50 &&
+            fileBytes[1] == 0x4B &&
+            fileBytes[2] == 0x03 &&
+            fileBytes[3] == 0x04) {
+          isValidFormat = true; // DOCX
+        } else if (fileBytes.length >= 8 &&
+            fileBytes[0] == 0xD0 &&
+            fileBytes[1] == 0xCF &&
+            fileBytes[2] == 0x11 &&
+            fileBytes[3] == 0xE0) {
+          isValidFormat = true; // DOC
         }
 
         if (!isValidFormat) {
           setState(() => _isUploadingCV = false);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Fichier corrompu ou falsifié. Veuillez envoyer un vrai document PDF ou Word.')),
+              const SnackBar(
+                content: Text(
+                  'Fichier corrompu ou invalide. Veuillez envoyer un document PDF ou Word.',
+                ),
+              ),
             );
           }
           return;
         }
 
-        final fileExt = result.files.single.extension ?? 'pdf';
+        final fileExt = pickedFile.extension ?? 'pdf';
         final fileName = '${user.id}_cv.$fileExt';
         const filePath = 'cvs';
 
         await Supabase.instance.client.storage
             .from('cv_files')
-            .upload(
+            .uploadBinary(
               '$filePath/$fileName',
-              file,
+              fileBytes,
               fileOptions: const FileOptions(upsert: true),
             )
             .timeout(
@@ -360,17 +379,19 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('CV téléchargé avec succès !')),
+            const SnackBar(
+              content: Text('Votre CV a été mis à jour avec succès !'),
+              backgroundColor: Colors.green,
+            ),
           );
         }
       }
     } catch (e) {
+      debugPrint('Error uploading CV: $e');
       setState(() => _isUploadingCV = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ErrorTranslator.translate(e)),
-          ),
+          SnackBar(content: Text('Erreur lors de l\'envoi du CV : ${e.toString()}')),
         );
       }
     }

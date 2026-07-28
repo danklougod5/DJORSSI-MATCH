@@ -13,7 +13,10 @@ import {
   ShieldCheck,
   Zap
 } from 'lucide-react';
-import { formatLongDate } from '../../lib/dateUtils';
+import {
+  formatEffectiveJobDeadline,
+  isJobExpired,
+} from '../../lib/dateUtils';
 
 interface JobsTabProps {
   jobsList: any[];
@@ -61,27 +64,6 @@ const JobsTab: React.FC<JobsTabProps> = ({
     return Array.from(lvls).sort();
   }, [jobsList]);
 
-  // Helper to parse DD/MM/YYYY
-  const parseDate = (dateStr: string) => {
-    if (!dateStr || typeof dateStr !== 'string') return null;
-    
-    // Try DD/MM/YYYY first since it's the user's primary format
-    const parts = dateStr.split('/');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const year = parseInt(parts[2], 10);
-      const d = new Date(year, month, day);
-      if (!isNaN(d.getTime())) return d;
-    }
-
-    // Fallback to standard parsing for ISO or other formats
-    let d = new Date(dateStr);
-    if (!isNaN(d.getTime())) return d;
-
-    return null;
-  };
-
   // Filtered list
   const filteredJobs = useMemo(() => {
     const now = new Date();
@@ -106,17 +88,11 @@ const JobsTab: React.FC<JobsTabProps> = ({
       // Level filter
       if (filterLevel !== 'all' && job.required_level !== filterLevel) return false;
 
-      // Date Limit filter (Deadline)
+      // Date Limit filter (effective expiry = deadline || created_at + 21 days)
       if (filterDateLimit !== 'all') {
-        const deadlineDate = parseDate(job.deadline);
-        if (deadlineDate) {
-          if (filterDateLimit === 'active' && deadlineDate < now) return false;
-          if (filterDateLimit === 'expired' && deadlineDate >= now) return false;
-        } else if (filterDateLimit === 'expired') {
-          // If no date and we want expired, maybe hide it? 
-          // Usually untracked dates are considered "active" until proven otherwise
-          return false;
-        }
+        const expired = isJobExpired(job, now);
+        if (filterDateLimit === 'active' && expired) return false;
+        if (filterDateLimit === 'expired' && !expired) return false;
       }
 
       // Approved filter
@@ -412,8 +388,7 @@ const JobsTab: React.FC<JobsTabProps> = ({
             <tbody className="divide-y divide-slate-100">
               {filteredJobs.map(job => {
                 const isSelected = selectedJobIds.includes(job.id);
-                const deadlineDate = parseDate(job.deadline);
-                const isExpired = deadlineDate && deadlineDate < new Date();
+                const isExpired = isJobExpired(job);
                 const isNew = job.created_at && (new Date().getTime() - new Date(job.created_at).getTime() < 48 * 60 * 60 * 1000);
 
                 return (
@@ -467,7 +442,7 @@ const JobsTab: React.FC<JobsTabProps> = ({
                     <td className="px-6 py-5">
                       <div className="flex flex-col">
                         <span className={`text-xs font-black px-2 py-0.5 rounded-md w-fit bg-slate-100 ${isExpired ? 'text-red-500 bg-red-50' : 'text-slate-500'}`}>
-                          {job.deadline ? formatLongDate(job.deadline) : 'Aucune'}
+                          {formatEffectiveJobDeadline(job) || 'Aucune'}
                         </span>
                         {isExpired && <span className="text-[8px] font-black text-red-400 uppercase tracking-tighter mt-1 px-1">Expiré</span>}
                       </div>

@@ -25,6 +25,8 @@ class _CvListScreenState extends State<CvListScreen> {
   bool _isUploading = false;
   CvQuotaInfo? _quotaInfo;
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
+  int _aiExtraPurchased = 0;
+  bool _isRealPremium = false;
 
   @override
   void initState() {
@@ -55,6 +57,7 @@ class _CvListScreenState extends State<CvListScreen> {
             final isPremiumVal = profile['is_premium'] ?? false;
             final premiumUntilRaw = profile['premium_until'];
             final extraPurchased = (profile['extra_cvs_purchased'] ?? 0) as int;
+            final extraAi = (profile['ai_adapt_extra_purchased'] ?? 0) as int;
             final showPremiumOverride = profile['show_premium'];
 
             bool activePremium = isPremiumVal;
@@ -67,21 +70,25 @@ class _CvListScreenState extends State<CvListScreen> {
               activePremium = true;
             }
 
-            _updateQuotaWithDetails(activePremium, extraPurchased);
+            _updateQuotaWithDetails(activePremium, extraPurchased, extraAi, isPremiumVal == true);
           }
         }, onError: (e) {
           debugPrint('CvListScreen: profiles realtime error: $e');
         });
   }
 
-  Future<void> _updateQuotaWithDetails(bool isPremium, int extraPurchased) async {
+  Future<void> _updateQuotaWithDetails(bool isPremium, int extraPurchased, int extraAi, bool realPremium) async {
     try {
       final info = await CvQuotaService.getQuotaInfo(
         isPremiumUser: isPremium,
         extraPurchased: extraPurchased,
       );
       if (mounted) {
-        setState(() => _quotaInfo = info);
+        setState(() {
+          _quotaInfo = info;
+          _aiExtraPurchased = extraAi;
+          _isRealPremium = realPremium;
+        });
       }
     } catch (e) {
       debugPrint('Error updating quota details: $e');
@@ -91,7 +98,15 @@ class _CvListScreenState extends State<CvListScreen> {
   Future<void> _loadQuotaInfo() async {
     try {
       final info = await CvQuotaService.getQuotaInfo();
-      if (mounted) setState(() => _quotaInfo = info);
+      final details = await CvQuotaService.getUserQuotaDetails();
+      final realPrem = await CvQuotaService.isRealPremium();
+      if (mounted) {
+        setState(() {
+          _quotaInfo = info;
+          _aiExtraPurchased = details.extraAiAdaptations;
+          _isRealPremium = realPrem;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading quota info: $e');
     }
@@ -947,37 +962,49 @@ class _CvListScreenState extends State<CvListScreen> {
           const SizedBox(height: 12),
 
           // Colored dots legend
-          Wrap(
-            spacing: 16,
-            runSpacing: 6,
-            children: [
-              _buildLegendItem(
-                color: const Color(0xFFF97316),
-                label: '$includedSlots inclus',
-              ),
-              if (adaptedCount > 0)
+          Builder(builder: (_) {
+            final String aiQuotaText;
+            if (VersionService.isAiAdaptTrialRunning) {
+              aiQuotaText = '$adaptedCount/∞ adaptés';
+            } else {
+              final int monthlyQuota = _isRealPremium
+                  ? CvQuotaService.premiumAiAdaptationQuota
+                  : CvQuotaService.freeAiAdaptationQuota;
+              final int totalAllowed = monthlyQuota + _aiExtraPurchased;
+              aiQuotaText = '$adaptedCount/$totalAllowed adaptés';
+            }
+
+            return Wrap(
+              spacing: 16,
+              runSpacing: 6,
+              children: [
+                _buildLegendItem(
+                  color: const Color(0xFFF97316),
+                  label: '$includedSlots inclus',
+                ),
                 _buildLegendItem(
                   color: Colors.green.shade500,
-                  label: '$adaptedCount adapté${adaptedCount > 1 ? "s" : ""}',
+                  label: aiQuotaText,
                 ),
-              if (purchasedSlots > 0)
-                _buildLegendItem(
-                  color: const Color(0xFF3B82F6),
-                  label: '$purchasedSlots acheté${purchasedSlots > 1 ? "s" : ""}',
-                ),
-              if (overLimit > 0)
-                _buildLegendItem(
-                  color: Colors.red.shade500,
-                  label: '$overLimit en excès',
-                ),
-              if (remaining > 0)
-                _buildLegendItem(
-                  color: Colors.grey.shade300,
-                  label: '$remaining disponible${remaining > 1 ? "s" : ""}',
-                  isBorder: true,
-                ),
-            ],
-          ),
+                if (purchasedSlots > 0)
+                  _buildLegendItem(
+                    color: const Color(0xFF3B82F6),
+                    label: '$purchasedSlots acheté${purchasedSlots > 1 ? "s" : ""}',
+                  ),
+                if (overLimit > 0)
+                  _buildLegendItem(
+                    color: Colors.red.shade500,
+                    label: '$overLimit en excès',
+                  ),
+                if (remaining > 0)
+                  _buildLegendItem(
+                    color: Colors.grey.shade300,
+                    label: '$remaining disponible${remaining > 1 ? "s" : ""}',
+                    isBorder: true,
+                  ),
+              ],
+            );
+          }),
 
           const SizedBox(height: 12),
 

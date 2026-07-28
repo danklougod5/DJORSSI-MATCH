@@ -59,7 +59,10 @@ class ErrorTranslator {
     }
 
     // --- DATABASE / POSTGREST ERRORS ---
-    if (message.contains('postgrestexception')) {
+    if (message.contains('postgrestexception') || message.contains('522')) {
+      if (message.contains('522') || message.contains('code: 522')) {
+        return 'Le serveur met trop de temps à répondre (erreur 522). Veuillez réessayer.';
+      }
       if (message.contains('unique constraint') || message.contains('already exists')) {
         return 'Cette information existe déjà dans notre base de données.';
       }
@@ -90,8 +93,9 @@ class ErrorTranslator {
         message.contains('clientexception') ||
         message.contains('authretryablefetchexception') ||
         message.contains('timeout') ||
+        message.contains('522') ||
         message.contains('délai d\'attente dépassé')) {
-      return 'Erreur réseau. Veuillez vérifier votre connexion internet.';
+      return 'Erreur réseau (délai d\'attente dépassé). Veuillez vérifier votre connexion internet.';
     }
 
     // --- FALLBACK ---

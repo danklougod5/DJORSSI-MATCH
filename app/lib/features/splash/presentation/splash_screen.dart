@@ -44,9 +44,26 @@ class _SplashScreenState extends State<SplashScreen>
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) {
         final session = Supabase.instance.client.auth.currentSession;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (session != null) {
-            context.go('/');
+            try {
+              final response = await Supabase.instance.client
+                  .from('profiles')
+                  .select('is_recruiter')
+                  .eq('id', session.user.id)
+                  .maybeSingle();
+              if (response != null && response['is_recruiter'] == true) {
+                if (mounted) {
+                  context.go('/recruiter-swipes');
+                  return;
+                }
+              }
+            } catch (e) {
+              debugPrint('Error fetching recruiter flag in Splash: $e');
+            }
+            if (mounted) {
+              context.go('/');
+            }
           } else {
             context.go('/onboarding');
           }

@@ -120,6 +120,11 @@ class _CvPdfViewerScreenState extends State<CvPdfViewerScreen> {
                     allowPrinting: true,
                     allowSharing: true,
                     pdfFileName: 'CV.pdf',
+                    onError: (context, error) {
+                      return const Center(
+                        child: Text('Aperçu du CV indisponible'),
+                      );
+                    },
                   ),
                 ),
     );

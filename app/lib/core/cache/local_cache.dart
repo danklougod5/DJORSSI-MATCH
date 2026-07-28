@@ -11,11 +11,13 @@ class LocalCache {
   static const String swipeCountKey = 'cached_swipe_count';
   static const String swipeCountDateKey = 'cached_swipe_count_date';
   static const String tagsKey = 'cached_sector_tags';
+  static const String chatsKey = 'cached_chats';
 
   // TTL defaults (in seconds)
   static const int jobsTTL = 300;          // 5 minutes
   static const int profileTTL = 120;       // 2 minutes
   static const int matchesTTL = 180;       // 3 minutes
+  static const int chatsTTL = 180;         // 3 minutes
   static const int skillsTTL = 600;        // 10 minutes
   static const int notificationsTTL = 300; // 5 minutes
   static const int swipedIdsTTL = 3600;    // 1 heure (les swipes ne changent jamais)
@@ -71,6 +73,7 @@ class LocalCache {
   static Future<void> clearAll() async {
     await clear(jobsKey);
     await clear(matchesKey);
+    await clear(chatsKey);
     await clear(profileKey);
     await clear(skillsKey);
     await clear(notificationsKey);

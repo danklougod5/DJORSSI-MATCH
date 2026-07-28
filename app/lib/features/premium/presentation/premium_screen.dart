@@ -40,14 +40,25 @@ class _PremiumScreenState extends State<PremiumScreen> {
       debugPrint('Données Realtime reçues: $data');
       if (data.isNotEmpty && mounted) {
         setState(() {
-          VersionService.showPremium = data.first['show_premium'] ?? false;
-          if (data.first['premium_price_cfa'] != null) {
-            VersionService.premiumPriceCfa = data.first['premium_price_cfa'] as int;
+          final row = data.first;
+          VersionService.showPremium = row['show_premium'] ?? false;
+          if (row['premium_price_cfa'] != null) {
+            VersionService.premiumPriceCfa = row['premium_price_cfa'] as int;
           }
-          if (data.first['extra_cv_price_cfa'] != null) {
-            VersionService.extraCvPriceCfa = data.first['extra_cv_price_cfa'] as int;
+          if (row['extra_cv_price_cfa'] != null) {
+            VersionService.extraCvPriceCfa = row['extra_cv_price_cfa'] as int;
           }
-          debugPrint('showPremium: ${VersionService.showPremium}, premiumPrice: ${VersionService.premiumPriceCfa}, extraCvPrice: ${VersionService.extraCvPriceCfa}');
+          if (row['ai_adapt_premium_limit'] != null) {
+            VersionService.aiAdaptPremiumLimit = row['ai_adapt_premium_limit'] as int;
+          }
+          VersionService.featUnlimitedSwipes = row['feat_unlimited_swipes'] ?? true;
+          VersionService.featUnlockedHistory = row['feat_unlocked_history'] ?? true;
+          VersionService.featCertifiedBadge = row['feat_certified_badge'] ?? true;
+          VersionService.featRewind = row['feat_rewind'] ?? true;
+          VersionService.featEmailAlerts = row['feat_email_alerts'] ?? true;
+          VersionService.featExtraCvs = row['feat_extra_cvs'] ?? true;
+          VersionService.featAiAdaptation = row['feat_ai_adaptation'] ?? true;
+          debugPrint('showPremium: ${VersionService.showPremium}, premiumPrice: ${VersionService.premiumPriceCfa}');
         });
       }
     }, onError: (error) {
@@ -202,47 +213,69 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 const SizedBox(height: 20),
                 _buildHeroSection(),
                 const SizedBox(height: 40),
-                _buildFeatureCard(
-                  icon: Icons.all_inclusive_rounded,
-                  title: 'SWIPES ILLIMITÉS',
-                  description: 'Ne soyez plus jamais bloqué. Swiper autant de Djorssis que vous voulez par jour.',
-                  color: const Color(0xFFF97316),
-                ),
-                const SizedBox(height: 16),
-                _buildFeatureCard(
-                  icon: Icons.history_rounded,
-                  title: 'HISTORIQUE DÉVERROUILLÉ',
-                  description: 'Ne soyez plus limité à vos 3 derniers matches. Consultez l\'intégralité de vos candidatures.',
-                  color: const Color(0xFFF59E0B),
-                ),
-                const SizedBox(height: 16),
-                _buildFeatureCard(
-                  icon: Icons.verified_rounded,
-                  title: 'BADGE "CANDIDAT CERTIFIÉ"',
-                  description: 'Un signal de confiance unique pour rassurer les employeurs sur votre sérieux.',
-                  color: const Color(0xFFF97316),
-                ),
-                const SizedBox(height: 16),
-                _buildFeatureCard(
-                  icon: Icons.undo_rounded,
-                  title: 'RETOUR EN ARRIÈRE',
-                  description: 'Vous avez swipé trop vite ? Annulez votre dernier geste instantanément.',
-                  color: const Color(0xFFFB923C),
-                ),
-                const SizedBox(height: 16),
-                _buildFeatureCard(
-                  icon: Icons.notifications_active_rounded,
-                  title: 'ALERTES EMPLOIS PAR EMAIL',
-                  description: 'Soyez le premier informé ! Recevez un email dès qu\'un job correspondant est publié.',
-                  color: const Color(0xFFF97316),
-                ),
-                const SizedBox(height: 16),
-                _buildFeatureCard(
-                  icon: Icons.description_rounded,
-                  title: '3 CV PROFESSIONNELS INCLUS',
-                  description: 'Créez jusqu\'à 3 CV gratuitement contre 1 seul pour les comptes gratuits. CV supplémentaires à ${_formatPrice(VersionService.extraCvPriceCfa)} F CFA.',
-                  color: const Color(0xFFF59E0B),
-                ),
+                if (VersionService.featUnlimitedSwipes) ...[
+                  _buildFeatureCard(
+                    icon: Icons.all_inclusive_rounded,
+                    title: 'SWIPES ILLIMITÉS',
+                    description: 'Ne soyez plus jamais bloqué. Swiper autant de Djorssis que vous voulez par jour.',
+                    color: const Color(0xFFF97316),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (VersionService.featUnlockedHistory) ...[
+                  _buildFeatureCard(
+                    icon: Icons.history_rounded,
+                    title: 'HISTORIQUE DÉVERROUILLÉ',
+                    description: 'Ne soyez plus limité à vos 3 derniers matches. Consultez l\'intégralité de vos candidatures.',
+                    color: const Color(0xFFF59E0B),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (VersionService.featCertifiedBadge) ...[
+                  _buildFeatureCard(
+                    icon: Icons.verified_rounded,
+                    title: 'BADGE "CANDIDAT CERTIFIÉ"',
+                    description: 'Un signal de confiance unique pour rassurer les employeurs sur votre sérieux.',
+                    color: const Color(0xFFF97316),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (VersionService.featRewind) ...[
+                  _buildFeatureCard(
+                    icon: Icons.undo_rounded,
+                    title: 'RETOUR EN ARRIÈRE',
+                    description: 'Vous avez swipé trop vite ? Annulez votre dernier geste instantanément.',
+                    color: const Color(0xFFFB923C),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (VersionService.featEmailAlerts) ...[
+                  _buildFeatureCard(
+                    icon: Icons.notifications_active_rounded,
+                    title: 'ALERTES EMPLOIS PAR EMAIL',
+                    description: 'Soyez le premier informé ! Recevez un email dès qu\'un job correspondant est publié.',
+                    color: const Color(0xFFF97316),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (VersionService.featExtraCvs) ...[
+                  _buildFeatureCard(
+                    icon: Icons.description_rounded,
+                    title: '3 CV PROFESSIONNELS INCLUS',
+                    description: 'Créez jusqu\'à 3 CV gratuitement contre 1 seul pour les comptes gratuits. CV supplémentaires à ${_formatPrice(VersionService.extraCvPriceCfa)} F CFA.',
+                    color: const Color(0xFFF59E0B),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                if (VersionService.featAiAdaptation) ...[
+                  _buildFeatureCard(
+                    icon: Icons.auto_awesome_rounded,
+                    title: '${VersionService.aiAdaptPremiumLimit} ADAPTATIONS CV PAR IA / MOIS',
+                    description: 'Adaptez automatiquement votre CV à chaque offre d\'emploi grâce à l\'IA (${VersionService.aiAdaptPremiumLimit} adaptations offertes chaque mois en Premium).',
+                    color: const Color(0xFFF97316),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 const SizedBox(height: 40),
                 if (VersionService.showPremium) ...[
                   _buildPriceCard(),

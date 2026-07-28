@@ -413,16 +413,19 @@ class _MatchDetailsScreenState extends State<MatchDetailsScreen> {
             await launchUrl(waAppUri, mode: LaunchMode.externalApplication);
           } else if (await canLaunchUrl(waWebUri)) {
             await launchUrl(waWebUri, mode: LaunchMode.externalApplication);
-          } else if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Application WhatsApp non trouvée")),
-            );
+          } else {
+            await launchUrl(waWebUri, mode: LaunchMode.externalNonBrowserApplication);
           }
         } catch (e) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Erreur d'ouverture WhatsApp")),
-            );
+          debugPrint('Primary WhatsApp launch failed, trying webUrl fallback: $e');
+          try {
+            await launchUrl(waWebUri, mode: LaunchMode.externalApplication);
+          } catch (e2) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Impossible d'ouvrir WhatsApp sur cet appareil.")),
+              );
+            }
           }
         }
       }

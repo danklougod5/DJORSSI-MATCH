@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Star, Search, Trash2, Pencil } from 'lucide-react';
+import { Users, Star, Search, Trash2, Pencil, UserX, UserCheck } from 'lucide-react';
 
 interface UsersTabProps {
   stats: any;
@@ -9,8 +9,11 @@ interface UsersTabProps {
   setStatusFilter: (filter: 'all' | 'premium' | 'free') => void;
   recentUsersList: any[];
   handleTogglePremium: (userId: string, currentPremium: boolean) => Promise<void>;
+  handleToggleBlockUser?: (userId: string, currentBlocked: boolean) => Promise<void>;
   handleDeleteProfile: (userId: string) => Promise<void>;
   setEditingUser: (user: any) => void;
+  focusSection?: 'visible-recruiters' | null;
+  onFocusHandled?: () => void;
 }
 
 const UsersTab: React.FC<UsersTabProps> = ({
@@ -21,9 +24,35 @@ const UsersTab: React.FC<UsersTabProps> = ({
   setStatusFilter,
   recentUsersList,
   handleTogglePremium,
+  handleToggleBlockUser,
   handleDeleteProfile,
-  setEditingUser
+  setEditingUser,
+  focusSection,
+  onFocusHandled,
 }) => {
+  const [showVisibleRecruitersOnly, setShowVisibleRecruitersOnly] = React.useState(false);
+
+  React.useEffect(() => {
+    if (focusSection === 'visible-recruiters') {
+      setShowVisibleRecruitersOnly(true);
+      onFocusHandled?.();
+    }
+  }, [focusSection, onFocusHandled]);
+
+  const filteredUsers = recentUsersList.filter(user => {
+    const normalizedSearch = searchTerm.toLowerCase();
+    const matchesSearch = user.name.toLowerCase().includes(normalizedSearch) ||
+      user.phone.includes(searchTerm) ||
+      user.id.toLowerCase().includes(normalizedSearch);
+    const matchesFilter = statusFilter === 'all' ||
+      (statusFilter === 'premium' && user.premium) ||
+      (statusFilter === 'free' && !user.premium);
+    const matchesRecruiterVisibility = !showVisibleRecruitersOnly ||
+      (user.isVisibleToRecruiters === true && user.isRecruiter !== true);
+
+    return matchesSearch && matchesFilter && matchesRecruiterVisibility;
+  });
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -49,6 +78,23 @@ const UsersTab: React.FC<UsersTabProps> = ({
             <Users className="text-slate-200" />
          </div>
       </div>
+
+      {showVisibleRecruitersOnly && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div>
+            <h4 className="text-sm font-bold text-emerald-900">Vue filtrée: profils visibles aux recruteurs</h4>
+            <p className="text-xs text-emerald-700">
+              Vous voyez uniquement les candidats ayant activé leur visibilité recruteur.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowVisibleRecruitersOnly(false)}
+            className="px-4 py-2 rounded-lg bg-white border border-emerald-200 text-emerald-800 text-xs font-bold hover:bg-emerald-100 transition-colors"
+          >
+            Retirer le filtre
+          </button>
+        </div>
+      )}
 
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
@@ -79,6 +125,17 @@ const UsersTab: React.FC<UsersTabProps> = ({
                 </button>
               </div>
 
+              <button
+                onClick={() => setShowVisibleRecruitersOnly(prev => !prev)}
+                className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all ${
+                  showVisibleRecruitersOnly
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                Visibles recruteurs
+              </button>
+
               <div className="relative flex-1 lg:w-64">
                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                  <input 
@@ -104,17 +161,7 @@ const UsersTab: React.FC<UsersTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {recentUsersList
-                .filter(user => {
-                  const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                        user.phone.includes(searchTerm) ||
-                                        user.id.toLowerCase().includes(searchTerm.toLowerCase());
-                  const matchesFilter = statusFilter === 'all' || 
-                                        (statusFilter === 'premium' && user.premium) || 
-                                        (statusFilter === 'free' && !user.premium);
-                  return matchesSearch && matchesFilter;
-                })
-                .map(user => (
+              {filteredUsers.map(user => (
                 <tr key={user.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -137,9 +184,19 @@ const UsersTab: React.FC<UsersTabProps> = ({
                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight ${user.premium ? 'bg-cta text-white shadow-sm shadow-cta/20' : 'bg-slate-100 text-slate-500'}`}>
                           {user.premium ? 'Premium' : 'Standard'}
                         </span>
+                        {user.isBlocked && (
+                          <span className="px-2.5 py-1 bg-red-100 text-red-600 rounded-lg text-[10px] font-black uppercase border border-red-200">
+                            Bloqué
+                          </span>
+                        )}
                         {user.extraCvsPurchased > 0 && (
                           <span className="px-2 py-1 bg-primary/10 text-primary rounded-lg text-[10px] font-bold border border-primary/20">
                             +{user.extraCvsPurchased} CV
+                          </span>
+                        )}
+                        {user.isVisibleToRecruiters && !user.isRecruiter && (
+                          <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-bold border border-emerald-200">
+                            Visible recruteur
                           </span>
                         )}
                         {user.aiAdaptExtraPurchased > 0 && (
@@ -162,6 +219,20 @@ const UsersTab: React.FC<UsersTabProps> = ({
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
+                      {handleToggleBlockUser && (
+                        <button 
+                          onClick={() => handleToggleBlockUser(user.id, user.isBlocked)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                            user.isBlocked 
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                              : 'bg-red-50 text-red-600 hover:bg-red-100'
+                          }`}
+                          title={user.isBlocked ? "Débloquer le compte" : "Bloquer le compte"}
+                        >
+                          {user.isBlocked ? <UserCheck size={14} /> : <UserX size={14} />}
+                          {user.isBlocked ? "DÉBLOQUER" : "BLOQUER"}
+                        </button>
+                      )}
                       <button 
                         onClick={() => handleTogglePremium(user.id, user.premium)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
@@ -191,11 +262,15 @@ const UsersTab: React.FC<UsersTabProps> = ({
                   </td>
                 </tr>
               ))}
-              {recentUsersList.length === 0 && (
+              {filteredUsers.length === 0 && (
                   <tr>
                       <td colSpan={5} className="px-6 py-20 text-center">
                           <Users size={40} className="mx-auto text-slate-200 mb-2" />
-                          <p className="text-slate-400 italic">Aucun utilisateur trouvé.</p>
+                          <p className="text-slate-400 italic">
+                            {showVisibleRecruitersOnly
+                              ? 'Aucun candidat visible aux recruteurs trouvé.'
+                              : 'Aucun utilisateur trouvé.'}
+                          </p>
                       </td>
                   </tr>
               )}

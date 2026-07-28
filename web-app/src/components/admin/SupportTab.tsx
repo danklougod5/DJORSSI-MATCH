@@ -17,7 +17,9 @@ interface SupportMessage {
   user_id: string;
   message_type: 'question' | 'suggestion';
   content: string;
+  image_url?: string | null;
   admin_reply: string | null;
+  admin_image_url?: string | null;
   replied_at: string | null;
   created_at: string;
   user_name?: string;
@@ -37,6 +39,7 @@ const SupportTab: React.FC = () => {
 
   // Reply text states indexed by message id
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({});
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, File>>({});
   const [submittingReplyId, setSubmittingReplyId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -90,7 +93,8 @@ const SupportTab: React.FC = () => {
 
   const handleSendReply = async (messageId: string) => {
     const replyText = replyTexts[messageId]?.trim();
-    if (!replyText) return;
+    const selectedFile = selectedFiles[messageId];
+    if (!replyText && !selectedFile) return;
 
     setSubmittingReplyId(messageId);
     setError('');
@@ -100,10 +104,33 @@ const SupportTab: React.FC = () => {
       const msg = messages.find(m => m.id === messageId);
       const userId = msg?.user_id;
 
+      let adminImageUrl = msg?.admin_image_url || null;
+
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `admin_${messageId}_${Date.now()}.${fileExt}`;
+        const filePath = `support/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('cv_files')
+          .upload(filePath, selectedFile, {
+            upsert: true
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('cv_files')
+          .getPublicUrl(filePath);
+
+        adminImageUrl = publicUrlData.publicUrl;
+      }
+
       const { error: updateError } = await supabase
         .from('support_messages')
         .update({
-          admin_reply: replyText,
+          admin_reply: replyText || '',
+          admin_image_url: adminImageUrl,
           replied_at: new Date().toISOString(),
           is_read: false // Mark as unread for the user
         })
@@ -117,13 +144,23 @@ const SupportTab: React.FC = () => {
       setMessages(prev =>
         prev.map(m =>
           m.id === messageId
-            ? { ...m, admin_reply: replyText, replied_at: new Date().toISOString() }
+            ? { 
+                ...m, 
+                admin_reply: replyText || '', 
+                admin_image_url: adminImageUrl,
+                replied_at: new Date().toISOString() 
+              }
             : m
         )
       );
 
-      // Clear the reply input
+      // Clear inputs
       setReplyTexts(prev => ({ ...prev, [messageId]: '' }));
+      setSelectedFiles(prev => {
+        const copy = { ...prev };
+        delete copy[messageId];
+        return copy;
+      });
 
       // Trigger push notification to user
       if (userId) {
@@ -323,8 +360,24 @@ const SupportTab: React.FC = () => {
               </div>
 
               {/* Message Content */}
-              <div className="text-slate-800 text-sm bg-slate-50 rounded-xl p-4 border border-slate-100 whitespace-pre-wrap leading-relaxed">
-                {msg.content}
+              <div className="text-slate-800 text-sm bg-slate-50 rounded-xl p-4 border border-slate-100 leading-relaxed">
+                <div className="whitespace-pre-wrap">{msg.content}</div>
+                {msg.image_url && (
+                  <div className="mt-3">
+                    <a
+                      href={msg.image_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block hover:opacity-90 transition-opacity"
+                    >
+                      <img
+                        src={msg.image_url}
+                        alt="Capture d'écran du candidat"
+                        className="max-h-60 rounded-lg border border-slate-200 object-cover"
+                      />
+                    </a>
+                  </div>
+                )}
                 <div className="text-right text-[10px] text-slate-400 mt-2 font-medium">
                   Reçu le {new Date(msg.created_at).toLocaleDateString('fr-FR', {
                     day: 'numeric',
@@ -344,8 +397,24 @@ const SupportTab: React.FC = () => {
                       <CornerDownRight size={14} className="text-slate-400" />
                       <span>Votre réponse :</span>
                     </div>
-                    <div className="bg-orange-50/30 border border-orange-100/50 rounded-xl p-4 ml-6 whitespace-pre-wrap text-sm text-slate-800 relative">
-                      {msg.admin_reply}
+                    <div className="bg-orange-50/30 border border-orange-100/50 rounded-xl p-4 ml-6 text-sm text-slate-800 relative">
+                      <div className="whitespace-pre-wrap">{msg.admin_reply}</div>
+                      {msg.admin_image_url && (
+                        <div className="mt-3">
+                          <a
+                            href={msg.admin_image_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block hover:opacity-90 transition-opacity"
+                          >
+                            <img
+                              src={msg.admin_image_url}
+                              alt="Capture d'écran de l'admin"
+                              className="max-h-48 rounded-lg border border-orange-200/50 object-cover"
+                            />
+                          </a>
+                        </div>
+                      )}
                       <div className="text-right text-[10px] text-slate-400 mt-2 font-medium">
                         Répondu le {new Date(msg.replied_at!).toLocaleDateString('fr-FR', {
                           day: 'numeric',
@@ -362,7 +431,7 @@ const SupportTab: React.FC = () => {
                       <summary className="text-[11px] text-slate-400 hover:text-primary cursor-pointer select-none font-semibold focus:outline-none">
                         Modifier la réponse
                       </summary>
-                      <div className="mt-2 space-y-2">
+                      <div className="mt-2 space-y-3">
                         <textarea
                           value={replyTexts[msg.id] ?? msg.admin_reply}
                           onChange={(e) => setReplyTexts(prev => ({ ...prev, [msg.id]: e.target.value }))}
@@ -370,6 +439,44 @@ const SupportTab: React.FC = () => {
                           rows={3}
                           className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
+                        
+                        {/* Edit Image Selection */}
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer transition-all">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setSelectedFiles(prev => ({ ...prev, [msg.id]: file }));
+                                }
+                              }}
+                            />
+                            <span>Changer l'image</span>
+                          </label>
+                          {selectedFiles[msg.id] ? (
+                            <div className="flex items-center gap-2 bg-slate-100 px-2 py-1 rounded-lg text-xs border border-slate-200">
+                              <span className="text-slate-600 truncate max-w-[200px]">{selectedFiles[msg.id].name}</span>
+                              <button
+                                onClick={() => {
+                                  setSelectedFiles(prev => {
+                                    const copy = { ...prev };
+                                    delete copy[msg.id];
+                                    return copy;
+                                  });
+                                }}
+                                className="text-red-500 hover:text-red-700 font-bold"
+                              >
+                                Supprimer
+                              </button>
+                            </div>
+                          ) : msg.admin_image_url ? (
+                            <span className="text-[11px] text-slate-400">Image existante conservée</span>
+                          ) : null}
+                        </div>
+
                         <button
                           onClick={() => handleSendReply(msg.id)}
                           disabled={submittingReplyId === msg.id}
@@ -386,26 +493,64 @@ const SupportTab: React.FC = () => {
                       <CornerDownRight size={14} className="text-slate-400" />
                       <span>Rédiger une réponse :</span>
                     </div>
-                    <div className="flex gap-2 items-end ml-6">
-                      <textarea
-                        value={replyTexts[msg.id] || ''}
-                        onChange={(e) => setReplyTexts(prev => ({ ...prev, [msg.id]: e.target.value }))}
-                        placeholder="Écrivez votre réponse ici pour que l'utilisateur la reçoive sur son mobile..."
-                        rows={3}
-                        className="w-full flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                      />
-                      <button
-                        onClick={() => handleSendReply(msg.id)}
-                        disabled={submittingReplyId === msg.id || !replyTexts[msg.id]?.trim()}
-                        className="bg-primary text-white p-3 rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center"
-                        title="Envoyer la réponse"
-                      >
-                        {submittingReplyId === msg.id ? (
-                          <RefreshCw className="animate-spin" size={18} />
-                        ) : (
-                          <Send size={18} />
+                    
+                    <div className="ml-6 space-y-3">
+                      <div className="flex gap-2 items-end">
+                        <textarea
+                          value={replyTexts[msg.id] || ''}
+                          onChange={(e) => setReplyTexts(prev => ({ ...prev, [msg.id]: e.target.value }))}
+                          placeholder="Écrivez votre réponse ici pour que l'utilisateur la reçoive sur son mobile..."
+                          rows={3}
+                          className="w-full flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                        />
+                        <button
+                          onClick={() => handleSendReply(msg.id)}
+                          disabled={submittingReplyId === msg.id || (!replyTexts[msg.id]?.trim() && !selectedFiles[msg.id])}
+                          className="bg-primary text-white p-3 rounded-xl hover:shadow-lg hover:shadow-primary/20 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center h-[46px] w-[46px]"
+                          title="Envoyer la réponse"
+                        >
+                          {submittingReplyId === msg.id ? (
+                            <RefreshCw className="animate-spin" size={18} />
+                          ) : (
+                            <Send size={18} />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Image selector and preview */}
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer transition-all">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setSelectedFiles(prev => ({ ...prev, [msg.id]: file }));
+                              }
+                            }}
+                          />
+                          <span>Ajouter une image</span>
+                        </label>
+                        {selectedFiles[msg.id] && (
+                          <div className="flex items-center gap-2 bg-slate-100 px-2 py-1 rounded-lg text-xs border border-slate-200">
+                            <span className="text-slate-600 truncate max-w-[200px]">{selectedFiles[msg.id].name}</span>
+                            <button
+                              onClick={() => {
+                                setSelectedFiles(prev => {
+                                  const copy = { ...prev };
+                                  delete copy[msg.id];
+                                  return copy;
+                                });
+                              }}
+                              className="text-red-500 hover:text-red-700 font-bold"
+                            >
+                              Supprimer
+                            </button>
+                          </div>
                         )}
-                      </button>
+                      </div>
                     </div>
                   </div>
                 )}

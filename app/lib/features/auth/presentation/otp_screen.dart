@@ -8,8 +8,20 @@ import '../../../core/utils/error_translator.dart';
 class OtpScreen extends StatefulWidget {
   final String email;
   final String? fullName;
+  final bool isRecruiter;
+  final String? companyName;
+  final String? companyIndustry;
+  final String? companySize;
 
-  const OtpScreen({super.key, required this.email, this.fullName});
+  const OtpScreen({
+    super.key,
+    required this.email,
+    this.fullName,
+    this.isRecruiter = false,
+    this.companyName,
+    this.companyIndustry,
+    this.companySize,
+  });
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -96,7 +108,14 @@ class _OtpScreenState extends State<OtpScreen> {
         if (widget.fullName != null) {
           await Supabase.instance.client
               .from('profiles')
-              .upsert({'id': response.user!.id, 'full_name': widget.fullName})
+              .upsert({
+                'id': response.user!.id,
+                'full_name': widget.fullName,
+                'is_recruiter': widget.isRecruiter,
+                'company_name': widget.companyName,
+                'company_industry': widget.companyIndustry,
+                'company_size': widget.companySize,
+              })
               .timeout(
                 const Duration(seconds: 10),
                 onTimeout: () => throw Exception(
@@ -106,7 +125,11 @@ class _OtpScreenState extends State<OtpScreen> {
         }
 
         if (mounted) {
-          context.go('/complete-profile');
+          if (widget.isRecruiter) {
+            context.go('/recruiter-swipes');
+          } else {
+            context.go('/complete-profile');
+          }
         }
       }
     } catch (e) {

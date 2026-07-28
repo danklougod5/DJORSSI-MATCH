@@ -264,6 +264,11 @@ class _CvTemplateSelectionScreenState extends State<CvTemplateSelectionScreen> {
                       canChangePageFormat: false,
                       allowPrinting: false,
                       allowSharing: false,
+                      onError: (context, error) {
+                        return const Center(
+                          child: Text('Aperçu du CV indisponible'),
+                        );
+                      },
                     ),
                   ),
                 ),

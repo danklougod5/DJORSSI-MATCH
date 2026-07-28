@@ -73,6 +73,32 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     setState(() => _isLoading = true);
     try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final profile = await Supabase.instance.client
+            .from('profiles')
+            .select('is_blocked')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (profile != null && profile['is_blocked'] == true) {
+          await Supabase.instance.client.auth.signOut();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Votre compte a été suspendu par l\'administration. La réinitialisation du mot de passe est impossible.',
+                ),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 5),
+              ),
+            );
+            context.go('/auth');
+          }
+          return;
+        }
+      }
+
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(password: password),
       );

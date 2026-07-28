@@ -16,7 +16,7 @@ import {
   Pencil,
   Building
 } from 'lucide-react';
-import { formatLongDate } from '../../lib/dateUtils';
+import { formatEffectiveJobDeadline } from '../../lib/dateUtils';
 
 interface JobApprovalTabProps {
   jobsList: any[];
@@ -346,9 +346,9 @@ const JobApprovalTab: React.FC<JobApprovalTabProps> = ({
                       <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
                         <MapPin size={12} className="text-slate-400" />
                         <span>Lieu : <strong>{job.location || 'Abidjan'}</strong></span>
-                        {job.deadline && (
+                        {formatEffectiveJobDeadline(job) && (
                           <span className="ml-auto flex items-center gap-1">
-                            <Calendar size={12} /> Expire : <strong>{formatLongDate(job.deadline)}</strong>
+                            <Calendar size={12} /> Expire : <strong>{formatEffectiveJobDeadline(job)}</strong>
                           </span>
                         )}
                       </div>

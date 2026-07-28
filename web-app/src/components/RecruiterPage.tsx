@@ -41,6 +41,7 @@ const RecruiterPage: React.FC = () => {
 
   const [contractType, setContractType] = useState('CDI');
   const [requiresCoverLetter, setRequiresCoverLetter] = useState(false);
+  const [isSalaryNonNegotiable, setIsSalaryNonNegotiable] = useState(false);
   
   // Loading & statuses
   const [isLoading, setIsLoading] = useState(false);
@@ -156,12 +157,23 @@ const RecruiterPage: React.FC = () => {
         tags.push(contractType);
       }
 
+      let formattedSalary = formData.salary.trim();
+      if (isSalaryNonNegotiable) {
+        if (formattedSalary) {
+          if (!formattedSalary.toLowerCase().includes('non négociable')) {
+            formattedSalary += ' (Non négociable)';
+          }
+        } else {
+          formattedSalary = 'Non négociable';
+        }
+      }
+
       const rawData = {
         company_name: formData.company.trim(),
         job_title: formData.title.trim(),
         location: formData.location.trim(),
         required_level: formData.level.trim(),
-        salary_range: formData.salary.trim(),
+        salary_range: formattedSalary,
         contact_email: formData.email.trim(),
         whatsapp_number: formData.phone.trim(),
         description: formData.description.trim(),
@@ -196,6 +208,7 @@ const RecruiterPage: React.FC = () => {
       if (error) throw error;
 
       setSubmitStatus('success');
+      setIsSalaryNonNegotiable(false);
       setFormData({
         company: '',
         title: '',
@@ -417,9 +430,20 @@ const RecruiterPage: React.FC = () => {
 
                   <div className="grid md:grid-cols-2 gap-5">
                     <div>
-                      <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
-                        Salaire / Rémunération
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-black uppercase tracking-wider text-black">
+                          Salaire / Rémunération
+                        </label>
+                        <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700 hover:text-black transition-colors select-none">
+                          <input
+                            type="checkbox"
+                            checked={isSalaryNonNegotiable}
+                            onChange={(e) => setIsSalaryNonNegotiable(e.target.checked)}
+                            className="w-4 h-4 accent-primary rounded cursor-pointer"
+                          />
+                          <span>Non négociable</span>
+                        </label>
+                      </div>
                       <div className="relative">
                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
@@ -427,7 +451,7 @@ const RecruiterPage: React.FC = () => {
                           name="salary"
                           value={formData.salary}
                           onChange={handleInputChange}
-                          placeholder="Ex: 150000 (Chiffres uniquement)"
+                          placeholder={isSalaryNonNegotiable ? "Ex: 150000 (Non négociable)" : "Ex: 150000 (Chiffres uniquement)"}
                           className="w-full pl-10 pr-4 py-3 bg-slate-50 border-2 border-black rounded-xl focus:translate-x-[2px] focus:translate-y-[2px] focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] outline-none transition-all font-bold placeholder:text-slate-400 text-black"
                         />
                       </div>

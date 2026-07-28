@@ -1,13 +1,19 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import '../../../core/services/version_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:in_app_review/in_app_review.dart';
+import '../../../core/services/profile_notifier.dart';
 import '../../../core/cache/local_cache.dart';
+import '../../cv_generator/models/cv_model.dart';
+import '../../cv_generator/services/cv_ai_import_service.dart';
+import '../../recruiter/presentation/widgets/candidate_cv_swipe_card.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,7 +23,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   final _supabase = Supabase.instance.client;
   bool _isLoading = true;
   Map<String, dynamic>? _profileData;
@@ -26,6 +32,11 @@ class _ProfileScreenState extends State<ProfileScreen>
   int _unreadSupportReplies = 0;
 
   StreamSubscription<List<Map<String, dynamic>>>? _profileSubscription;
+
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  bool _isHighlightingVisibility = false;
+  Timer? _highlightTimer;
 
   /// Getter centralisé : vérifie `is_premium` ET `premium_until` pour
   /// déterminer si l'utilisateur est réellement premium actif.
@@ -50,8 +61,48 @@ class _ProfileScreenState extends State<ProfileScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    ProfileNotifier.highlightVisibilityNotifier.addListener(_checkHighlightVisibility);
+
     _loadProfile();
     _setupRealtime();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkHighlightVisibility());
+  }
+
+  void _checkHighlightVisibility() {
+    if (ProfileNotifier.highlightVisibilityNotifier.value) {
+      if (mounted) {
+        setState(() => _isHighlightingVisibility = true);
+        _pulseController.repeat(reverse: true);
+        _highlightTimer?.cancel();
+        _highlightTimer = Timer(const Duration(seconds: 4), () {
+          if (mounted) {
+            _pulseController.stop();
+            setState(() => _isHighlightingVisibility = false);
+            ProfileNotifier.highlightVisibilityNotifier.value = false;
+          }
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _pulseController.dispose();
+    _highlightTimer?.cancel();
+    ProfileNotifier.highlightVisibilityNotifier.removeListener(_checkHighlightVisibility);
+    _profileSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -87,13 +138,6 @@ class _ProfileScreenState extends State<ProfileScreen>
             });
           }
         });
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _profileSubscription?.cancel();
-    super.dispose();
   }
 
   Future<void> _loadProfile({bool forceRefresh = false}) async {
@@ -134,17 +178,28 @@ class _ProfileScreenState extends State<ProfileScreen>
 
       final response = await _supabase
           .from('profiles')
-          .select('id, full_name, skills, cv_url, is_premium, premium_until, sexe')
+          .select('id, full_name, skills, cv_url, is_premium, premium_until, sexe, is_visible_to_recruiters, parsed_cv')
           .eq('id', user.id)
           .maybeSingle();
 
       if (response != null) {
-        // Mettre en cache
-        await LocalCache.save(LocalCache.profileKey, response);
+        final profileMap = Map<String, dynamic>.from(response);
+        
+        final parsedCvStr = (response['parsed_cv'] ?? '').toString();
+        // Purge si le profil contient les anciennes données fictives de test
+        if (parsedCvStr.contains('Djossi Tech') || parsedCvStr.contains('Silicon Abidjan')) {
+          await _supabase.from('profiles').update({
+            'parsed_cv': null,
+          }).eq('id', user.id);
+
+          profileMap['parsed_cv'] = null;
+        }
+
+        await LocalCache.save(LocalCache.profileKey, profileMap);
         
         if (mounted) {
           setState(() {
-            _profileData = response;
+            _profileData = profileMap;
             _skills = List<String>.from(response['skills'] ?? []);
             _fullName = response['full_name'];
           });
@@ -172,13 +227,441 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  /// Navigue vers l'écran d'édition et recharge le profil au retour
   Future<void> _navigateToEditProfile() async {
     final result = await context.push('/complete-profile');
     // Si le profil a été modifié, recharger les données
     if (result == true && mounted) {
       _loadProfile(forceRefresh: true);
     }
+  }
+
+  Future<void> _toggleRecruiterVisibility(bool value) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    if (!value) {
+      // Désactivation directe
+      await _updateVisibilityInSupabase(userId, false);
+      return;
+    }
+
+    // 1. Vérifier si un CV existe
+    final cvUrl = (_profileData?['cv_url'] as String?)?.trim();
+    if (cvUrl == null || cvUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Veuillez d\'abord générer ou importer un CV dans l\'onglet "Mon CV".',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // 2. Modale moderne de confirmation (style BottomSheet bleu)
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 28.h),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28.r)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Poignée supérieure (Drag Handle)
+              Container(
+                width: 40.w,
+                height: 4.h,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+              SizedBox(height: 20.h),
+
+              // Badge Icône Bleu Lumineux
+              Container(
+                width: 64.r,
+                height: 64.r,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.35),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.visibility_rounded,
+                  color: Colors.white,
+                  size: 32.r,
+                ),
+              ),
+              SizedBox(height: 18.h),
+
+              // Titre
+              Text(
+                'Visibilité Recruteur',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0F172A),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              SizedBox(height: 12.h),
+
+              // Description
+              Text(
+                'En activant cette option, votre profil et votre parcours professionnel seront rendus visibles auprès des chercheurs de têtes et recruteurs en quête de talents.\n\nVotre CV sera automatiquement synthétisé et préparé pour leur être présenté de manière claire et professionnelle.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13.5.sp,
+                  color: const Color(0xFF475569),
+                  height: 1.45,
+                ),
+              ),
+              SizedBox(height: 24.h),
+
+              // Bouton d'action principal (Bleu arrondi)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(vertical: 14.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16.r),
+                    ),
+                  ),
+                  child: Text(
+                    'Accepter & Synthétiser',
+                    style: TextStyle(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 10.h),
+
+              // Bouton d'annulation
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  'Annuler',
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    color: const Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      await _updateVisibilityInSupabase(userId, false);
+      return;
+    }
+
+    // 3. Modale de chargement & Synthèse du CV en amont
+    _showSynthesisLoadingDialog();
+
+    try {
+      CvModel? cvModel;
+      final existingParsed = _profileData?['parsed_cv'];
+
+      if (existingParsed != null && existingParsed is Map<String, dynamic> && existingParsed.isNotEmpty) {
+        final parsedStr = existingParsed.toString();
+        if (!parsedStr.contains('Djossi Tech') && !parsedStr.contains('Silicon Abidjan')) {
+          try {
+            final parsed = CvModel.fromJson(existingParsed);
+            if (parsed.experiences.isNotEmpty || parsed.educations.isNotEmpty) {
+              cvModel = parsed;
+            }
+          } catch (e) {
+            debugPrint('Erreur lecture parsed_cv existant: $e');
+          }
+        }
+      }
+
+      if (cvModel == null) {
+        final response = await http.get(Uri.parse(cvUrl)).timeout(const Duration(seconds: 20));
+        if (response.statusCode != 200) {
+          throw Exception('Impossible de télécharger le CV (${response.statusCode})');
+        }
+
+        final bytes = response.bodyBytes;
+        final rawText = CvAiImportService.extractTextFromPdf(bytes);
+        cvModel = await CvAiImportService.analyzeWithMistral(rawText);
+      }
+
+      // Sauvegarde dans profiles (parsed_cv) et user_cvs
+      await _supabase.from('profiles').update({
+        'is_visible_to_recruiters': true,
+        'parsed_cv': cvModel.toJson(),
+      }).eq('id', userId);
+
+      try {
+        await _supabase.rpc('save_candidate_parsed_cv', params: {
+          'p_candidate_id': userId,
+          'p_cv_data': cvModel.toJson(),
+          'p_title': cvModel.title.isNotEmpty ? cvModel.title : 'CV Importé',
+        });
+      } catch (e) {
+        debugPrint('Erreur save_candidate_parsed_cv: $e');
+      }
+
+      // Mettre à jour le cache local
+      if (_profileData != null) {
+        final updatedData = Map<String, dynamic>.from(_profileData!);
+        updatedData['is_visible_to_recruiters'] = true;
+        updatedData['parsed_cv'] = cvModel.toJson();
+        await LocalCache.save(LocalCache.profileKey, updatedData);
+      }
+
+      if (mounted) {
+        setState(() {
+          if (_profileData != null) {
+            _profileData!['is_visible_to_recruiters'] = true;
+            _profileData!['parsed_cv'] = cvModel!.toJson();
+          }
+        });
+
+        Navigator.of(context).pop(); // Fermer le loader
+        _showCandidateRecruiterPreview(cvUrl);
+      }
+    } catch (e) {
+      debugPrint('Erreur synthèse en amont du CV: $e');
+      if (mounted) {
+        Navigator.of(context).pop(); // Fermer le loader
+        setState(() {
+          if (_profileData != null) {
+            _profileData!['is_visible_to_recruiters'] = false;
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la préparation de votre profil : $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showSynthesisLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+        content: Padding(
+          padding: EdgeInsets.symmetric(vertical: 20.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: Color(0xFFF97316), strokeWidth: 3),
+              SizedBox(height: 20.h),
+              Text(
+                'Préparation & Synthèse de votre profil...',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+              ),
+              SizedBox(height: 8.h),
+              Text(
+                'Votre CV est en cours de structuration pour être présenté aux recruteurs.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5.sp, color: const Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updateVisibilityInSupabase(String userId, bool value) async {
+    try {
+      await _supabase
+          .from('profiles')
+          .update({'is_visible_to_recruiters': value})
+          .eq('id', userId);
+
+      if (_profileData != null) {
+        final updatedData = Map<String, dynamic>.from(_profileData!);
+        updatedData['is_visible_to_recruiters'] = value;
+        await LocalCache.save(LocalCache.profileKey, updatedData);
+      }
+
+      if (mounted) {
+        setState(() {
+          if (_profileData != null) {
+            _profileData!['is_visible_to_recruiters'] = value;
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              value
+                  ? 'Votre CV est prêt et visible par les recruteurs !'
+                  : 'Votre CV n\'est plus visible par les recruteurs.',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Erreur update visibilité: $e');
+    }
+  }
+
+  void _showCandidateRecruiterPreview(String cvUrl) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.88,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: EdgeInsets.only(top: 12.h, bottom: 8.h),
+                width: 40.w,
+                height: 4.h,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+                child: Row(
+                  children: [
+                    Icon(Icons.visibility_rounded, color: const Color(0xFFF97316), size: 22.r),
+                    SizedBox(width: 8.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Aperçu de votre profil recruteur',
+                            style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                          ),
+                          Text(
+                            'Voici exactement comment votre profil sera présenté aux recruteurs.',
+                            style: TextStyle(fontSize: 12.sp, color: const Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.all(16.r),
+                  child: CandidateCvSwipeCard(
+                    candidateId: _supabase.auth.currentUser?.id,
+                    fullName: _fullName ?? 'Mon Profil',
+                    skills: _skills,
+                    cvUrl: cvUrl,
+                    sexe: _profileData?['sexe'],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(16.r),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48.h,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.of(context).pop();
+                      final userId = _supabase.auth.currentUser?.id;
+                      if (userId != null) {
+                        await _updateVisibilityInSupabase(userId, true);
+                      }
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Row(
+                              children: [
+                                Icon(Icons.check_circle_rounded, color: Colors.white, size: 22.r),
+                                SizedBox(width: 10.w),
+                                Expanded(
+                                  child: Text(
+                                    'Fiche & Parcours enregistrée et visible par les recruteurs !',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5.sp),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            backgroundColor: const Color(0xFF10B981),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+                            margin: EdgeInsets.all(16.r),
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF97316),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
+                    ),
+                    child: Text(
+                      'Parfait, tout est bon !',
+                      style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _signOut() async {
@@ -867,7 +1350,56 @@ class _ProfileScreenState extends State<ProfileScreen>
                             ),
                           )
                         : null,
-                    onTap: () => context.push('/job-alerts'),
+                    onTap: () {
+                      if (!VersionService.featEmailAlerts) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Les alertes emplois par email sont actuellement désactivées.',
+                            ),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                        return;
+                      }
+                      context.push('/job-alerts');
+                    },
+                  ),
+                  AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _isHighlightingVisibility ? _pulseAnimation.value : 1.0,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          decoration: BoxDecoration(
+                            color: _isHighlightingVisibility
+                                ? const Color(0xFF3B82F6).withOpacity(0.12)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(16.r),
+                            border: Border.all(
+                              color: _isHighlightingVisibility
+                                  ? const Color(0xFF3B82F6)
+                                  : Colors.transparent,
+                              width: _isHighlightingVisibility ? 2 : 0,
+                            ),
+                          ),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _buildOptionTile(
+                      icon: Icons.visibility,
+                      title: 'Visible par les recruteurs',
+                      subtitle: 'Permettre aux recruteurs de voir mon CV',
+                      color: Colors.blue,
+                      showArrow: false,
+                      trailing: Switch(
+                        value: _profileData?['is_visible_to_recruiters'] == true,
+                        onChanged: _toggleRecruiterVisibility,
+                        activeColor: const Color(0xFFF97316),
+                      ),
+                    ),
                   ),
                   _buildOptionTile(
                     icon: Icons.chat_bubble_outline_rounded,

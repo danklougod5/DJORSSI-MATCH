@@ -20,11 +20,51 @@ serve(async (req) => {
     const { title, message, target, is_personal } = body;
     console.log(`[DEBUG] Payload: title="${title}", target="${target}", is_personal=${is_personal}`);
 
+    // 0. Vérifier l'authentification et les droits administrateur
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error("Missing Authorization header");
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '').trim();
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    if (authError || !user) {
+      console.error("Authentication failed:", authError?.message);
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // 1. Initialiser le client Supabase Admin
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    );
+
+    const { data: callerProfile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !callerProfile?.is_admin) {
+      console.error(`Forbidden broadcast attempt by user: ${user.id}`);
+      return new Response(JSON.stringify({ error: "Forbidden: Admin privilege required" }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // 2. Récupérer les tokens FCM et les profils
     console.log(`[DEBUG] Récupération des tokens...`);

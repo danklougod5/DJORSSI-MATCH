@@ -1,35 +1,61 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../core/services/cv_quota_service.dart';
-import '../../../core/services/genius_pay_service.dart';
-import '../../../core/services/version_service.dart';
+import 'package:djossimatch/core/services/version_service.dart';
+import 'package:djossimatch/core/services/genius_pay_service.dart';
+import 'package:djossimatch/core/services/cv_quota_service.dart';
 
-/// A bottom sheet paywall for CV creation/modification payments.
-/// Shows the reason (extra CV or modification) and allows 500 F CFA payment.
+/// Modèle local pour les packs de crédits
+class CreditPackItem {
+  final String id;
+  final String name;
+  final int credits;
+  final int priceCfa;
+  final String badge;
+  final bool isRecommended;
+
+  CreditPackItem({
+    required this.id,
+    required this.name,
+    required this.credits,
+    required this.priceCfa,
+    this.badge = '',
+    this.isRecommended = false,
+  });
+
+  factory CreditPackItem.fromJson(Map<String, dynamic> json) {
+    return CreditPackItem(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Pack de Crédits',
+      credits: (json['credits'] ?? 1) as int,
+      priceCfa: (json['price_cfa'] ?? 500) as int,
+      badge: json['badge']?.toString() ?? '',
+      isRecommended: json['is_recommended'] == true,
+    );
+  }
+}
+
 class CvPaywallSheet extends StatefulWidget {
   final PaymentReason reason;
-  final VoidCallback? onPaymentSuccess;
 
   const CvPaywallSheet({
-    Key? key,
+    super.key,
     required this.reason,
-    this.onPaymentSuccess,
-  }) : super(key: key);
+  });
 
   /// Show the paywall bottom sheet. Returns true if payment was successful.
-  /// Si la période d'essai CV est active, le paiement est bypassé automatiquement.
   static Future<bool> show(BuildContext context, PaymentReason reason) async {
-    if (!VersionService.showPremium) {
-      return true;
-    }
-    // Pendant la période d'essai : modifications gratuites, mais les quotas de
-    // création (1 CV freemium / 3 CV premium) restent en vigueur.
+    // Pendant la période d'essai CV : modifications gratuites
     if (VersionService.isCvTrialRunning && reason == PaymentReason.modification) {
       return true;
     }
-    // Pendant la période d'essai IA : adaptations gratuites
+    // Pendant la période d'essai IA : adaptations gratuites (contrôlé par le Toggle Admin)
     if (VersionService.isAiAdaptTrialRunning && reason == PaymentReason.aiAdaptation) {
+      return true;
+    }
+
+    // Pour les autres motifs, si showPremium est inactif, bypasser
+    if (!VersionService.showPremium && reason != PaymentReason.aiAdaptation) {
       return true;
     }
 
@@ -57,6 +83,11 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
   Timer? _verificationTimer;
   int _verificationAttempts = 0;
 
+  // Packs de crédits pour l'adaptation IA
+  List<CreditPackItem> _creditPacks = [];
+  CreditPackItem? _selectedPack;
+  bool _isLoadingPacks = false;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +95,10 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat();
+
+    if (widget.reason == PaymentReason.aiAdaptation) {
+      _fetchCreditPacks();
+    }
   }
 
   @override
@@ -73,6 +108,72 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
     super.dispose();
   }
 
+  Future<void> _fetchCreditPacks() async {
+    setState(() => _isLoadingPacks = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('credit_packs')
+          .select()
+          .eq('is_active', true)
+          .order('display_order', ascending: true);
+
+      if ((response as List).isNotEmpty) {
+        final loaded = (response as List)
+            .map((row) => CreditPackItem.fromJson(row as Map<String, dynamic>))
+            .toList();
+
+        setState(() {
+          _creditPacks = loaded;
+          _selectedPack = loaded.firstWhere(
+            (p) => p.isRecommended,
+            orElse: () => loaded.first,
+          );
+        });
+      } else {
+        _useDefaultPacks();
+      }
+    } catch (e) {
+      debugPrint('Error fetching credit packs: $e');
+      _useDefaultPacks();
+    } finally {
+      if (mounted) setState(() => _isLoadingPacks = false);
+    }
+  }
+
+  void _useDefaultPacks() {
+    final defaults = [
+      CreditPackItem(
+        id: 'pack_testeur',
+        name: 'Pack Testeur',
+        credits: 3,
+        priceCfa: 500,
+        badge: 'Pour postuler sur un coup de cœur',
+        isRecommended: false,
+      ),
+      CreditPackItem(
+        id: 'pack_booster',
+        name: 'Pack Booster',
+        credits: 10,
+        priceCfa: 1500,
+        badge: 'Meilleure valeur',
+        isRecommended: true,
+      ),
+      CreditPackItem(
+        id: 'pack_commando',
+        name: 'Pack Commando',
+        credits: 25,
+        priceCfa: 3000,
+        badge: 'Pour candidats très actifs',
+        isRecommended: false,
+      ),
+    ];
+    setState(() {
+      _creditPacks = defaults;
+      _selectedPack = defaults[1]; // Booster par défaut
+    });
+  }
+
   String get _title {
     switch (widget.reason) {
       case PaymentReason.extraCv:
@@ -80,7 +181,7 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
       case PaymentReason.modification:
         return 'Modification de CV';
       case PaymentReason.aiAdaptation:
-        return 'Adaptation IA épuisée';
+        return 'Packs de Crédits Adaptation IA';
       default:
         return 'Paiement requis';
     }
@@ -94,9 +195,7 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
       case PaymentReason.modification:
         return 'La modification de vos CV existants nécessite un paiement unique de ${VersionService.extraCvPriceCfa} F CFA par modification.';
       case PaymentReason.aiAdaptation:
-        return 'Vous avez utilisé vos ${VersionService.aiAdaptFreeLimit} adaptations IA gratuites ce mois-ci. '
-            'Chaque adaptation supplémentaire coûte ${VersionService.aiAdaptPrice} F CFA, '
-            'ou passez en Premium pour des adaptations illimitées !';
+        return 'Rechargez des crédits pour adapter votre CV à chaque offre d\'emploi avec l\'IA.';
       default:
         return '';
     }
@@ -113,6 +212,13 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
       default:
         return Icons.lock_outline_rounded;
     }
+  }
+
+  int get _amountToPay {
+    if (widget.reason == PaymentReason.aiAdaptation && _selectedPack != null) {
+      return _selectedPack!.priceCfa;
+    }
+    return VersionService.extraCvPriceCfa;
   }
 
   Future<void> _initiatePayment() async {
@@ -143,19 +249,21 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
       final String description = widget.reason == PaymentReason.extraCv
           ? "Déblocage d'un CV supplémentaire"
           : widget.reason == PaymentReason.aiAdaptation
-              ? "Adaptation IA de CV"
+              ? "Achat ${_selectedPack?.name ?? 'Pack Crédits Adaptation IA'}"
               : "Modification de CV existant";
-          
+
       final Map<String, dynamic> metadata = {
-        "type": widget.reason == PaymentReason.extraCv 
-            ? "extra_cv" 
+        "type": widget.reason == PaymentReason.extraCv
+            ? "extra_cv"
             : widget.reason == PaymentReason.aiAdaptation
-                ? "ai_adaptation"
-                : "modification"
+                ? "ai_adaptation_pack"
+                : "modification",
+        "pack_id": _selectedPack?.id,
+        "credits": _selectedPack?.credits,
       };
 
       final initResult = await GeniusPayService.initiatePayment(
-        amount: CvQuotaService.extraCvPrice,
+        amount: _amountToPay.toDouble(),
         phone: phone.toString(),
         email: user.email ?? '',
         name: name.toString(),
@@ -173,7 +281,6 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
         _isVerifying = true;
       });
 
-      // Start verifying payment status
       _startPaymentVerification();
     } catch (e) {
       if (!mounted) return;
@@ -189,12 +296,13 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
     _verificationTimer?.cancel();
     _verificationTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       _verificationAttempts++;
-      if (_verificationAttempts > 20) { // Max 1 minute of polling (20 * 3s = 60s)
+      if (_verificationAttempts > 20) {
         timer.cancel();
         if (mounted) {
           setState(() {
             _isVerifying = false;
-            _error = "La validation prend du temps. Cliquez sur 'Vérifier le paiement' manuellement.";
+            _error =
+                "La validation prend du temps. Cliquez sur 'Vérifier le paiement' manuellement.";
           });
         }
       } else {
@@ -215,7 +323,7 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
 
     try {
       final supabase = Supabase.instance.client;
-      
+
       final response = await supabase
           .from('payments')
           .select('status')
@@ -227,13 +335,45 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
       if (status == 'SUCCESS') {
         _verificationTimer?.cancel();
 
+        // Si c'est un achat de pack de crédits IA, ajouter les crédits au profil
+        if (widget.reason == PaymentReason.aiAdaptation && _selectedPack != null) {
+          try {
+            final user = supabase.auth.currentUser;
+            if (user != null) {
+              final profile = await supabase
+                  .from('profiles')
+                  .select('ai_adapt_extra_purchased')
+                  .eq('id', user.id)
+                  .maybeSingle();
+
+              final currentExtra = (profile?['ai_adapt_extra_purchased'] ?? 0) as int;
+              final newExtra = currentExtra + _selectedPack!.credits;
+
+              await supabase
+                  .from('profiles')
+                  .update({'ai_adapt_extra_purchased': newExtra})
+                  .eq('id', user.id);
+
+              debugPrint(
+                'CvPaywallSheet: ${_selectedPack!.credits} crédits ajoutés avec succès (Total: $newExtra)',
+              );
+            }
+          } catch (creditErr) {
+            debugPrint('CvPaywallSheet: Erreur ajout crédits: $creditErr');
+          }
+        }
+
         if (!mounted) return;
 
         Navigator.pop(context, true);
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Paiement confirmé ! Vous pouvez continuer.'),
+          SnackBar(
+            content: Text(
+              widget.reason == PaymentReason.aiAdaptation
+                  ? '${_selectedPack?.credits ?? ''} crédits d\'adaptation IA ajoutés avec succès !'
+                  : 'Paiement confirmé ! Vous pouvez continuer.',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -246,11 +386,11 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
           });
         }
       } else {
-        // Still PENDING
         if (!automatic && mounted) {
           setState(() {
             _isVerifying = false;
-            _error = 'Paiement en attente. Veuillez finaliser la transaction sur le site et réessayer.';
+            _error =
+                'Paiement en attente. Veuillez finaliser la transaction sur le site et réessayer.';
           });
         }
       }
@@ -266,6 +406,8 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
 
   @override
   Widget build(BuildContext context) {
+    final isAiAdaptation = widget.reason == PaymentReason.aiAdaptation;
+
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       decoration: BoxDecoration(
@@ -294,13 +436,13 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
           ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             child: Column(
               children: [
-                // Icon with gradient background
+                // Top Icon
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 64,
+                  height: 64,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
@@ -316,113 +458,222 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
                       ),
                     ],
                   ),
-                  child: Icon(_icon, color: Colors.white, size: 32),
+                  child: Icon(_icon, color: Colors.white, size: 28),
                 ),
-
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
                 // Title
                 Text(
                   _title,
                   style: const TextStyle(
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF0F172A),
                     letterSpacing: -0.3,
                   ),
                 ),
-
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
 
                 // Description
                 Text(
                   _description,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     color: Colors.grey.shade600,
-                    height: 1.5,
+                    height: 1.4,
                   ),
                 ),
+                const SizedBox(height: 18),
 
-                const SizedBox(height: 24),
-
-                // Price card
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFFF97316).withOpacity(0.08),
-                        const Color(0xFFF97316).withOpacity(0.03),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFF97316).withOpacity(0.2),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        VersionService.extraCvPriceCfa.toString(),
-                        style: const TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFFF97316),
-                          letterSpacing: -1,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'F CFA',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFFF97316),
+                // AI Adaptation: Render the 3 Credit Packs selector
+                if (isAiAdaptation) ...[
+                  if (_isLoadingPacks)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: CircularProgressIndicator(color: Color(0xFFF97316)),
+                    )
+                  else
+                    Column(
+                      children: _creditPacks.map((pack) {
+                        final isSelected = _selectedPack?.id == pack.id;
+                        return GestureDetector(
+                          onTap: () => setState(() => _selectedPack = pack),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? const Color(0xFFFFF7ED)
+                                  : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isSelected
+                                    ? const Color(0xFFF97316)
+                                    : const Color(0xFFE2E8F0),
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Radio<String>(
+                                  value: pack.id,
+                                  groupValue: _selectedPack?.id,
+                                  activeColor: const Color(0xFFF97316),
+                                  onChanged: (_) {
+                                    setState(() => _selectedPack = pack);
+                                  },
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Wrap(
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        children: [
+                                          Text(
+                                            pack.name,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                              color: isSelected
+                                                  ? const Color(0xFF9A3412)
+                                                  : const Color(0xFF0F172A),
+                                            ),
+                                          ),
+                                          if (pack.badge.isNotEmpty)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: pack.isRecommended
+                                                    ? const Color(0xFFF97316)
+                                                    : const Color(0xFFE2E8F0),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                pack.badge,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: pack.isRecommended
+                                                      ? Colors.white
+                                                      : const Color(0xFF475569),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${pack.credits} adaptations IA',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade600,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '${pack.priceCfa} F CFA',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFF97316),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          Text(
-                            'Paiement unique',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
+                        );
+                      }).toList(),
+                    ),
+                ] else ...[
+                  // Single Item Price Card (Extra CV / Modification)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 18,
+                      horizontal: 20,
+                    ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFFF97316).withOpacity(0.08),
+                          const Color(0xFFF97316).withOpacity(0.03),
                         ],
                       ),
-                    ],
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFF97316).withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          VersionService.extraCvPriceCfa.toString(),
+                          style: const TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFFF97316),
+                            letterSpacing: -1,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'F CFA',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFF97316),
+                              ),
+                            ),
+                            Text(
+                              'Paiement unique',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Features
-                _buildFeature(
-                  icon: Icons.flash_on_rounded,
-                  text: widget.reason == PaymentReason.extraCv
-                      ? 'Emplacement débloqué immédiatement'
-                      : 'Modification illimitée pour ce CV',
-                ),
-                const SizedBox(height: 8),
-                _buildFeature(
-                  icon: Icons.verified_outlined,
-                  text: 'Paiement sécurisé via Mobile Money',
-                ),
-                const SizedBox(height: 8),
-                _buildFeature(
-                  icon: Icons.star_outline_rounded,
-                  text: 'Passez en Premium pour plus d\'avantages',
-                ),
+                  const SizedBox(height: 14),
+                  _buildFeature(
+                    icon: Icons.flash_on_rounded,
+                    text: widget.reason == PaymentReason.extraCv
+                        ? 'Emplacement débloqué immédiatement'
+                        : 'Modification illimitée pour ce CV',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildFeature(
+                    icon: Icons.verified_outlined,
+                    text: 'Paiement sécurisé via Mobile Money',
+                  ),
+                ],
 
                 if (_error != null) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -448,7 +699,7 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
                   ),
                 ],
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 18),
 
                 // Payment button
                 if (_isVerifying)
@@ -456,7 +707,7 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
                 else
                   SizedBox(
                     width: double.infinity,
-                    height: 54,
+                    height: 52,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _initiatePayment,
                       style: ElevatedButton.styleFrom(
@@ -484,9 +735,11 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
                                 const Icon(Icons.payment_rounded, size: 20),
                                 const SizedBox(width: 10),
                                 Text(
-                                  'Payer ${VersionService.extraCvPriceCfa} F CFA',
+                                  isAiAdaptation
+                                      ? 'Acheter le ${_selectedPack?.name ?? 'Pack'} (${_amountToPay} F CFA)'
+                                      : 'Payer ${VersionService.extraCvPriceCfa} F CFA',
                                   style: const TextStyle(
-                                    fontSize: 16,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -495,7 +748,7 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
                     ),
                   ),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Cancel button
                 TextButton(
@@ -522,7 +775,7 @@ class _CvPaywallSheetState extends State<CvPaywallSheet>
       children: [
         SizedBox(
           width: double.infinity,
-          height: 54,
+          height: 52,
           child: OutlinedButton.icon(
             onPressed: _verifyPayment,
             icon: const SizedBox(

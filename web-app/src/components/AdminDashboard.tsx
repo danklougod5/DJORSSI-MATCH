@@ -15,9 +15,12 @@ import {
   FileText,
   CheckSquare,
   Megaphone,
-  UserX
+  UserX,
+  Building2,
+  Smartphone
 } from 'lucide-react';
 import { supabase, fetchProfilesInBatches } from '../lib/supabase';
+import { isJobExpired } from '../lib/dateUtils';
 
 import UserEditModal from './admin/UserEditModal';
 import JobEditModal from './admin/JobEditModal';
@@ -35,6 +38,9 @@ import CvTrialTab from './admin/CvTrialTab';
 import SupportTab from './admin/SupportTab';
 import AnnouncementsTab from './admin/AnnouncementsTab';
 import DeleteFeedbackTab from './admin/DeleteFeedbackTab';
+import ChatModerationTab from './admin/ChatModerationTab';
+import VersionControlTab from './admin/VersionControlTab';
+import CompaniesTab from './admin/CompaniesTab';
 
 const cleanPhone = (phone: any): string => {
   if (!phone) return "";
@@ -47,10 +53,37 @@ const cleanPhone = (phone: any): string => {
   return cleaned;
 };
 
+const getDefaultJobDeadline = (createdAt: Date = new Date()): string => {
+  const fallback = new Date(createdAt);
+  fallback.setDate(fallback.getDate() + 21);
+  return fallback.toISOString().split('T')[0];
+};
+
 const COLORS = ['#FF8200', '#009A44', '#F43F5E', '#7C3AED'];
+type AdminTab =
+  | 'overview'
+  | 'users'
+  | 'companies'
+  | 'chats'
+  | 'job-approval'
+  | 'add-jobs'
+  | 'all-jobs'
+  | 'settings'
+  | 'job-metrics'
+  | 'notifications'
+  | 'reports'
+  | 'swipes'
+  | 'cv-trial'
+  | 'support'
+  | 'announcements'
+  | 'delete-feedback'
+  | 'app-version';
+
+type DashboardSectionTarget = 'ai-adapt-stats' | 'visible-recruiters' | null;
 
 const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'job-approval' | 'add-jobs' | 'all-jobs' | 'settings' | 'job-metrics' | 'notifications' | 'reports' | 'swipes' | 'cv-trial' | 'support' | 'announcements' | 'delete-feedback'>('overview');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [dashboardSectionTarget, setDashboardSectionTarget] = useState<DashboardSectionTarget>(null);
   const [stats, setStats] = useState({
     totalUsers: 0,
     premiumUsers: 0,
@@ -59,6 +92,9 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     maleUsers: 0,
     femaleUsers: 0,
     iosWaitlist: 0,
+    cvAdapterUsers: 0,
+    adaptedCvsCount: 0,
+    visibleRecruiters: 0,
     jobSectors: [] as any[],
     contractTypes: [] as any[]
   });
@@ -132,6 +168,24 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         .select('id', { count: 'exact', head: true })
         .eq('is_approved', false);
 
+      // Candidates visible to recruiters
+      const { count: visibleRecruitersCount } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_visible_to_recruiters', true);
+
+      // Users who used AI CV Adaptation
+      const { count: cvAdapterUsersCount } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .or('ai_adapt_monthly_count.gt.0,ai_adapt_extra_purchased.gt.0');
+
+      // Total adapted CVs in user_cvs
+      const { count: adaptedCvsCount } = await supabase
+        .from('user_cvs')
+        .select('id', { count: 'exact', head: true })
+        .ilike('title', '%Adapté%');
+
       setStats(prev => ({
         ...prev,
         totalUsers: usersCount || 0,
@@ -140,14 +194,17 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         maleUsers: maleCount || 0,
         femaleUsers: femaleCount || 0,
         iosWaitlist: iosWaitlistCount || 0,
-        pendingApprovals: pendingJobsCount || 0
+        pendingApprovals: pendingJobsCount || 0,
+        visibleRecruiters: visibleRecruitersCount || 0,
+        cvAdapterUsers: cvAdapterUsersCount || 0,
+        adaptedCvsCount: adaptedCvsCount || 0,
       }));
 
       let userData: any[] | null = null;
       if (activeTab === 'overview') {
         const { data } = await supabase
           .from('profiles')
-          .select('id, full_name, is_premium, premium_until, created_at, phone_number, skills, extra_cvs_purchased')
+          .select('id, full_name, is_premium, premium_until, created_at, phone_number, skills, extra_cvs_purchased, is_visible_to_recruiters, is_recruiter')
           .order('is_premium', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(500);
@@ -162,7 +219,9 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
             date: new Date(u.created_at).toLocaleDateString(),
             phone: u.phone_number || '-',
             sector: Array.isArray(u.skills) ? u.skills.join(', ') : (u.skills || '-'),
-            extraCvsPurchased: u.extra_cvs_purchased || 0
+            extraCvsPurchased: u.extra_cvs_purchased || 0,
+            isVisibleToRecruiters: u.is_visible_to_recruiters === true,
+            isRecruiter: u.is_recruiter === true,
           })));
         }
       }
@@ -221,7 +280,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     try {
       let query = supabase
         .from('profiles')
-        .select('id, full_name, is_premium, premium_until, created_at, phone_number, skills, extra_cvs_purchased, ai_adapt_extra_purchased');
+        .select('id, full_name, is_premium, premium_until, created_at, phone_number, skills, extra_cvs_purchased, ai_adapt_extra_purchased, is_blocked, is_visible_to_recruiters, is_recruiter');
 
       if (filter === 'premium') {
         query = query.eq('is_premium', true);
@@ -254,15 +313,43 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           name: u.full_name || 'Anonyme',
           premium: u.is_premium,
           premiumUntil: u.premium_until,
+          isBlocked: u.is_blocked === true,
           date: new Date(u.created_at).toLocaleDateString(),
           phone: u.phone_number || '-',
           sector: Array.isArray(u.skills) ? u.skills.join(', ') : (u.skills || '-'),
           extraCvsPurchased: u.extra_cvs_purchased || 0,
-          aiAdaptExtraPurchased: u.ai_adapt_extra_purchased || 0
+          aiAdaptExtraPurchased: u.ai_adapt_extra_purchased || 0,
+          isVisibleToRecruiters: u.is_visible_to_recruiters === true,
+          isRecruiter: u.is_recruiter === true,
         })));
       }
     } catch (error) {
       console.error('Error fetching users:', error);
+    }
+  };
+
+  const handleToggleBlockUser = async (userId: string, currentBlocked: boolean) => {
+    try {
+      const newBlocked = !currentBlocked;
+      setRecentUsersList(prev => prev.map(u => u.id === userId ? { ...u, isBlocked: newBlocked } : u));
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_blocked: newBlocked })
+        .eq('id', userId);
+
+      if (error) {
+        setRecentUsersList(prev => prev.map(u => u.id === userId ? { ...u, isBlocked: currentBlocked } : u));
+        alert("Erreur de blocage : " + error.message);
+        throw error;
+      }
+
+      fetchStats();
+      if (activeTab === 'users') {
+        fetchUsers(searchTerm, statusFilter);
+      }
+    } catch (err) {
+      console.error("Error toggling block:", err);
     }
   };
 
@@ -290,12 +377,13 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
     };
 
     const rawUrl = item.urls && typeof item.urls === 'string' && item.urls.trim() !== '' ? item.urls.trim() : null;
+    const createdAt = new Date();
 
     const jobData = {
       job_title: item.title || "Sans titre",
       company_name: item.company_name || "Non précisé",
       description: item.summary || "",
-      deadline: item.deadline || null,
+      deadline: item.deadline || getDefaultJobDeadline(createdAt),
       required_level: item.niveau || null,
       location: item.lieu || "Côte d'Ivoire",
       source_url: rawUrl || `manual_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
@@ -309,7 +397,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
       requires_cover_letter: !!item.lettre_motivation && String(item.lettre_motivation).toUpperCase() !== "NON",
       cover_letter_instructions: item.lettre_motivation || null,
       salary_range: item.salary_range || null,
-      created_at: new Date().toISOString(),
+      created_at: createdAt.toISOString(),
       raw_data: item
     };
 
@@ -443,6 +531,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           details,
           created_at,
           user_id,
+          reported_user_id,
           jobs:job_id(id, job_title, company_name, location)
         `)
         .order('created_at', { ascending: false });
@@ -454,27 +543,32 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         return;
       }
 
-      const userIds = Array.from(new Set(reportsData.map((r: any) => r.user_id).filter(Boolean))) as string[];
-      const profilesMap: Record<string, string> = {};
+      const userIds = Array.from(
+        new Set([
+          ...reportsData.map((r: any) => r.user_id),
+          ...reportsData.map((r: any) => r.reported_user_id),
+        ].filter(Boolean))
+      ) as string[];
+
+      const profilesMap: Record<string, any> = {};
 
       if (userIds.length > 0) {
         const { data: profilesData, error: profilesError } = await fetchProfilesInBatches(
           userIds,
-          'id, full_name'
+          'id, full_name, company_name, phone_number, is_blocked, is_recruiter'
         );
 
         if (!profilesError && profilesData) {
           profilesData.forEach((p: any) => {
-            if (p.full_name) {
-              profilesMap[p.id] = p.full_name;
-            }
+            profilesMap[p.id] = p;
           });
         }
       }
 
       const combined = reportsData.map((r: any) => ({
         ...r,
-        profiles: r.user_id && profilesMap[r.user_id] ? { full_name: profilesMap[r.user_id] } : null
+        profiles: r.user_id && profilesMap[r.user_id] ? { full_name: profilesMap[r.user_id].full_name } : null,
+        reported_profile: r.reported_user_id && profilesMap[r.reported_user_id] ? profilesMap[r.reported_user_id] : null,
       }));
 
       setReportsList(combined);
@@ -553,27 +647,9 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   };
 
   const handleCleanupExpiredJobs = async () => {
-    const parseLocalDate = (dateStr: string) => {
-      if (!dateStr || typeof dateStr !== 'string') return null;
-      const parts = dateStr.split('/');
-      if (parts.length === 3) {
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const year = parseInt(parts[2], 10);
-        const d = new Date(year, month, day);
-        if (!isNaN(d.getTime())) return d;
-      }
-      let d = new Date(dateStr);
-      if (!isNaN(d.getTime())) return d;
-      return null;
-    };
-
     const now = new Date();
     const expiredIds = jobsList
-      .filter(job => {
-        const d = parseLocalDate(job.deadline);
-        return d && d < now;
-      })
+      .filter(job => isJobExpired(job, now))
       .map(j => j.id);
 
     if (expiredIds.length === 0) {
@@ -704,13 +780,14 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
 
       const formattedJobs = jobsToAdd.map((item, index) => {
         const rawUrl = item.urls && typeof item.urls === 'string' && item.urls.trim() !== '' ? item.urls.trim() : null;
+        const createdAt = new Date();
         return {
           job_title: item.title || item.job_title || "Sans titre",
           company_name: item.company_name || "Non précisé",
           location: item.lieu || item.location || "Côte d'Ivoire",
           description: item.summary || item.description || "",
           tags: Array.isArray(item.tags) ? item.tags : (typeof item.tags === 'string' ? item.tags.split(',').map((s: any) => s.trim()) : []),
-          deadline: item.deadline || null,
+          deadline: item.deadline || getDefaultJobDeadline(createdAt),
           whatsapp_number: cleanPhone(item.contact || item.whatsapp_number),
           contact_email: item.email || item.contact_email || null,
           application_instructions: item.objet || item.application_instructions || null,
@@ -723,7 +800,7 @@ const AdminDashboard: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           is_ai_verified: true,
           is_approved: true,
           source_url: rawUrl || `bulk_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 8)}`,
-          created_at: new Date().toISOString(),
+          created_at: createdAt.toISOString(),
           raw_data: item
         };
       });
@@ -993,61 +1070,75 @@ reader.readAsText(file);
   };
 
   const navItems = [
-    { id: 'overview', label: 'Vue d\'ensemble', icon: <TrendingUp size={20} /> },
-    { id: 'users', label: 'Utilisateurs', icon: <Users size={20} /> },
-    { id: 'all-jobs', label: 'Base des Offres', icon: <Briefcase size={20} /> },
-    { id: 'job-metrics', label: 'Métriques Offres', icon: <BarChart3 size={20} /> },
-    { id: 'add-jobs', label: 'Ajout d\'Annonces', icon: <Plus size={20} /> },
-    { id: 'reports', label: 'Signalements', icon: <ShieldAlert size={20} /> },
-    { id: 'notifications', label: 'Notifications', icon: <Bell size={20} /> },
-    { id: 'announcements', label: 'Annonces de l\'App', icon: <Megaphone size={20} /> },
-    { id: 'swipes', label: 'Swipes', icon: <Hand size={20} /> },
-    { id: 'cv-trial', label: 'CV Essai', icon: <FileText size={20} /> },
-    { id: 'support', label: 'Suggestions & Q&A', icon: <MessageSquare size={20} /> },
-    { id: 'delete-feedback', label: 'Désinscriptions', icon: <UserX size={20} /> },
-    { id: 'job-approval', label: 'Approbations', icon: <CheckSquare size={20} /> },
-    { id: 'settings', label: 'Sécurité', icon: <Settings size={20} /> },
+    { id: 'overview', label: 'Vue d\'ensemble', icon: <TrendingUp size={18} /> },
+    { id: 'users', label: 'Candidats / Utilisateurs', icon: <Users size={18} /> },
+    { id: 'companies', label: 'Entreprises Recruteuses', icon: <Building2 size={18} /> },
+    { id: 'chats', label: 'Messagerie & Modération', icon: <MessageSquare size={18} /> },
+    { id: 'all-jobs', label: 'Base des Offres', icon: <Briefcase size={18} /> },
+    { id: 'job-metrics', label: 'Métriques Offres', icon: <BarChart3 size={18} /> },
+    { id: 'add-jobs', label: 'Ajout d\'Annonces', icon: <Plus size={18} /> },
+    { id: 'reports', label: 'Signalements', icon: <ShieldAlert size={18} /> },
+    { id: 'notifications', label: 'Notifications', icon: <Bell size={18} /> },
+    { id: 'announcements', label: 'Annonces de l\'App', icon: <Megaphone size={18} /> },
+    { id: 'swipes', label: 'Swipes', icon: <Hand size={18} /> },
+    { id: 'cv-trial', label: 'CV Essai', icon: <FileText size={18} /> },
+    { id: 'app-version', label: 'Version & Maintenance', icon: <Smartphone size={18} /> },
+    { id: 'support', label: 'Suggestions & Q&A', icon: <MessageSquare size={18} /> },
+    { id: 'delete-feedback', label: 'Désinscriptions', icon: <UserX size={18} /> },
+    { id: 'job-approval', label: 'Approbations', icon: <CheckSquare size={18} /> },
+    { id: 'settings', label: 'Sécurité', icon: <Settings size={18} /> },
   ];
+
+  const navigateToDashboardSection = (
+    tab: AdminTab,
+    section?: DashboardSectionTarget,
+  ) => {
+    setActiveTab(tab);
+    setDashboardSectionTarget(section || null);
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
       {/* Sidebar navigation remained as is for structure */}
       <aside className="w-72 bg-white border-r border-slate-200 flex flex-col shadow-sm z-20 overflow-y-auto">
-        <div className="p-8">
-           <div className="flex items-center gap-3 mb-10">
-              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-primary/20">D</div>
-              <h1 className="text-xl font-black tracking-tighter">DJORSSI <span className="text-primary italic">ADMIN</span></h1>
+        <div className="p-5">
+           <div className="flex items-center gap-3 mb-8 px-2">
+              <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg shadow-primary/20">D</div>
+              <h1 className="text-lg font-black tracking-tighter">DJORSSI <span className="text-primary italic">ADMIN</span></h1>
            </div>
            
            <nav className="space-y-1">
              {navItems.map(item => (
                <button
                  key={item.id}
-                 onClick={() => setActiveTab(item.id as any)}
-                 className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-bold transition-all group ${
+                 onClick={() => {
+                   setActiveTab(item.id as AdminTab);
+                   setDashboardSectionTarget(null);
+                 }}
+                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all group whitespace-nowrap ${
                    activeTab === item.id 
-                    ? 'bg-primary text-white shadow-md shadow-primary/20 scale-[1.02]' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                    ? 'bg-primary text-white shadow-md shadow-primary/20 scale-[1.01]' 
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                  }`}
                >
-                 <span className={`${activeTab === item.id ? 'text-white' : 'text-slate-400 group-hover:text-primary transition-colors'}`}>
+                 <span className={`shrink-0 flex items-center justify-center ${activeTab === item.id ? 'text-white' : 'text-slate-400 group-hover:text-primary transition-colors'}`}>
                     {item.icon}
                  </span>
-                 {item.label}
-                 {activeTab === item.id && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                 <span className="truncate">{item.label}</span>
+                 {activeTab === item.id && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />}
                </button>
              ))}
            </nav>
         </div>
 
-        <div className="mt-auto p-8 pt-0">
+        <div className="mt-auto p-5 pt-0">
            <button 
              type="button"
              onClick={onLogout}
-             className="w-full flex items-center gap-4 px-4 py-3.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 transition-all group"
+             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-all group"
            >
-             <LogOut size={20} className="group-hover:rotate-12 transition-transform" />
-             Déconnexion
+             <LogOut size={18} className="group-hover:rotate-12 transition-transform shrink-0" />
+             <span className="truncate">Déconnexion</span>
            </button>
         </div>
       </aside>
@@ -1138,6 +1229,7 @@ reader.readAsText(file);
             topSectors={topSectors}
             COLORS={COLORS} 
             setActiveTab={setActiveTab} 
+            onNavigateToDashboardSection={navigateToDashboardSection}
             onMakeMePremium={handleMakeMePremium}
             onMakeAllPremium={handleMakeAllPremium}
             onRevokeCampaignPremium={handleRevokeCampaignPremium}
@@ -1154,8 +1246,26 @@ reader.readAsText(file);
             setStatusFilter={setStatusFilter}
             recentUsersList={recentUsersList}
             handleTogglePremium={handleTogglePremium}
+            handleToggleBlockUser={handleToggleBlockUser}
             handleDeleteProfile={handleDeleteProfile}
             setEditingUser={setEditingUser}
+            focusSection={dashboardSectionTarget === 'visible-recruiters' ? dashboardSectionTarget : null}
+            onFocusHandled={() => setDashboardSectionTarget(null)}
+          />
+        )}
+
+        {activeTab === 'companies' && (
+          <CompaniesTab
+            onTogglePremium={handleTogglePremium}
+            onToggleBlockUser={handleToggleBlockUser}
+            onDeleteProfile={handleDeleteProfile}
+            onEditUser={setEditingUser}
+          />
+        )}
+
+        {activeTab === 'chats' && (
+          <ChatModerationTab 
+            onToggleBlockUser={handleToggleBlockUser}
           />
         )}
 
@@ -1204,12 +1314,19 @@ reader.readAsText(file);
             isLoading={isLoading}
             handleDeleteJob={handleDeleteJob}
             handleDismissReport={handleDismissReport}
+            handleToggleBlockUser={handleToggleBlockUser}
             fetchReports={fetchReports}
           />
         )}
         {activeTab === 'notifications' && <NotificationsTab />}
         {activeTab === 'swipes' && <SwipesTab />}
-        {activeTab === 'cv-trial' && <CvTrialTab />}
+        {activeTab === 'cv-trial' && (
+          <CvTrialTab
+            focusSection={dashboardSectionTarget === 'ai-adapt-stats' ? dashboardSectionTarget : null}
+            onFocusHandled={() => setDashboardSectionTarget(null)}
+          />
+        )}
+        {activeTab === 'app-version' && <VersionControlTab />}
         {activeTab === 'support' && <SupportTab />}
         {activeTab === 'announcements' && <AnnouncementsTab />}
         {activeTab === 'delete-feedback' && <DeleteFeedbackTab />}

@@ -158,9 +158,10 @@ class _MatchesScreenState extends State<MatchesScreen> {
       }
 
       final response = await _supabase
-          .from('applications')
-          .select('id, status, created_at, user_id, job_id, jobs(id, company_name, job_title, whatsapp_number, contact_email, application_link, salary_range, location, description, experience, required_level, requires_cover_letter, cover_letter_instructions)')
+          .from('swipes_log')
+          .select('id, created_at, user_id, job_id, jobs(id, company_name, job_title, whatsapp_number, contact_email, application_link, salary_range, location, description, experience, required_level, requires_cover_letter, cover_letter_instructions)')
           .eq('user_id', userId)
+          .eq('direction', 'right')
           .order('created_at', ascending: false);
 
       final matchesList = List<Map<String, dynamic>>.from(response);
@@ -295,8 +296,9 @@ class _MatchesScreenState extends State<MatchesScreen> {
                       itemBuilder: (context, index) {
                         final match = filtered[index];
 
-                        // Limit to 3 matches if Freemium
-                        final isLocked = !_isPremium && index >= 3 && VersionService.showPremium;
+                        // Limit to 3 matches if Freemium or if featUnlockedHistory is disabled
+                        final isUnlocked = _isPremium && VersionService.featUnlockedHistory;
+                        final isLocked = !isUnlocked && index >= 3 && VersionService.showPremium;
                         return _buildMatchCard(match, isLocked: isLocked);
                       },
                     ),

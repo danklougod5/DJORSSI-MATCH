@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupportQnaScreen extends StatefulWidget {
@@ -64,7 +66,7 @@ class _SupportQnaScreenState extends State<SupportQnaScreen> with SingleTickerPr
     }
   }
 
-  Future<void> _submitMessage(String type, String content) async {
+  Future<void> _submitMessage(String type, String content, {String? imageUrl}) async {
     final user = _supabase.auth.currentUser;
     if (user == null || content.trim().isEmpty) return;
 
@@ -73,6 +75,7 @@ class _SupportQnaScreenState extends State<SupportQnaScreen> with SingleTickerPr
         'user_id': user.id,
         'message_type': type,
         'content': content.trim(),
+        if (imageUrl != null) 'image_url': imageUrl,
       });
 
       if (mounted) {
@@ -104,6 +107,8 @@ class _SupportQnaScreenState extends State<SupportQnaScreen> with SingleTickerPr
   void _showNewMessageDialog() {
     final textController = TextEditingController();
     String selectedType = 'question';
+    XFile? selectedImage;
+    bool isUploading = false;
 
     showModalBottomSheet(
       context: context,
@@ -258,6 +263,98 @@ class _SupportQnaScreenState extends State<SupportQnaScreen> with SingleTickerPr
                       ),
                     ),
                   ),
+                  SizedBox(height: 16.h),
+                  // Image Selection
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Capture d\'écran (Optionnel)',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF334155),
+                        ),
+                      ),
+                      if (selectedImage == null)
+                        TextButton.icon(
+                          onPressed: () async {
+                            try {
+                              final picker = ImagePicker();
+                              final XFile? pickedFile = await picker.pickImage(
+                                source: ImageSource.gallery,
+                                maxWidth: 1200,
+                                maxHeight: 1200,
+                                imageQuality: 85,
+                              );
+                              if (pickedFile != null) {
+                                setModalState(() {
+                                  selectedImage = pickedFile;
+                                });
+                              }
+                            } catch (e) {
+                              debugPrint('Error picking image: $e');
+                            }
+                          },
+                          icon: const Icon(Icons.add_photo_alternate, color: Color(0xFFF97316), size: 20),
+                          label: Text(
+                            'Ajouter',
+                            style: TextStyle(
+                              color: const Color(0xFFF97316),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.sp,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  SizedBox(height: 8.h),
+                  if (selectedImage != null)
+                    Container(
+                      height: 100.h,
+                      width: 100.w,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(11.r),
+                            child: Image.file(
+                              File(selectedImage!.path),
+                              width: 100.w,
+                              height: 100.h,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: -8,
+                            right: -8,
+                            child: GestureDetector(
+                              onTap: () {
+                                setModalState(() {
+                                  selectedImage = null;
+                                });
+                              },
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                padding: const EdgeInsets.all(4),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   SizedBox(height: 24.h),
                   
                   // Submit Button
@@ -265,12 +362,56 @@ class _SupportQnaScreenState extends State<SupportQnaScreen> with SingleTickerPr
                     width: double.infinity,
                     height: 50.h,
                     child: ElevatedButton(
-                      onPressed: () {
-                        if (textController.text.trim().isNotEmpty) {
-                          _submitMessage(selectedType, textController.text);
-                          Navigator.pop(context);
-                        }
-                      },
+                      onPressed: isUploading
+                          ? null
+                          : () async {
+                              final text = textController.text.trim();
+                              if (text.isEmpty) return;
+
+                              setModalState(() {
+                                isUploading = true;
+                              });
+
+                              String? uploadedImageUrl;
+                              if (selectedImage != null) {
+                                try {
+                                  final user = _supabase.auth.currentUser;
+                                  if (user != null) {
+                                    final bytes = await selectedImage!.readAsBytes();
+                                    final ext = selectedImage!.name.split('.').last;
+                                    final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+                                    final filePath = 'support/$fileName';
+
+                                    await _supabase.storage.from('cv_files').uploadBinary(
+                                      filePath,
+                                      bytes,
+                                      fileOptions: const FileOptions(
+                                        contentType: 'image/jpeg',
+                                        upsert: true,
+                                      ),
+                                    );
+
+                                    uploadedImageUrl = _supabase.storage.from('cv_files').getPublicUrl(filePath);
+                                  }
+                                } catch (e) {
+                                  debugPrint('Error uploading support image: $e');
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Erreur lors de l\'envoi de l\'image : $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                }
+                              }
+
+                              await _submitMessage(selectedType, text, imageUrl: uploadedImageUrl);
+                              
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFF97316),
                         elevation: 0,
@@ -278,14 +419,25 @@ class _SupportQnaScreenState extends State<SupportQnaScreen> with SingleTickerPr
                           borderRadius: BorderRadius.circular(14.r),
                         ),
                       ),
-                      child: Text(
-                        'Envoyer le message',
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: isUploading
+                          ? const Center(
+                              child: SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              'Envoyer le message',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -477,6 +629,40 @@ class _SupportQnaScreenState extends State<SupportQnaScreen> with SingleTickerPr
                     height: 1.4,
                   ),
                 ),
+                if (item['image_url'] != null && (item['image_url'] as String).isNotEmpty) ...[
+                  SizedBox(height: 12.h),
+                  GestureDetector(
+                    onTap: () => _showFullScreenImage(context, item['image_url']),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12.r),
+                      child: Image.network(
+                        item['image_url'],
+                        height: 180.h,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            height: 180.h,
+                            color: const Color(0xFFF1F5F9),
+                            child: const Center(
+                              child: CircularProgressIndicator(color: Color(0xFFF97316)),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 60.h,
+                            color: const Color(0xFFF1F5F9),
+                            child: const Center(
+                              child: Icon(Icons.broken_image, color: Colors.grey),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
                 
                 // Admin Reply Section
                 if (hasReply) ...[
@@ -526,6 +712,40 @@ class _SupportQnaScreenState extends State<SupportQnaScreen> with SingleTickerPr
                             height: 1.4,
                           ),
                         ),
+                        if (item['admin_image_url'] != null && (item['admin_image_url'] as String).isNotEmpty) ...[
+                          SizedBox(height: 10.h),
+                          GestureDetector(
+                            onTap: () => _showFullScreenImage(context, item['admin_image_url']),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10.r),
+                              child: Image.network(
+                                item['admin_image_url'],
+                                height: 150.h,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Container(
+                                    height: 150.h,
+                                    color: const Color(0xFFFFEDD5),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(color: Color(0xFFEA580C)),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 50.h,
+                                    color: const Color(0xFFFFEDD5),
+                                    child: const Center(
+                                      child: Icon(Icons.broken_image, color: Colors.grey),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -557,6 +777,46 @@ class _SupportQnaScreenState extends State<SupportQnaScreen> with SingleTickerPr
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 20.h),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              top: 10.h,
+              right: 10.w,
+              child: CircleAvatar(
+                backgroundColor: Colors.black.withOpacity(0.5),
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

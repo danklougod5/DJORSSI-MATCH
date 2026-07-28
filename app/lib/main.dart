@@ -10,9 +10,11 @@ import 'package:djossimatch/features/swipe/presentation/swipe_screen.dart';
 import 'package:djossimatch/features/matches/presentation/matches_screen.dart';
 import 'package:djossimatch/features/profile/presentation/profile_screen.dart';
 import 'package:djossimatch/features/cv_generator/screens/cv_list_screen.dart';
+import 'package:djossimatch/features/matches/presentation/chats_list_screen.dart';
 import 'package:djossimatch/core/routing/app_router.dart';
 import 'package:djossimatch/core/services/version_service.dart';
 import 'package:djossimatch/core/services/notification_service.dart';
+import 'package:djossimatch/core/services/profile_notifier.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:upgrader/upgrader.dart';
@@ -43,7 +45,7 @@ Future<void> main() async {
   // Initialisation de Firebase
   try {
     await Firebase.initializeApp(
-       options: DefaultFirebaseOptions.currentPlatform,
+      options: DefaultFirebaseOptions.currentPlatform,
     );
     await NotificationService.initialize();
   } catch (e) {
@@ -62,6 +64,7 @@ class DjorssiMatchApp extends StatefulWidget {
 
 class _DjorssiMatchAppState extends State<DjorssiMatchApp> {
   late final StreamSubscription<AuthState> _authSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _profileBlockSubscription;
 
   @override
   void initState() {
@@ -72,13 +75,41 @@ class _DjorssiMatchAppState extends State<DjorssiMatchApp> {
       final AuthChangeEvent event = data.event;
       if (event == AuthChangeEvent.passwordRecovery) {
         AppRouter.router.go('/reset-password');
+      } else if (event == AuthChangeEvent.signedIn) {
+        _subscribeToProfileBlock();
+      } else if (event == AuthChangeEvent.signedOut) {
+        _profileBlockSubscription?.cancel();
       }
     });
+
+    _subscribeToProfileBlock();
+  }
+
+  void _subscribeToProfileBlock() {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _profileBlockSubscription?.cancel();
+    _profileBlockSubscription = Supabase.instance.client
+        .from('profiles')
+        .stream(primaryKey: ['id'])
+        .eq('id', userId)
+        .listen((data) async {
+          if (data.isNotEmpty) {
+            final isBlocked = data.first['is_blocked'] == true;
+            if (isBlocked) {
+              debugPrint('*** PROFILE BLOCKED BY ADMIN: EJECTING USER ***');
+              await Supabase.instance.client.auth.signOut();
+              AppRouter.router.go('/auth');
+            }
+          }
+        });
   }
 
   @override
   void dispose() {
     _authSubscription.cancel();
+    _profileBlockSubscription?.cancel();
     super.dispose();
   }
 
@@ -102,7 +133,7 @@ class _DjorssiMatchAppState extends State<DjorssiMatchApp> {
             final mediaQuery = MediaQuery.of(context);
             final scale = mediaQuery.textScaler.clamp(
               minScaleFactor: 1.0,
-               maxScaleFactor: 1.15,
+              maxScaleFactor: 1.15,
             );
             return MediaQuery(
               data: mediaQuery.copyWith(textScaler: scale),
@@ -118,12 +149,15 @@ class _DjorssiMatchAppState extends State<DjorssiMatchApp> {
 class MainNavigationScreen extends StatefulWidget {
   final int initialIndex;
   final String? initialJobId;
-  const MainNavigationScreen({super.key, this.initialIndex = 0, this.initialJobId});
+  const MainNavigationScreen({
+    super.key,
+    this.initialIndex = 0,
+    this.initialJobId,
+  });
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
-
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late int _selectedIndex;
@@ -135,6 +169,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     // Écouter les changements Premium en temps réel
     VersionService.showPremiumNotifier.addListener(_onPremiumChanged);
+    ProfileNotifier.selectedTabNotifier.addListener(_onGlobalTabChanged);
     VersionService.listenToChanges();
 
     // Vérifier la version, demander la permission ATT et mettre à jour le token de notification
@@ -144,9 +179,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     });
   }
 
+  void _onGlobalTabChanged() {
+    if (mounted) {
+      setState(() {
+        _selectedIndex = ProfileNotifier.selectedTabNotifier.value;
+      });
+    }
+  }
+
   void _onPremiumChanged() {
     if (mounted) {
-      debugPrint('MainNav: showPremium a changé → ${VersionService.showPremium}');
+      debugPrint(
+        'MainNav: showPremium a changé → ${VersionService.showPremium}',
+      );
       setState(() {});
     }
   }
@@ -154,6 +199,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void dispose() {
     VersionService.showPremiumNotifier.removeListener(_onPremiumChanged);
+    ProfileNotifier.selectedTabNotifier.removeListener(_onGlobalTabChanged);
     super.dispose();
   }
 
@@ -191,84 +237,112 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             messages: UpgraderMessages(code: 'fr'),
           ),
           child: Scaffold(
-          body: Row(
-            children: [
-              if (isWide)
-                NavigationRail(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: _onItemTapped,
-                  labelType: NavigationRailLabelType.all,
-                  destinations: const [
-                    NavigationRailDestination(
-                      icon: Icon(Icons.swipe),
-                      label: Text('Offres'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.favorite),
-                      label: Text('Matches'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.description),
-                      label: Text('Mon CV'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.person),
-                      label: Text('Profil'),
-                    ),
-                  ],
-                ),
-              if (isWide) const VerticalDivider(thickness: 1, width: 1),
-              Expanded(
-                child: SafeArea(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: isWide ? 800 : double.infinity,
+            body: Row(
+              children: [
+                if (isWide)
+                  NavigationRail(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: _onItemTapped,
+                    labelType: NavigationRailLabelType.all,
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.swipe),
+                        label: Text('Offres'),
                       ),
-                      child: IndexedStack(
-                        index: _selectedIndex,
-                        children: [
-                          SwipeScreen(
-                            key: ValueKey('swipe_${VersionService.showPremium}_${widget.initialJobId}'),
-                            jobId: widget.initialJobId,
-                          ),
-                          MatchesScreen(key: ValueKey('matches_${VersionService.showPremium}')),
-                          CvListScreen(key: ValueKey('cv_list_${VersionService.showPremium}')),
-                          ProfileScreen(key: ValueKey('profile_${VersionService.showPremium}')),
-                        ],
+                      NavigationRailDestination(
+                        icon: Icon(Icons.favorite),
+                        label: Text('Matches'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.chat_bubble),
+                        label: Text('Messagerie'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.description),
+                        label: Text('Mon CV'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.person),
+                        label: Text('Profil'),
+                      ),
+                    ],
+                  ),
+                if (isWide) const VerticalDivider(thickness: 1, width: 1),
+                Expanded(
+                  child: SafeArea(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: isWide ? 800 : double.infinity,
+                        ),
+                        child: IndexedStack(
+                          index: _selectedIndex,
+                          children: [
+                            SwipeScreen(
+                              key: ValueKey(
+                                'swipe_${VersionService.showPremium}_${widget.initialJobId}',
+                              ),
+                              jobId: widget.initialJobId,
+                            ),
+                            MatchesScreen(
+                              key: ValueKey(
+                                'matches_${VersionService.showPremium}',
+                              ),
+                            ),
+                            ChatsListScreen(
+                              key: ValueKey(
+                                'chats_${VersionService.showPremium}',
+                              ),
+                              embedInNavBar: true,
+                            ),
+                            CvListScreen(
+                              key: ValueKey(
+                                'cv_list_${VersionService.showPremium}',
+                              ),
+                            ),
+                            ProfileScreen(
+                              key: ValueKey(
+                                'profile_${VersionService.showPremium}',
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
+            bottomNavigationBar: !isWide
+                ? NavigationBar(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: _onItemTapped,
+                    destinations: const [
+                      NavigationDestination(
+                        icon: Icon(Icons.swipe),
+                        label: 'Offres',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.favorite),
+                        label: 'Matches',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.chat_bubble),
+                        label: 'Messagerie',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.description),
+                        label: 'Mon CV',
+                      ),
+                      NavigationDestination(
+                        icon: Icon(Icons.person),
+                        label: 'Profil',
+                      ),
+                    ],
+                  )
+                : null,
           ),
-          bottomNavigationBar: !isWide
-              ? NavigationBar(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: _onItemTapped,
-                  destinations: const [
-                    NavigationDestination(
-                      icon: Icon(Icons.swipe),
-                      label: 'Offres',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.favorite),
-                      label: 'Matches',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.description),
-                      label: 'Mon CV',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.person),
-                      label: 'Profil',
-                    ),
-                  ],
-                )
-              : null,
-        ),
-      );
+        );
       },
     );
   }

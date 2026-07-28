@@ -12,7 +12,7 @@ import {
   BarChart3,
   ExternalLink
 } from 'lucide-react';
-import { formatLongDate } from '../../lib/dateUtils';
+import { formatEffectiveJobDeadline } from '../../lib/dateUtils';
 import { supabase } from '../../lib/supabase';
 
 interface JobMetricsTabProps {}
@@ -268,9 +268,9 @@ const JobMetricsTab: React.FC<JobMetricsTabProps> = () => {
                                   <MapPin size={9} /> {job.location}
                                 </span>
                               )}
-                              {job.deadline && (
+                              {formatEffectiveJobDeadline(job) && (
                                 <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1 shrink-0">
-                                  <Calendar size={9} /> {formatLongDate(job.deadline)}
+                                  <Calendar size={9} /> {formatEffectiveJobDeadline(job)}
                                 </span>
                               )}
                             </div>

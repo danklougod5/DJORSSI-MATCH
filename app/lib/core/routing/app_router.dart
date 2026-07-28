@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:djossimatch/features/auth/presentation/auth_screen.dart';
+import 'package:djossimatch/features/auth/presentation/recruiter_auth_screen.dart';
 import 'package:djossimatch/features/auth/presentation/onboarding_screen.dart';
 import 'package:djossimatch/features/splash/presentation/splash_screen.dart';
 import 'package:djossimatch/features/premium/presentation/premium_screen.dart';
@@ -12,7 +13,11 @@ import 'package:djossimatch/features/auth/presentation/recruiter_post_job_screen
 import 'package:djossimatch/features/profile/presentation/job_alerts_screen.dart';
 import 'package:djossimatch/features/profile/presentation/support_qna_screen.dart';
 import 'package:djossimatch/features/matches/presentation/match_details_screen.dart';
+import 'package:djossimatch/features/matches/presentation/chats_list_screen.dart';
+import 'package:djossimatch/features/matches/presentation/chat_screen.dart';
 import 'package:djossimatch/features/notifications/presentation/notification_screen.dart';
+import 'package:djossimatch/features/recruiter/presentation/recruiter_preview_screen.dart';
+import 'package:djossimatch/features/recruiter/presentation/recruiter_navigation_screen.dart';
 import 'package:djossimatch/core/services/version_service.dart';
 import 'package:djossimatch/main.dart'; // To access MainNavigationScreen
 import 'package:djossimatch/features/cv_generator/screens/cv_builder_screen.dart';
@@ -25,7 +30,8 @@ import 'package:flutter/material.dart';
 import 'package:djossimatch/features/cv_generator/models/cv_model.dart';
 
 class AppRouter {
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
   static final GoRouter router = GoRouter(
     navigatorKey: navigatorKey,
     initialLocation: '/splash',
@@ -51,13 +57,15 @@ class AppRouter {
       }
 
       if (!isAuth) {
-        // Not logged in -> can only be on Splash, Onboarding, Auth, OTP or RecruiterPost
+        // Not logged in -> can only be on Splash, Onboarding, Auth, RecruiterAuth, OTP or RecruiterPost
         if (state.matchedLocation != '/splash' &&
             state.matchedLocation != '/onboarding' &&
             state.matchedLocation != '/auth' &&
+            state.matchedLocation != '/recruiter-auth' &&
             state.matchedLocation != '/otp' &&
             state.matchedLocation != '/reset-password' &&
-            state.matchedLocation != '/recruiter-post') {
+            state.matchedLocation != '/recruiter-post' &&
+            state.matchedLocation != '/recruiter-preview') {
           return '/onboarding';
         }
         return null;
@@ -65,6 +73,7 @@ class AppRouter {
 
       // Logged in
       if (isGoingToAuth ||
+          state.matchedLocation == '/recruiter-auth' ||
           state.matchedLocation == '/onboarding' ||
           state.matchedLocation == '/otp') {
         return '/';
@@ -78,8 +87,63 @@ class AppRouter {
       ),
       GoRoute(path: '/auth', builder: (context, state) => const AuthScreen()),
       GoRoute(
+        path: '/recruiter-auth',
+        builder: (context, state) => const RecruiterAuthScreen(),
+      ),
+      GoRoute(
+        path: '/recruiter-preview',
+        builder: (context, state) => const RecruiterPreviewScreen(),
+      ),
+      GoRoute(
         path: '/recruiter-post',
         builder: (context, state) => const RecruiterPostJobScreen(),
+      ),
+      GoRoute(
+        path: '/recruiter-swipes',
+        builder: (context, state) {
+          final tab = state.uri.queryParameters['tab'];
+          final initialIndex = tab == 'profile'
+              ? 3
+              : (tab == 'post'
+                  ? 2
+                  : ((tab == 'chats' || tab == 'messagerie') ? 1 : 0));
+          return RecruiterNavigationScreen(initialIndex: initialIndex);
+        },
+      ),
+      GoRoute(
+        path: '/chats',
+        redirect: (context, state) async {
+          final currentUser = Supabase.instance.client.auth.currentUser;
+          if (currentUser != null) {
+            try {
+              final profile = await Supabase.instance.client
+                  .from('profiles')
+                  .select('is_recruiter')
+                  .eq('id', currentUser.id)
+                  .maybeSingle();
+              if (profile != null && profile['is_recruiter'] == true) {
+                return '/recruiter-swipes?tab=post';
+              }
+            } catch (e) {
+              debugPrint('Error checking role in /chats route: $e');
+            }
+          }
+          return null;
+        },
+        builder: (context, state) => const ChatsListScreen(),
+      ),
+      GoRoute(
+        path: '/chat/:chatId',
+        builder: (context, state) {
+          final chatId = state.pathParameters['chatId']!;
+          final extra = state.extra as Map<String, dynamic>?;
+          return ChatScreen(
+            chatId: chatId,
+            otherUserName: extra?['otherUserName'],
+            otherUserCompany: extra?['otherUserCompany'],
+            isRecruiter: extra?['isRecruiter'],
+          );
+        },
       ),
       GoRoute(
         path: '/reset-password',
@@ -92,6 +156,10 @@ class AppRouter {
           return OtpScreen(
             email: extras?['email'] ?? '',
             fullName: extras?['fullName'],
+            isRecruiter: extras?['isRecruiter'] ?? false,
+            companyName: extras?['companyName'],
+            companyIndustry: extras?['companyIndustry'],
+            companySize: extras?['companySize'],
           );
         },
       ),
@@ -132,9 +200,14 @@ class AppRouter {
           final tab = state.uri.queryParameters['tab'];
           final jobId = state.uri.queryParameters['job_id'];
           final initialIndex = tab == 'profile'
-              ? 3
-              : (tab == 'matches' ? 1 : (tab == 'cv' ? 2 : 0));
-          return MainNavigationScreen(initialIndex: initialIndex, initialJobId: jobId);
+              ? 4
+              : (tab == 'matches'
+                    ? 1
+                    : (tab == 'chats' ? 2 : (tab == 'cv' ? 3 : 0)));
+          return MainNavigationScreen(
+            initialIndex: initialIndex,
+            initialJobId: jobId,
+          );
         },
       ),
       // CV Generator: List of saved CVs (main entry point)
